@@ -1,0 +1,143 @@
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+
+client = TestClient(app)
+
+
+def auth_headers(email: str) -> dict[str, str]:
+    response = client.post(
+        "/v1/auth/register",
+        json={
+            "email": email,
+            "password": "StrongPass123",
+            "display_name": "Records Test",
+        },
+    )
+    assert response.status_code == 201
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+def restore_plan(headers: dict[str, str], product_id: str) -> None:
+    response = client.post(
+        "/v1/subscription/restore",
+        headers=headers,
+        json={"provider": "app_store", "product_id": product_id, "receipt": "dev-receipt"},
+    )
+    assert response.status_code == 200
+
+
+def test_records_today_requires_authentication() -> None:
+    response = client.get("/v1/records/today")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "not_authenticated"
+
+
+def test_records_today_returns_daily_summary_shape() -> None:
+    headers = auth_headers("records-summary@example.com")
+    client.post(
+        "/v1/me/onboarding",
+        headers=headers,
+        json={
+            "height_cm": 175,
+            "current_weight_kg": 72,
+            "age": 23,
+            "sex": "female",
+            "goal_label": "wedding fat loss",
+        },
+    )
+
+    response = client.get("/v1/records/today", headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["date"]
+    assert body["calories_range_kcal"] == [0, 0]
+    assert body["protein_floor_g"] == 115
+    assert body["weight_kg"] == 72
+    assert body["hunger_score"] is None
+    assert body["food_logs"] == []
+    assert body["workout_logs"] == []
+    assert "先拍照" in body["ai_summary"]
+
+
+def test_checkin_updates_today_weight_and_hunger() -> None:
+    headers = auth_headers("records-checkin@example.com")
+
+    response = client.post(
+        "/v1/checkins",
+        headers=headers,
+        json={
+            "weight_kg": 71.6,
+            "hunger_level": 7,
+            "mood_level": 5,
+            "craving_level": 8,
+            "notes": "training day",
+        },
+    )
+
+    assert response.status_code == 201
+    checkin = response.json()
+    assert checkin["weight_kg"] == 71.6
+    assert checkin["hunger_level"] == 7
+
+    today = client.get("/v1/records/today", headers=headers).json()
+    assert today["weight_kg"] == 71.6
+    assert today["hunger_score"] == 7
+    assert today["mood_score"] == 5
+    assert today["craving_score"] == 8
+
+
+def test_pro_workout_analysis_creates_pending_log_and_confirm_flow() -> None:
+    headers = auth_headers("records-workout@example.com")
+    restore_plan(headers, "fitmate.pro.monthly")
+
+    response = client.post(
+        "/v1/workouts/analyze",
+        headers=headers,
+        json={"text": "椭圆机 45 分钟，中高强度，然后练腿 35 分钟"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["workout_analysis"]["workout_log_id"]
+    assert body["workout_analysis"]["status"] == "pending"
+    assert body["workout_analysis"]["duration_minutes"] == 80
+    assert body["workout_analysis"]["calories_burned_range_kcal"] == [360, 560]
+
+    today = client.get("/v1/records/today", headers=headers).json()
+    assert len(today["workout_logs"]) == 1
+    assert today["workout_logs"][0]["status"] == "pending"
+
+    workout_log_id = body["workout_analysis"]["workout_log_id"]
+    edit = client.patch(
+        f"/v1/workouts/logs/{workout_log_id}",
+        headers=headers,
+        json={"duration_minutes": 75, "intensity": "medium"},
+    )
+    assert edit.status_code == 200
+    assert edit.json()["duration_minutes"] == 75
+    assert edit.json()["status"] == "edited"
+
+    confirm = client.post(f"/v1/workouts/logs/{workout_log_id}/confirm", headers=headers)
+    assert confirm.status_code == 200
+    assert confirm.json()["status"] == "confirmed"
+
+
+def test_free_workout_analysis_does_not_auto_create_log() -> None:
+    headers = auth_headers("records-free-workout@example.com")
+
+    response = client.post(
+        "/v1/workouts/analyze",
+        headers=headers,
+        json={"text": "跑步 30 分钟，轻松强度"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["workout_analysis"]["workout_log_id"] is None
+    assert body["workout_analysis"]["status"] == "analysis_only"
+    assert client.get("/v1/records/today", headers=headers).json()["workout_logs"] == []

@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "node16",
+    "moduleResolution": "node16",
+    "outDir": ".test-build",
+    "noEmit": false
+  },
+  "include": [
+    "src/domain/**/*.ts",
+    "src/services/**/*.ts",
+    "src/state/**/*.ts",
+    "src/storage/**/*.ts",
+    "src/tests/**/*.ts"
+  ]
+}

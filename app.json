@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "fitmate-ai-app",
+    "slug": "fitmate-ai-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "FitMate uses the camera to analyze meal photos for nutrition estimates.",
+        "NSPhotoLibraryUsageDescription": "FitMate uses selected meal photos to estimate calories and nutrition."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FitMate uses selected meal photos to estimate calories and nutrition.",
+          "cameraPermission": "FitMate uses the camera to analyze meal photos for nutrition estimates."
+        }
+      ]
+    ]
+  }
+}

@@ -1,0 +1,180 @@
+# Progress: FitMate AI MVP Engineering
+
+## Current State
+- **Last completed task:** Productionization Task 18 deployment environment checklist
+- **Current task:** Project formally migrated to permanent root
+- **Next task:** Continue all FitMate development from `C:\Users\jiang\Projects\fitmate-ai`
+
+## What's Been Done
+- Root `App.tsx` is now a minimal entry wrapper.
+- Prototype code lives in `src/FitMateApp.tsx`.
+- Shared navigation types live in `src/types.ts`.
+- Shared iPhone responsive theme constants live in `src/theme.ts`.
+- Prototype data for profile rows, drawer threads, and plan features lives in `src/mockData.ts`.
+- Shared styles now live in `src/styles.ts`.
+- Reusable UI building blocks now live in `src/components/ui.tsx`.
+- Screens now live in `src/screens/`.
+- Chat drawer and bottom panels now live in `src/overlays/`.
+- TypeScript verification passed after the screen and overlay split.
+- Typed domain models now live in `src/domain/models.ts`.
+- Central initial app state now lives in `src/state/appState.ts`.
+- Chat, records, subscription, settings, profile, and drawer data now read from typed app state instead of scattered mock constants.
+- TypeScript and iOS export verification passed after the state refactor.
+- Auth service contracts now live in `src/services/auth.ts`.
+- Subscription entitlement contracts now live in `src/services/subscription.ts`.
+- Runtime config stub now lives in `src/config/env.ts`.
+- TypeScript and iOS export verification passed after service contracts were added.
+- AI vision service contract now lives in `src/services/aiVision.ts`.
+- Xiaomi-first provider stub now lives in `src/services/providers/xiaomi.ts`.
+- Qwen fallback provider stub now lives in `src/services/providers/qwen.ts`.
+- TypeScript and iOS export verification passed after AI vision contracts were added.
+- Local store adapter now lives in `src/storage/localStore.ts`.
+- Persistence save/load helpers now live in `src/state/persistence.ts`.
+- TypeScript and iOS export verification passed after persistence stubs were added.
+- Zero-dependency logic test runner now lives in `src/tests/runLogicTests.ts`.
+- Test TypeScript config now lives in `tsconfig.test.json`.
+- `package.json` now includes `typecheck` and `test` scripts.
+- `npm.cmd test`, `npm.cmd run typecheck`, and iOS export verification passed.
+- Backend/API design now lives in `docs/backend-api-design-v0.2.md`.
+- Backend implementation task plan now lives in `docs/backend-task-plan-v0.1.md`.
+- Backend productionization task plan now lives in `docs/backend-productionization-task-plan-v0.1.md`.
+- FastAPI backend shell now lives in `backend/app/`.
+- Backend settings now read database, Redis, object storage, Xiaomi, and Qwen environment config.
+- Backend `/healthz` and `/v1/healthz` tests passed.
+- SQLAlchemy database models now cover users, profiles, subscriptions, usage counters, chat, food logs, workout logs, check-ins, memory items, safety events, notifications, and model-call logging.
+- Alembic initial migration now renders PostgreSQL SQL successfully.
+- PostgreSQL 18 is now running locally on `localhost:5432`.
+- Database `fitmate` and role `fitmate` are created for local development.
+- Alembic migration `upgrade head` applied successfully to the real local PostgreSQL database.
+- PostgreSQL table inspection confirmed 14 public tables.
+- Auth API now supports register, login, password reset request, and password reset confirm.
+- Auth service now has PBKDF2 password hashing and signed bearer-token generation.
+- Full backend test suite passed with 10 tests.
+- Profile API now supports authenticated `GET /v1/me`, `PATCH /v1/me/profile`, and `POST /v1/me/onboarding`.
+- Profile service stores body data, goal data, food preferences, training baseline, and risk flags behind the service boundary.
+- Full backend test suite passed with 13 tests.
+- Subscription API now supports `GET /v1/subscription`, `POST /v1/subscription/checkout`, `POST /v1/subscription/restore`, and `POST /v1/webhooks/app-store`.
+- Entitlement service now calculates Free, Pro, and Elite automatic-recording, memory-retention, priority-analysis, deep-review, and future high-confidence auto-confirm rights.
+- Fair-use decisions are backend-only and intentionally do not return concrete usage thresholds to the mobile app.
+- Full backend test suite passed with 19 tests.
+- Chat API now supports authenticated thread list, thread creation, thread message history, and text message send.
+- Chat messages are isolated per user, matching the right-swipe drawer privacy requirement.
+- Text assistant response currently uses a contract mock; provider routing starts in Backend Task 7.
+- Full backend test suite passed with 23 tests.
+- AI vision router now uses Xiaomi-first, retries malformed/failed Xiaomi responses once, falls back to Qwen, and validates required food-photo JSON ranges.
+- Low-confidence Xiaomi analysis now routes to Qwen fallback.
+- Real provider HTTP calls are still isolated behind Xiaomi/Qwen provider classes and are not wired to mobile keys.
+- Full backend test suite passed with 27 tests.
+- Food photo API now accepts authenticated multipart image uploads through `POST /v1/chat/photo`.
+- Food analysis responses now create a chat image message plus assistant `food_analysis` message.
+- Free users receive analysis-only results and do not get automatic food logs.
+- Pro users with automatic-recording entitlement receive pending food logs for confirmation.
+- Food logs now support list, confirm, edit, and discard API flows.
+- Full backend test suite passed with 31 tests.
+- Records API now supports authenticated `GET /v1/records/today`.
+- Check-in API now supports `POST /v1/checkins` for weight, hunger, mood, craving, and notes.
+- Workout API now supports text analysis, Pro/Elite pending auto-record creation, edit, and confirm flows.
+- Today's records summary now combines food logs, workout logs, check-ins, profile weight, protein floor, and AI summary text.
+- Full backend test suite passed with 36 tests.
+- Safety API now exposes a public disclaimer and authenticated risk-classification boundary.
+- Safety events are logged for restriction, laxative/purging, and self-harm keyword risks.
+- Privacy API now has authenticated export, food-photo deletion, and account-deletion placeholder jobs.
+- Admin metrics are protected by a backend admin secret and return safety-event plus model-usage metrics shape.
+- Full backend test suite passed with 42 tests.
+- Full backend test suite passed with 42 tests using the real local `DATABASE_URL`.
+- Repository protocols now live in `backend/app/repositories/protocols.py`.
+- Existing in-memory stores now satisfy repository contracts for auth, profile, subscription, chat, food logs, workout logs, check-ins, and safety events.
+- Full backend test suite passed with 43 tests using the real local `DATABASE_URL`.
+- SQLAlchemy repositories now persist auth, profile, subscription, chat, food logs, workout logs, check-ins, safety events, and model-call metrics against PostgreSQL.
+- Database repository tests passed with 7 tests using the real local `DATABASE_URL`.
+- Full backend test suite passed with 50 tests using the real local `DATABASE_URL`.
+- Runtime API dependencies now create request-scoped SQLAlchemy-backed services.
+- Auth, profile, subscription, chat, food, workout, records, safety, and admin routes now use database-backed services at runtime.
+- Database sessions now commit successful requests and roll back failed requests.
+- Test database cleanup now isolates persisted rows between tests.
+- Full backend test suite passed with 50 tests after runtime database wiring.
+- Object-storage protocol and local fake now live in `backend/app/storage/`.
+- Food-photo analysis now stores image bytes through the storage boundary and persists only object keys in chat messages and food logs.
+- Privacy photo deletion now calls the food-photo storage delete boundary and reports deleted photo count.
+- Storage boundary tests cover save/delete behavior, food upload object-key persistence, and photo deletion wiring.
+- Full backend test suite passed with 53 tests after Task 15.
+- Typed mobile backend API client now lives in `src/services/apiClient.ts`.
+- Mobile API client now covers auth, profile, subscription, chat, food photo/logs, records/check-ins, workouts, safety, and privacy backend contracts.
+- API client attaches bearer tokens, maps auth/subscription backend payloads into mobile domain types, and converts photo uploads to React Native `FormData` in the default fetch path.
+- `createFitMateServices` now preserves local mock fallback for prototype mode while exposing backend-backed services for integration mode.
+- `npm.cmd test` and `npm.cmd run typecheck` passed after Task 16.
+- Food vision router now accepts a model-call repository and records each Xiaomi/Qwen attempt.
+- Model-call logging now captures provider, model name, purpose, status, latency, estimated cost, and error code.
+- Fallback provider calls now use purpose `fallback`, feeding existing admin fallback-rate metrics.
+- Food-photo runtime dependency now creates a request-scoped vision router wired to `SqlAlchemyModelCallRepository`.
+- Full backend test suite passed with 53 tests after Task 17.
+- Deployment checklist now lives in `docs/deployment-checklist-v0.1.md`.
+- Environment template now lives in `.env.example`.
+- Deployment docs cover local, staging, and production startup, release gates, and secret ownership for AI providers, App Store, database, Redis, object storage, and admin access.
+- Backend productionization task plan is now marked complete with 8 of 8 tasks done.
+- Xiaomi and Qwen backend vision provider adapters now use an OpenAI-compatible chat completions request shape.
+- Provider adapters read API keys, base URLs, and model names from backend environment variables only.
+- Provider adapters send multimodal text+image requests with JSON response format and parse returned JSON content.
+- Provider tests cover Xiaomi request shape, Qwen/DashScope environment mapping, missing API key errors, and invalid JSON responses.
+- Full backend test suite passed with 57 tests after provider adapters.
+- Mobile app runtime config now reads `EXPO_PUBLIC_API_BASE_URL`, `EXPO_PUBLIC_APP_ENV`, and `EXPO_PUBLIC_USE_MOCK_API`.
+- `createFitMateServices` now stores the backend login token and reuses it for subsequent authenticated API requests.
+- `loadAppDataFromBackend` now maps backend `/me`, `/subscription`, `/chat/threads`, and `/records/today` payloads into the existing UI state shape.
+- Login flow now calls the configured auth service; in backend mode it hydrates UI state after login, while mock mode remains the default fallback.
+- `npm.cmd test` and `npm.cmd run typecheck` passed after the first mobile UI backend integration slice.
+- Mobile app action wiring now lives in `src/services/appActions.ts`.
+- Chat thread creation, chat text send, records check-ins, subscription restore, and settings privacy actions now call the shared action layer.
+- In backend mode, the action layer calls backend mutations; in mock mode, it preserves local prototype state updates.
+- Chat, Records, Subscription, and Settings screens now receive backend-aware actions from `FitMateApp`.
+- `npm.cmd test` and `npm.cmd run typecheck` passed after the remaining mobile UI action wiring.
+- `expo-image-picker` is now installed for native camera and photo-library selection.
+- Photo picker access now lives in `src/services/photoPicker.ts`, isolated behind a small `pickFoodPhoto` service.
+- Chat attachment actions now support camera capture and gallery selection, then call `actions.analyzeFoodPhoto`.
+- Food-photo action wiring now uploads through `api.food.analyzePhoto`, updates the active food analysis card, appends a record, and preserves mock-mode preview behavior.
+- iOS camera and photo-library permission text is configured in `app.json` and the Expo image-picker plugin.
+- `npm.cmd test`, `npm.cmd run typecheck`, and backend smoke `pytest tests/test_food_flow.py tests/test_records.py` passed after the food-photo picker/upload flow.
+- Local FastAPI backend is running on `http://127.0.0.1:8000` and LAN `http://192.168.1.71:8000`.
+- Expo Metro is running on `http://127.0.0.1:8081` with `EXPO_PUBLIC_API_BASE_URL=http://192.168.1.71:8000` and `EXPO_PUBLIC_USE_MOCK_API=false`.
+- Live HTTP smoke confirmed backend register, thread creation, check-in, and records read paths.
+- Mobile records hydration now supports the real backend `/records/today` top-level response shape as well as the earlier nested summary test shape.
+- `npm.cmd test` and `npm.cmd run typecheck` passed after the real records response mapping fix.
+- Backend was restarted with Xiaomi and Qwen provider keys injected into the process environment only; no secrets were written to project files.
+- Provider smoke uploaded a local PNG through `/v1/chat/photo` and received a successful `food_analysis` response via Qwen fallback.
+- Admin metrics confirmed model-call logging for Xiaomi primary attempts and Qwen fallback.
+- On-device smoke exposed prototype-only interaction gaps: fixed read-only auth/profile/chat inputs, invisible chat updates, silent async actions, non-clickable subscription cards, and check-in/profile actions without visible feedback.
+- Login now uses editable credentials and falls back to registration for a first local smoke account.
+- Chat now renders all messages, supports typed input, and shows sending/uploading status.
+- Subscription plans are fully tappable cards and show current selection/update status.
+- Records check-ins now show status and insert visible records.
+- Profile is editable and saves through the backend profile endpoint while updating local UI state.
+- `npm.cmd test` and `npm.cmd run typecheck` passed after the interaction blocker fixes.
+- Food analysis card now calls backend-backed food log confirm, edit-portion, and discard actions.
+- Mobile action layer now maps food log status changes back into active analysis, records, and chat feedback.
+- Free-user `analysis_only` photo responses are now represented distinctly instead of being treated as confirmed food logs.
+- Subagent scans identified remaining UX gaps: unimplemented file/craving shortcuts, non-selectable thread rows, forgot-password/onboarding prototype forms, and destructive-action confirmation.
+- `npm.cmd test` and `npm.cmd run typecheck` passed after food log action wiring.
+- Food analysis card confirm/edit/discard labels now state the exact result instead of reusing generic already-read copy.
+- Food log edit now opens an inline portion-note editor before saving the edit.
+- Food discard now marks the active card as discarded and removes the discarded food record from today's records.
+- Chat composer now uses keyboard avoidance so the input moves up with the on-screen keyboard.
+- Chat composer placeholder is now `询问 FitMate` and the input starts empty until the user types.
+- `npm.cmd test` and `npm.cmd run typecheck` passed after the food action UX and composer fixes.
+- Active food cards are now nullable: discard removes the confirmation card instead of leaving a discarded/pending card on screen.
+- Confirm/edit/discard now keep the active food card and today's records synchronized, including manually opened food records.
+- The portion editor hides the main AI composer while editing so only the selected food editor moves with the keyboard.
+- The Add Content panel now replaces `嘴馋急救` with `食物记录`, opening a manual food-record confirmation card.
+- Chat text responses can now surface a structured `food_analysis` payload into the same food confirmation card if the backend returns one.
+- Logic tests now cover manual food open, edit, confirm, and discard lifecycle.
+- `npm.cmd test` and `npm.cmd run typecheck` passed after the second on-device food UX fix.
+- FitMate AI is now formally rooted at `C:\Users\jiang\Projects\fitmate-ai`.
+- Project agent guidance now lives in `AGENTS.md` and `CLAUDE.md`.
+- Project memory now lives in `docs/project_notes/` with bugs, decisions, key facts, and work log files.
+- Migration copied source, backend, docs, Git metadata, iOS export artifacts, and FitMate work records from the old Codex session directory.
+- Generated dependency/cache/runtime folders were intentionally excluded from migration and regenerated where needed.
+- `npm.cmd install`, `npm.cmd test`, `npm.cmd run typecheck`, and `pytest backend\tests` passed from the new project root.
+
+## What's Next
+- Use the new project root for all future Codex, subagent, Git, GitHub, deployment, and testing work; then resume on-device smoke testing.
+
+## Blockers
+- None for local PostgreSQL migration verification.

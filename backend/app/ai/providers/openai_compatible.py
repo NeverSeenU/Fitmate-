@@ -1,0 +1,133 @@
+from __future__ import annotations
+
+import base64
+import json
+import urllib.error
+import urllib.request
+from typing import Protocol
+
+
+SYSTEM_PROMPT = (
+    "You are FitMate AI's food-photo nutrition analyst. Return valid JSON only. "
+    "Use calorie and macro ranges, never fake exact precision. Ask one concise "
+    "follow-up question when portion size, oil, sauce, or shared servings are unclear."
+)
+
+
+USER_PROMPT = (
+    "Analyze this food photo for a fat-loss coaching app. Required JSON fields: "
+    "meal_name, detected_items, calories_range_kcal, protein_g_range, carbs_g_range, "
+    "fat_g_range, confidence, needs_follow_up, follow_up_question, fat_loss_advice, "
+    "supportive_reply, safety_flags."
+)
+
+
+class JsonTransport(Protocol):
+    def post_json(
+        self,
+        url: str,
+        headers: dict[str, str],
+        payload: dict,
+        timeout_seconds: float,
+    ) -> dict:
+        ...
+
+
+class UrllibJsonTransport:
+    def post_json(
+        self,
+        url: str,
+        headers: dict[str, str],
+        payload: dict,
+        timeout_seconds: float,
+    ) -> dict:
+        data = json.dumps(payload).encode("utf-8")
+        request = urllib.request.Request(
+            url=url,
+            data=data,
+            headers=headers | {"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            raise RuntimeError(f"provider_http_{exc.code}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError("provider_network_error") from exc
+        except TimeoutError as exc:
+            raise TimeoutError("provider_timeout") from exc
+
+
+class OpenAICompatibleVisionProvider:
+    provider_name: str
+
+    def __init__(
+        self,
+        *,
+        provider_name: str,
+        model_name: str,
+        api_key: str | None,
+        base_url: str,
+        not_configured_error: str,
+        transport: JsonTransport | None = None,
+        timeout_seconds: float = 30,
+    ) -> None:
+        self.provider_name = provider_name
+        self.model_name = model_name
+        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
+        self.not_configured_error = not_configured_error
+        self.transport = transport or UrllibJsonTransport()
+        self.timeout_seconds = timeout_seconds
+
+    def analyze_food_photo(self, image_bytes: bytes, user_note: str | None = None) -> object:
+        if not self.api_key:
+            raise RuntimeError(self.not_configured_error)
+
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": self._user_text(user_note)},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64.b64encode(image_bytes).decode('ascii')}",
+                            },
+                        },
+                    ],
+                },
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.2,
+        }
+        response = self.transport.post_json(
+            url=f"{self.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            payload=payload,
+            timeout_seconds=self.timeout_seconds,
+        )
+        return self._extract_json_content(response)
+
+    def _user_text(self, user_note: str | None) -> str:
+        if not user_note:
+            return USER_PROMPT
+        return f"{USER_PROMPT}\n\nUser note: {user_note}"
+
+    def _extract_json_content(self, response: dict) -> object:
+        try:
+            content = response["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise ValueError("provider_response_missing_content") from exc
+        if isinstance(content, dict):
+            return content
+        if not isinstance(content, str):
+            raise ValueError("provider_response_content_invalid")
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise ValueError("provider_returned_invalid_json") from exc
