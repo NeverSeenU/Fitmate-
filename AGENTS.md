@@ -12,6 +12,7 @@
 | Human setup and repo map | `README.md` |
 | Current status | `docs/engineering/progress.md` |
 | Open task queue | `docs/engineering/backlog.md` |
+| Subagent roles and handoffs | `docs/engineering/team.md` |
 | Architecture and ownership | `docs/engineering/architecture.md` |
 | Commands and troubleshooting | `docs/engineering/runbook.md` |
 | Execution decisions | `docs/engineering/decisions.md` |
@@ -30,6 +31,7 @@
 ## Subagent Protocol
 
 - Main conversation owns product direction, prioritization, integration, and final verification.
+- Use `docs/engineering/team.md` to choose the right specialist role.
 - Subagents must receive owned files, acceptance criteria, out-of-scope notes, and a verification command.
 - Subagents may read any file but should edit only assigned owned files.
 - Before architecture changes, check `docs/engineering/decisions.md` and `docs/project_notes/decisions.md`.

@@ -31,3 +31,9 @@ This file records project-level execution decisions for the main conversation an
 - Date: 2026-05-13
 - Decision: real provider keys, GitHub tokens, database passwords beyond local templates, and App Store secrets must not be committed.
 - Consequence: `.env.example` may contain placeholders only; real `.env` files remain ignored.
+
+## ED-006: Fixed Six-Role Subagent Team
+
+- Date: 2026-05-13
+- Decision: FitMate uses six standing subagent roles: Frontend Lead, Backend Lead, AI/Vision Lead, QA Lead, DevOps Lead, and Product/PM Lead.
+- Consequence: the roles are operational templates, not permanent running agents. Main conversation launches the needed role per task using `docs/engineering/team.md`.

@@ -78,9 +78,10 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 1. Read `AGENTS.md` before using Codex or subagents.
 2. Check `docs/engineering/backlog.md` for the current task queue.
-3. Update `docs/engineering/progress.md` after meaningful work.
-4. Record important technical decisions in `docs/engineering/decisions.md`.
-5. Keep secrets out of committed files. Use `.env.example` only as a template.
+3. Use `docs/engineering/team.md` when assigning work to subagents.
+4. Update `docs/engineering/progress.md` after meaningful work.
+5. Record important technical decisions in `docs/engineering/decisions.md`.
+6. Keep secrets out of committed files. Use `.env.example` only as a template.
 
 ## GitHub
 
