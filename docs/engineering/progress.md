@@ -6,6 +6,8 @@
 - **Next task:** Continue all FitMate development from `C:\Users\jiang\Projects\fitmate-ai`
 
 ## What's Been Done
+- Project command system started with `README.md`, `AGENTS.md`, `docs/engineering/backlog.md`, `docs/engineering/architecture.md`, `docs/engineering/runbook.md`, and `docs/engineering/decisions.md`.
+- `AGENTS.md` now points agents to the command documents and defines subagent ownership, verification, and safety rules.
 - Root `App.tsx` is now a minimal entry wrapper.
 - Prototype code lives in `src/FitMateApp.tsx`.
 - Shared navigation types live in `src/types.ts`.
@@ -174,7 +176,7 @@
 - `npm.cmd install`, `npm.cmd test`, `npm.cmd run typecheck`, and `pytest backend\tests` passed from the new project root.
 
 ## What's Next
-- Use the new project root for all future Codex, subagent, Git, GitHub, deployment, and testing work; then resume on-device smoke testing.
+- Use `docs/engineering/backlog.md` as the formal task queue, then resume on-device smoke testing and production-readiness work.
 
 ## Blockers
 - None for local PostgreSQL migration verification.
