@@ -133,12 +133,15 @@ export function createBackendApi(options: ApiClientOptions = {}) {
       confirmLog: (foodLogId: string) => client.post(`/food/logs/${encodeURIComponent(foodLogId)}/confirm`, {}),
       patchLog: (foodLogId: string, payload: Record<string, unknown>) => client.patch(`/food/logs/${encodeURIComponent(foodLogId)}`, payload),
       discardLog: (foodLogId: string) => client.post(`/food/logs/${encodeURIComponent(foodLogId)}/discard`, {}),
+      deleteLog: (foodLogId: string) => client.delete(`/food/logs/${encodeURIComponent(foodLogId)}`),
     },
     records: {
       today: (date?: string) => (
         client.get(date ? `/records/today?date=${encodeURIComponent(date)}` : '/records/today') as ReturnType<BackendApiForAppData['records']['today']>
       ),
       createCheckin: (payload: Record<string, unknown>) => client.post('/checkins', payload),
+      patchCheckin: (checkinId: string, payload: Record<string, unknown>) => client.patch(`/checkins/${encodeURIComponent(checkinId)}`, payload),
+      deleteCheckin: (checkinId: string) => client.delete(`/checkins/${encodeURIComponent(checkinId)}`),
     },
     workouts: {
       analyze: (text: string) => client.post('/workouts/analyze', { text }),
@@ -287,6 +290,9 @@ class ApiClient {
     const response = await this.fetchImpl(this.url(path), init);
     if (!response.ok) {
       throw new ApiError(response.status, await readErrorDetail(response));
+    }
+    if (response.status === 204) {
+      return {};
     }
     return response.json();
   }

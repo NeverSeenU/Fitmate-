@@ -162,3 +162,7 @@ def test_confirm_edit_and_discard_food_log() -> None:
     discard_response = client.post(f"/v1/food/logs/{food_log_id}/discard", headers=headers)
     assert discard_response.status_code == 200
     assert discard_response.json()["status"] == "discarded"
+
+    delete_response = client.delete(f"/v1/food/logs/{food_log_id}", headers=headers)
+    assert delete_response.status_code == 204
+    assert client.get("/v1/food/logs", headers=headers).json()["food_logs"] == []

@@ -93,6 +93,18 @@ async function testApiClientAuthHeadersAndJsonBody() {
   assert(requests[0].init.body === JSON.stringify({ email: 'jason@example.com', password: 'StrongPass123' }), 'login must map identifier to backend email');
 }
 
+async function testApiClientHandlesEmptyDeleteResponses() {
+  const api = createBackendApi({
+    baseUrl: 'https://api.example.test',
+    getAccessToken: () => 'token-123',
+    fetchImpl: async () => emptyResponse(204),
+  });
+
+  const result = await api.food.deleteLog('food-1');
+
+  assert(JSON.stringify(result) === '{}', 'delete calls must tolerate 204 empty responses');
+}
+
 async function testApiClientMultipartPhotoUpload() {
   const requests: ApiRequestRecord[] = [];
   const api = createBackendApi({
@@ -357,6 +369,14 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
           calls.push(`checkin:${payload.weight_kg}:${payload.mood_level}`);
           return { id: 'checkin-live' };
         },
+        async patchCheckin(checkinId: string, payload: Record<string, unknown>) {
+          calls.push(`patchCheckin:${checkinId}:${payload.notes}`);
+          return { id: checkinId };
+        },
+        async deleteCheckin(checkinId: string) {
+          calls.push(`deleteCheckin:${checkinId}`);
+          return {};
+        },
       },
       food: {
         async analyzePhoto(input: {
@@ -396,6 +416,10 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
         async discardLog(foodLogId: string) {
           calls.push(`discardFood:${foodLogId}`);
           return { id: foodLogId, meal_name: 'Chicken bowl', status: 'discarded' };
+        },
+        async deleteLog(foodLogId: string) {
+          calls.push(`deleteFood:${foodLogId}`);
+          return {};
         },
       },
       subscription: {
@@ -521,6 +545,7 @@ async function run() {
   await testVisionFallback();
   await testPersistenceRoundTrip();
   await testApiClientAuthHeadersAndJsonBody();
+  await testApiClientHandlesEmptyDeleteResponses();
   await testApiClientMultipartPhotoUpload();
   await testMockFallbackServicesStayAvailable();
   await testBackendServiceFactoryReusesLoginToken();
@@ -541,6 +566,19 @@ function jsonResponse(payload: unknown) {
     },
     async text() {
       return JSON.stringify(payload);
+    },
+  };
+}
+
+function emptyResponse(status: number) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    async json() {
+      throw new Error('empty response body');
+    },
+    async text() {
+      return '';
     },
   };
 }

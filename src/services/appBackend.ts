@@ -27,6 +27,7 @@ export type BackendApiForAppData = {
       hunger_score?: number | null;
       food_logs?: Array<Record<string, unknown>>;
       workout_logs?: Array<Record<string, unknown>>;
+      checkins?: Array<Record<string, unknown>>;
     }>;
   };
 };
@@ -151,7 +152,33 @@ function mapRecords(
     text: `${numberValue(log.duration_minutes) ?? 0} min`,
     done: stringValue(log.status) === 'confirmed',
   }));
-  const nextRecords = [...foodRecords, ...workoutRecords];
+  const checkinRecords = (records.checkins ?? []).map((checkin) => {
+    const weight = numberValue(checkin.weight_kg);
+    const mood = numberValue(checkin.mood_level);
+    const hunger = numberValue(checkin.hunger_level);
+    const craving = numberValue(checkin.craving_level);
+    const kind = weight !== undefined ? 'weight' as const : 'mood' as const;
+    return {
+      id: stringValue(checkin.id) ?? 'checkin',
+      kind,
+      title: kind === 'weight' ? '体重打卡' : '心情日记',
+      status: '已记录',
+      text: [
+        weight !== undefined ? `${weight} kg` : null,
+        hunger !== undefined ? `饥饿 ${hunger}/10` : null,
+        mood !== undefined ? `心情 ${mood}/10` : null,
+        craving !== undefined ? `嘴馋 ${craving}/10` : null,
+        stringValue(checkin.notes),
+      ].filter(Boolean).join(' · '),
+      done: true,
+      weightKg: weight,
+      moodLevel: mood,
+      hungerLevel: hunger,
+      cravingLevel: craving,
+      detail: stringValue(checkin.notes),
+    };
+  });
+  const nextRecords = [...foodRecords, ...workoutRecords, ...checkinRecords];
   return nextRecords.length ? nextRecords : fallback.records;
 }
 

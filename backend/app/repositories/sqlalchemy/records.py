@@ -83,6 +83,14 @@ class SqlAlchemyFoodLogRepository:
         self.session.flush()
         return self._stored(db_log)
 
+    def delete(self, user_id: str, food_log_id: str) -> bool:
+        db_log = self.session.get(models.FoodLog, uuid.UUID(food_log_id))
+        if db_log is None or str(db_log.user_id) != user_id:
+            return False
+        self.session.delete(db_log)
+        self.session.flush()
+        return True
+
     def _stored(self, log: models.FoodLog) -> StoredFoodLog:
         return StoredFoodLog(
             id=str(log.id),
@@ -187,6 +195,12 @@ class SqlAlchemyCheckinRepository:
         self.session.flush()
         return self._stored(db_checkin)
 
+    def get_for_user(self, user_id: str, checkin_id: str) -> StoredCheckin | None:
+        db_checkin = self.session.get(models.Checkin, uuid.UUID(checkin_id))
+        if db_checkin is None or str(db_checkin.user_id) != user_id:
+            return None
+        return self._stored(db_checkin)
+
     def list_for_user(self, user_id: str, target_date: date | None = None) -> list[StoredCheckin]:
         query = select(models.Checkin).where(models.Checkin.user_id == uuid.UUID(user_id))
         if target_date is not None:
@@ -194,6 +208,27 @@ class SqlAlchemyCheckinRepository:
             query = query.where(models.Checkin.created_at >= start, models.Checkin.created_at < end)
         checkins = self.session.scalars(query.order_by(models.Checkin.created_at.desc())).all()
         return [self._stored(checkin) for checkin in checkins]
+
+    def save(self, checkin: StoredCheckin) -> StoredCheckin:
+        db_checkin = self.session.get(models.Checkin, uuid.UUID(checkin.id))
+        if db_checkin is None:
+            return self.create(checkin)
+
+        db_checkin.weight_kg = checkin.weight_kg
+        db_checkin.hunger_level = checkin.hunger_level
+        db_checkin.mood_level = checkin.mood_level
+        db_checkin.craving_level = checkin.craving_level
+        db_checkin.notes = checkin.notes
+        self.session.flush()
+        return self._stored(db_checkin)
+
+    def delete(self, user_id: str, checkin_id: str) -> bool:
+        db_checkin = self.session.get(models.Checkin, uuid.UUID(checkin_id))
+        if db_checkin is None or str(db_checkin.user_id) != user_id:
+            return False
+        self.session.delete(db_checkin)
+        self.session.flush()
+        return True
 
     def _stored(self, checkin: models.Checkin) -> StoredCheckin:
         return StoredCheckin(

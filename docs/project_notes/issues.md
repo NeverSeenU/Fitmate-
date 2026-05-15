@@ -17,3 +17,9 @@
 - **Status**: Completed
 - **Description**: Added full food-card editing for nutrition/detail fields, editable/deletable records, intake summary from confirmed food records, and form-based weight/mood check-ins.
 - **Notes**: `npm.cmd test` and `npm.cmd run typecheck` passed from `C:\Users\jiang\Projects\fitmate-ai`.
+
+## 2026-05-14 - Backend Persistence and Text Food Cards
+
+- **Status**: Completed
+- **Description**: Aligned food/check-in edit and delete flows with backend persistence, added check-in hydration into mobile records, and made explicit food text messages produce pending editable food cards.
+- **Notes**: `pytest backend\tests\test_chat.py backend\tests\test_food_flow.py backend\tests\test_records.py`, `npm.cmd run typecheck`, and `npm.cmd test` passed from `C:\Users\jiang\Projects\fitmate-ai`.

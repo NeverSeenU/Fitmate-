@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from pydantic import BaseModel, ConfigDict
 
 from app.ai.router import FoodVisionRouter
@@ -88,3 +88,11 @@ def discard_food_log(food_log_id: str, user: CurrentUser, service: FoodServiceDe
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="food_log_not_found")
     return result
+
+
+@router.delete("/food/logs/{food_log_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_food_log(food_log_id: str, user: CurrentUser, service: FoodServiceDependency) -> Response:
+    deleted = service.delete(user_id=user["id"], food_log_id=food_log_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="food_log_not_found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

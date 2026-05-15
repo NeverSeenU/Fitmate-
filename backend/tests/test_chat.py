@@ -78,6 +78,33 @@ def test_send_text_message_persists_user_and_mock_assistant_messages() -> None:
     assert [message["role"] for message in messages] == ["user", "assistant"]
     assert messages[0]["content_text"] == "训练后很饿，想吃甜品"
 
+def test_food_text_message_returns_editable_food_analysis_card() -> None:
+    headers = auth_headers("chat-food-card@example.com")
+    thread = client.post(
+        "/v1/chat/threads",
+        headers=headers,
+        json={"title": "Food log", "kind": "food"},
+    ).json()
+
+    response = client.post(
+        "/v1/chat/messages",
+        headers=headers,
+        json={
+            "thread_id": thread["id"],
+            "text": "我吃了半碗米饭和鸡胸肉",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["message"]["message_type"] == "food_analysis"
+    assert body["created_records"] == []
+    assert body["food_analysis"]["food_log_id"] is None
+    assert body["food_analysis"]["status"] == "pending"
+    assert body["food_analysis"]["meal_name"] == "半碗米饭和鸡胸肉"
+    assert body["food_analysis"]["calories_range_kcal"][1] > 0
+    assert body["food_analysis"]["protein_g_range"][1] > 0
+
 
 def test_user_cannot_read_another_users_thread_messages() -> None:
     owner_headers = auth_headers("thread-owner@example.com")

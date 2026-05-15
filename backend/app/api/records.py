@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import CurrentUser, get_records_service
@@ -34,3 +34,28 @@ def create_checkin(payload: CheckinRequest, user: CurrentUser, service: RecordsS
         user_id=user["id"],
         data=payload.model_dump(exclude_unset=True),
     )
+
+
+@router.patch("/checkins/{checkin_id}")
+def patch_checkin(
+    checkin_id: str,
+    payload: CheckinRequest,
+    user: CurrentUser,
+    service: RecordsServiceDependency,
+) -> dict:
+    result = service.patch_checkin(
+        user_id=user["id"],
+        checkin_id=checkin_id,
+        data=payload.model_dump(exclude_unset=True),
+    )
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checkin_not_found")
+    return result
+
+
+@router.delete("/checkins/{checkin_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_checkin(checkin_id: str, user: CurrentUser, service: RecordsServiceDependency) -> Response:
+    deleted = service.delete_checkin(user_id=user["id"], checkin_id=checkin_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checkin_not_found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

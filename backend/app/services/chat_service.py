@@ -96,6 +96,7 @@ class ChatService:
         thread = self.store.get_thread(user_id, thread_id)
         if thread is None:
             return None
+        food_analysis = self._text_food_analysis(text)
         self.store.add_message(
             StoredMessage(
                 id=str(uuid.uuid4()),
@@ -113,18 +114,121 @@ class ChatService:
                 thread_id=thread_id,
                 user_id=user_id,
                 role="assistant",
-                message_type="text",
-                content_text=self._mock_ai_response(text),
+                message_type="food_analysis" if food_analysis else "text",
+                content_text=(
+                    "我先把这顿生成一张可编辑食物卡片。你确认热量和份量后，再写入今日记录。"
+                    if food_analysis
+                    else self._mock_ai_response(text)
+                ),
+                structured_json={"food_analysis": food_analysis} if food_analysis else None,
                 model_provider="mock",
-                model_name="fitmate-contract-mock",
+                model_name="fitmate-text-food-card" if food_analysis else "fitmate-contract-mock",
             )
         )
-        return {"message": self._message_response(assistant_message), "created_records": []}
+        response = {"message": self._message_response(assistant_message), "created_records": []}
+        if food_analysis:
+            response["food_analysis"] = food_analysis
+        return response
 
     def _mock_ai_response(self, text: str) -> str:
         if "甜" in text or "饿" in text:
             return "先喝水，等 10 分钟；如果还饿，选高蛋白小份。你不是没自控力，是训练后身体需要恢复。"
         return "我先帮你记录重点，再给你一个可执行的小步骤。"
+
+    def _text_food_analysis(self, text: str) -> dict[str, Any] | None:
+        if not self._looks_like_food_log(text):
+            return None
+        calories = self._estimate_calories(text)
+        protein = self._estimate_protein(text)
+        carbs = self._estimate_carbs(text)
+        fat = self._estimate_fat(text)
+        return {
+            "food_log_id": None,
+            "meal_name": self._meal_name_from_text(text),
+            "calories_range_kcal": [max(calories - 80, 0), calories + 80],
+            "protein_g_range": [max(protein - 8, 0), protein + 8],
+            "carbs_g_range": [max(carbs - 12, 0), carbs + 12],
+            "fat_g_range": [max(fat - 6, 0), fat + 6],
+            "confidence": 0.55,
+            "status": "pending",
+            "needs_follow_up": False,
+            "follow_up_question": None,
+            "model_provider": "mock",
+            "model_name": "fitmate-text-food-card",
+        }
+
+    def _looks_like_food_log(self, text: str) -> bool:
+        if any(marker in text for marker in ["想吃", "嘴馋", "很饿"]):
+            return False
+        if any(marker in text for marker in ["吃了", "喝了", "早餐", "午餐", "晚餐", "夜宵"]):
+            return True
+        food_terms = [
+            "米饭",
+            "鸡胸",
+            "牛肉",
+            "鱼",
+            "鸡蛋",
+            "面",
+            "饭",
+            "沙拉",
+            "火锅",
+            "奶茶",
+            "咖啡",
+            "拿铁",
+            "蛋白",
+        ]
+        return any(term in text for term in food_terms)
+
+    def _meal_name_from_text(self, text: str) -> str:
+        meal_name = text.strip()
+        for prefix in ["我吃了", "吃了", "我喝了", "喝了"]:
+            if meal_name.startswith(prefix):
+                meal_name = meal_name[len(prefix):].strip()
+        return meal_name[:28] or "文字食物记录"
+
+    def _estimate_calories(self, text: str) -> int:
+        calories = 320
+        if "米饭" in text or "饭" in text:
+            calories += 180
+        if "面" in text:
+            calories += 260
+        if "奶茶" in text:
+            calories += 300
+        if "火锅" in text:
+            calories += 500
+        if "半" in text:
+            calories -= 80
+        return max(calories, 120)
+
+    def _estimate_protein(self, text: str) -> int:
+        protein = 12
+        if any(term in text for term in ["鸡胸", "牛肉", "鱼"]):
+            protein += 28
+        if any(term in text for term in ["鸡蛋", "蛋白"]):
+            protein += 10
+        return protein
+
+    def _estimate_carbs(self, text: str) -> int:
+        carbs = 25
+        if "米饭" in text or "饭" in text:
+            carbs += 45
+        if "面" in text:
+            carbs += 60
+        if "奶茶" in text:
+            carbs += 45
+        if "半" in text:
+            carbs -= 15
+        return max(carbs, 8)
+
+    def _estimate_fat(self, text: str) -> int:
+        fat = 10
+        if "火锅" in text:
+            fat += 35
+        if "牛肉" in text:
+            fat += 12
+        if "奶茶" in text or "拿铁" in text:
+            fat += 10
+        return fat
 
     def _thread_response(self, thread: StoredThread) -> dict:
         data = asdict(thread)

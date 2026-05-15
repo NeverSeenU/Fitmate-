@@ -58,6 +58,13 @@ class InMemoryFoodLogStore:
         self.logs_by_id[log.id] = log
         return log
 
+    def delete(self, user_id: str, food_log_id: str) -> bool:
+        log = self.get_for_user(user_id, food_log_id)
+        if log is None:
+            return False
+        del self.logs_by_id[food_log_id]
+        return True
+
 
 class FoodService:
     def __init__(
@@ -185,6 +192,9 @@ class FoodService:
             return None
         log.status = "discarded"
         return self._log_response(self.store.save(log))
+
+    def delete(self, user_id: str, food_log_id: str) -> bool:
+        return self.store.delete(user_id, food_log_id)
 
     def delete_user_photos(self, user_id: str) -> int:
         deleted_count = 0

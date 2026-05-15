@@ -17,12 +17,15 @@ type AppActionsApi = {
   };
   records: {
     createCheckin(payload: Record<string, unknown>): Promise<unknown>;
+    patchCheckin(checkinId: string, payload: Record<string, unknown>): Promise<unknown>;
+    deleteCheckin(checkinId: string): Promise<unknown>;
   };
   food: {
     analyzePhoto(input: PhotoUploadInput): Promise<FoodPhotoAnalysisResponse>;
     confirmLog(foodLogId: string): Promise<unknown>;
     patchLog(foodLogId: string, payload: Record<string, unknown>): Promise<unknown>;
     discardLog(foodLogId: string): Promise<unknown>;
+    deleteLog(foodLogId: string): Promise<unknown>;
   };
   subscription: {
     restore(payload: { provider: string; productId: string; receipt: string }): Promise<{
@@ -159,14 +162,15 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
     },
 
     async createCheckin(input: CheckinInput) {
+      let backendCheckin: { id?: string } | undefined;
       if (api) {
-        await api.records.createCheckin({
+        backendCheckin = await api.records.createCheckin({
           weight_kg: input.weightKg,
           hunger_level: input.hungerLevel,
           mood_level: input.moodLevel,
           craving_level: input.cravingLevel,
           notes: input.notes,
-        });
+        }) as { id?: string };
       }
       const state = getState();
       const title = input.weightKg !== undefined ? '体重打卡' : '心情日记';
@@ -186,7 +190,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         },
         records: [
           {
-            id: `checkin-${Date.now()}`,
+            id: backendCheckin?.id ?? `checkin-${Date.now()}`,
             kind: input.weightKg !== undefined ? 'weight' : 'mood',
             title,
             status: '已记录',
@@ -243,6 +247,25 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
 
     async updateRecord(recordId: string, input: Partial<FoodLogEditInput & CheckinInput & { title: string; detail: string }>) {
       const state = getState();
+      const record = state.records.find((item) => item.id === recordId);
+      if (api && record?.kind === 'food' && !isLocalOnlyFoodLog(recordId)) {
+        await api.food.patchLog(recordId, {
+          meal_name: input.title,
+          calories_range_kcal: input.caloriesKcal !== undefined ? [input.caloriesKcal, input.caloriesKcal] : undefined,
+          protein_g_range: input.proteinG !== undefined ? [input.proteinG, input.proteinG] : undefined,
+          carbs_g_range: input.carbsG !== undefined ? [input.carbsG, input.carbsG] : undefined,
+          fat_g_range: input.fatG !== undefined ? [input.fatG, input.fatG] : undefined,
+          user_portion_note: input.detail,
+        });
+      } else if (api && record && (record.kind === 'weight' || record.kind === 'mood' || record.kind === 'checkin')) {
+        await api.records.patchCheckin(recordId, {
+          weight_kg: input.weightKg,
+          hunger_level: input.hungerLevel,
+          mood_level: input.moodLevel,
+          craving_level: input.cravingLevel,
+          notes: input.detail ?? input.notes,
+        });
+      }
       setState({
         ...state,
         records: state.records.map((record) => {
@@ -287,6 +310,12 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
 
     async deleteRecord(recordId: string) {
       const state = getState();
+      const record = state.records.find((item) => item.id === recordId);
+      if (api && record?.kind === 'food' && !isLocalOnlyFoodLog(recordId)) {
+        await api.food.deleteLog(recordId);
+      } else if (api && record && (record.kind === 'weight' || record.kind === 'mood' || record.kind === 'checkin')) {
+        await api.records.deleteCheckin(recordId);
+      }
       setState({
         ...state,
         activeFoodAnalysis: state.activeFoodAnalysis?.id === recordId ? null : state.activeFoodAnalysis,

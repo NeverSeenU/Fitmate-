@@ -30,11 +30,28 @@ class InMemoryCheckinStore:
         self.checkins_by_id[checkin.id] = checkin
         return checkin
 
+    def get_for_user(self, user_id: str, checkin_id: str) -> StoredCheckin | None:
+        checkin = self.checkins_by_id.get(checkin_id)
+        if checkin is None or checkin.user_id != user_id:
+            return None
+        return checkin
+
     def list_for_user(self, user_id: str, target_date: date | None = None) -> list[StoredCheckin]:
         checkins = [checkin for checkin in self.checkins_by_id.values() if checkin.user_id == user_id]
         if target_date is not None:
             checkins = [checkin for checkin in checkins if checkin.created_at.date() == target_date]
         return sorted(checkins, key=lambda checkin: checkin.created_at, reverse=True)
+
+    def save(self, checkin: StoredCheckin) -> StoredCheckin:
+        self.checkins_by_id[checkin.id] = checkin
+        return checkin
+
+    def delete(self, user_id: str, checkin_id: str) -> bool:
+        checkin = self.get_for_user(user_id, checkin_id)
+        if checkin is None:
+            return False
+        del self.checkins_by_id[checkin_id]
+        return True
 
 
 class RecordsService:
@@ -63,6 +80,18 @@ class RecordsService:
             )
         )
         return self._checkin_response(checkin)
+
+    def patch_checkin(self, user_id: str, checkin_id: str, data: dict) -> dict | None:
+        checkin = self.store.get_for_user(user_id, checkin_id)
+        if checkin is None:
+            return None
+        for key in ["weight_kg", "hunger_level", "mood_level", "craving_level", "notes"]:
+            if key in data:
+                setattr(checkin, key, data[key])
+        return self._checkin_response(self.store.save(checkin))
+
+    def delete_checkin(self, user_id: str, checkin_id: str) -> bool:
+        return self.store.delete(user_id, checkin_id)
 
     def today(self, user_id: str, target_date: date | None = None) -> dict:
         summary_date = target_date or datetime.now(timezone.utc).date()

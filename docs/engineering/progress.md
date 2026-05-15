@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Food card nutrition editor and records editing UX completed
-- **Next task:** On-device smoke test food edit, records edit/delete, intake summary, weight check-in, and mood diary
+- **Current task:** Backend persistence alignment and text-to-food-card flow completed
+- **Next task:** On-device smoke test using `docs/engineering/smoke-checklist.md`, then harden safety and production readiness backlog items
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -184,9 +184,16 @@
 - Mood check-in is now a mood diary form with mood, hunger, craving scores, and detailed notes.
 - Mobile logic tests now cover food detail editing, record-page nutrition edits, and record deletion.
 - `npm.cmd test` and `npm.cmd run typecheck` passed after the food card and records UX work.
+- Food logs now support backend delete, so discard/delete can remove persisted records instead of only changing local UI state.
+- Check-ins now support backend list, edit, and delete through repository/service/API layers.
+- Mobile action wiring now calls backend food/check-in edit and delete endpoints while preserving mock-mode behavior.
+- Backend records hydration now maps check-ins into mobile records so weight and mood diary entries survive backend reload.
+- Text chat can now return a structured pending `food_analysis` payload for explicit food-log messages, feeding the same editable food card flow as photo/manual records.
+- Smoke checklist now lives in `docs/engineering/smoke-checklist.md`.
+- `pytest backend\tests\test_chat.py backend\tests\test_food_flow.py backend\tests\test_records.py`, `npm.cmd run typecheck`, and `npm.cmd test` passed after backend persistence and text food-card work.
 
 ## What's Next
-- Use `docs/engineering/team.md` and `docs/engineering/backlog.md` to assign the next implementation task, then resume on-device smoke testing and production-readiness work.
+- Run the Expo Go smoke checklist against the local backend. After that, start P1 safety and production readiness work from `docs/engineering/backlog.md`.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

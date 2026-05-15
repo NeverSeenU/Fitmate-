@@ -91,6 +91,49 @@ def test_checkin_updates_today_weight_and_hunger() -> None:
     assert today["craving_score"] == 8
 
 
+def test_checkin_patch_and_delete_flow() -> None:
+    headers = auth_headers("records-edit-checkin@example.com")
+
+    created = client.post(
+        "/v1/checkins",
+        headers=headers,
+        json={
+            "weight_kg": 72,
+            "hunger_level": 4,
+            "mood_level": 5,
+            "craving_level": 3,
+            "notes": "morning",
+        },
+    )
+    assert created.status_code == 201
+    checkin_id = created.json()["id"]
+
+    patched = client.patch(
+        f"/v1/checkins/{checkin_id}",
+        headers=headers,
+        json={
+            "weight_kg": 71.4,
+            "hunger_level": 6,
+            "mood_level": 8,
+            "craving_level": 2,
+            "notes": "edited diary",
+        },
+    )
+    assert patched.status_code == 200
+    assert patched.json()["weight_kg"] == 71.4
+    assert patched.json()["mood_level"] == 8
+    assert patched.json()["notes"] == "edited diary"
+
+    today = client.get("/v1/records/today", headers=headers).json()
+    assert today["weight_kg"] == 71.4
+    assert today["hunger_score"] == 6
+    assert today["checkins"][0]["id"] == checkin_id
+
+    deleted = client.delete(f"/v1/checkins/{checkin_id}", headers=headers)
+    assert deleted.status_code == 204
+    assert client.get("/v1/records/today", headers=headers).json()["checkins"] == []
+
+
 def test_pro_workout_analysis_creates_pending_log_and_confirm_flow() -> None:
     headers = auth_headers("records-workout@example.com")
     restore_plan(headers, "fitmate.pro.monthly")
