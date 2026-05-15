@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Backend persistence alignment and text-to-food-card flow completed
-- **Next task:** On-device smoke test using `docs/engineering/smoke-checklist.md`, then harden safety and production readiness backlog items
+- **Current task:** Safe test database guard completed
+- **Next task:** Backend secret baseline, then CI quality gates
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -191,9 +191,13 @@
 - Text chat can now return a structured pending `food_analysis` payload for explicit food-log messages, feeding the same editable food card flow as photo/manual records.
 - Smoke checklist now lives in `docs/engineering/smoke-checklist.md`.
 - `pytest backend\tests\test_chat.py backend\tests\test_food_flow.py backend\tests\test_records.py`, `npm.cmd run typecheck`, and `npm.cmd test` passed after backend persistence and text food-card work.
+- Backend test cleanup now refuses destructive truncation unless the environment is local/test and the database target is an approved localhost FitMate database.
+- Test database guard coverage now lives in `backend/tests/test_database_guard.py`.
+- Runbook and `.env.example` now document the local/test database cleanup boundary.
+- `pytest backend\tests`, `npm.cmd run typecheck`, and `npm.cmd test` passed after the safe test database guard.
 
 ## What's Next
-- Run the Expo Go smoke checklist against the local backend. After that, start P1 safety and production readiness work from `docs/engineering/backlog.md`.
+- Continue P1 safety and production readiness work with backend secret hardening, then GitHub CI quality gates.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

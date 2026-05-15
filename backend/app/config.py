@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import os
+from urllib.parse import urlparse
 
 
 @dataclass(frozen=True)
@@ -36,3 +37,25 @@ def get_settings() -> Settings:
             os.getenv("ACCESS_TOKEN_MINUTES", str(Settings.access_token_minutes))
         ),
     )
+
+
+def assert_safe_test_database_cleanup(settings: Settings) -> None:
+    parsed = urlparse(settings.database_url)
+    environment = settings.environment.lower()
+    database_name = parsed.path.lstrip("/")
+    hostname = (parsed.hostname or "").lower()
+    username = parsed.username or ""
+    safe_environments = {"local", "test"}
+    safe_hosts = {"", "localhost", "127.0.0.1", "::1"}
+    safe_database_names = {"fitmate", "fitmate_local", "fitmate_test"}
+
+    if (
+        environment not in safe_environments
+        or hostname not in safe_hosts
+        or username != "fitmate"
+        or database_name not in safe_database_names
+    ):
+        raise RuntimeError(
+            "Unsafe test database cleanup refused: set FITMATE_ENV=local or test, "
+            "use a localhost database, and target an approved FitMate local database."
+        )

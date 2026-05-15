@@ -1,13 +1,19 @@
 from collections.abc import Generator
+import os
 
 import pytest
 from sqlalchemy import text
 
+os.environ.setdefault("FITMATE_ENV", "local")
+
+from app.config import assert_safe_test_database_cleanup
 from app.db.session import SessionLocal
+from app.db.session import settings as db_settings
 
 
 @pytest.fixture(autouse=True)
 def clean_database() -> Generator[None, None, None]:
+    assert_safe_test_database_cleanup(db_settings)
     with SessionLocal() as session:
         session.execute(
             text(

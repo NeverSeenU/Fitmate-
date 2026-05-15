@@ -16,12 +16,6 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ## Priority 1: Safety And Production Readiness
 
-### P1-1: Safe Test Database Guard
-- Owner: Backend Lead / QA Lead
-- Files: `backend/tests/conftest.py`, `backend/app/config.py`, `.env.example`, `docs/engineering/runbook.md`
-- Problem: backend tests truncate tables through the configured database URL.
-- Done when: destructive test cleanup refuses to run unless the environment is explicitly test/local and the database name is safe.
-
 ### P1-2: Backend Secret Baseline
 - Owner: Backend Lead
 - Files: `backend/app/config.py`, `backend/app/api/auth.py`, `backend/app/api/admin.py`, `backend/app/services/auth_service.py`

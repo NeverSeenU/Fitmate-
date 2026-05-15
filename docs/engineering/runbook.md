@@ -85,6 +85,7 @@ Important local variables:
 
 ```text
 DATABASE_URL=postgresql+psycopg://fitmate:fitmate@localhost:5432/fitmate
+FITMATE_ENV=local
 EXPO_PUBLIC_API_BASE_URL=http://localhost:8000
 EXPO_PUBLIC_USE_MOCK_API=true
 ```
@@ -143,7 +144,14 @@ Only use history-rewrite commands after confirming the branch has not been share
 
 ### Backend Tests Risk Real Data
 
-Do not run backend tests against staging or production databases. Add or verify a test-database guard before expanding destructive cleanup behavior.
+Backend tests truncate application tables before each test. The test fixture now refuses cleanup unless:
+
+- `FITMATE_ENV` is `local` or `test`
+- `DATABASE_URL` points to localhost
+- the database user is `fitmate`
+- the database name is one of the approved local FitMate database names
+
+Do not bypass this guard for staging or production databases.
 
 ### Expo Cannot Reach Backend On Device
 

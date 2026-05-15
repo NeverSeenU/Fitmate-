@@ -23,3 +23,9 @@
 - **Status**: Completed
 - **Description**: Aligned food/check-in edit and delete flows with backend persistence, added check-in hydration into mobile records, and made explicit food text messages produce pending editable food cards.
 - **Notes**: `pytest backend\tests\test_chat.py backend\tests\test_food_flow.py backend\tests\test_records.py`, `npm.cmd run typecheck`, and `npm.cmd test` passed from `C:\Users\jiang\Projects\fitmate-ai`.
+
+## 2026-05-14 - Safe Test Database Guard
+
+- **Status**: Completed
+- **Description**: Added a backend test cleanup guard that refuses destructive table truncation unless the environment is local/test and the database target is an approved localhost FitMate database.
+- **Notes**: `pytest backend\tests`, `npm.cmd run typecheck`, and `npm.cmd test` passed from `C:\Users\jiang\Projects\fitmate-ai`.
