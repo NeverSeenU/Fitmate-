@@ -16,11 +16,6 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ## Priority 1: Safety And Production Readiness
 
-### P1-3: CI Quality Gates
-- Owner: DevOps Lead / QA Lead
-- Files: `.github/workflows/*`, `package.json`, `backend/pyproject.toml`
-- Done when: GitHub Actions runs TypeScript typecheck, mobile logic tests, backend pytest, and Alembic SQL rendering on pull requests.
-
 ## Priority 2: Core Product Stabilization
 
 ### P2-1: On-Device Smoke Test Pass

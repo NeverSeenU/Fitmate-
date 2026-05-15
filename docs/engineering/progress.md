@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Backend secret baseline completed
-- **Next task:** GitHub CI quality gates
+- **Current task:** GitHub CI quality gates completed
+- **Next task:** On-device smoke test pass, then AI photo path hardening
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -199,9 +199,12 @@
 - Password reset requests now hide `debug_reset_token` outside development/local/test runtimes.
 - Runtime security tests now live in `backend/tests/test_config_security.py`, and auth tests cover production password-reset response behavior.
 - `pytest backend\tests`, `npm.cmd run typecheck`, and `npm.cmd test` passed after the backend secret baseline.
+- GitHub Actions quality gates now live in `.github/workflows/quality-gates.yml`.
+- CI runs mobile `npm ci`, TypeScript typecheck, mobile logic tests, backend pytest against a PostgreSQL service, and Alembic SQL rendering on pushes and pull requests to `main`.
+- `pytest backend\tests`, `npm.cmd run typecheck`, `npm.cmd test`, and `python -m alembic upgrade head --sql` passed after adding CI.
 
 ## What's Next
-- Continue P1 safety and production readiness work with GitHub CI quality gates.
+- Resume P2 product stabilization with the Expo Go smoke checklist, then harden the AI photo path.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

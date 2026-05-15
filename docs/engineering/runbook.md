@@ -70,6 +70,15 @@ cd backend
 alembic upgrade head --sql
 ```
 
+GitHub CI runs the same backend and mobile quality gates on pushes and pull requests to `main`:
+
+- `npm ci`
+- `npm run typecheck`
+- `npm test`
+- `python -m pip install -e "backend[dev]"`
+- `python -m pytest backend/tests`
+- `python -m alembic upgrade head --sql`
+
 Start backend:
 
 ```powershell

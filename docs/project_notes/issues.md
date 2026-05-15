@@ -35,3 +35,9 @@
 - **Status**: Completed
 - **Description**: Added production runtime validation for auth/admin secrets and removed password reset debug token exposure outside local-style runtimes.
 - **Notes**: `pytest backend\tests`, `npm.cmd run typecheck`, and `npm.cmd test` passed from `C:\Users\jiang\Projects\fitmate-ai`.
+
+## 2026-05-15 - CI Quality Gates
+
+- **Status**: Completed
+- **Description**: Added GitHub Actions quality gates for mobile TypeScript, mobile logic tests, backend pytest with PostgreSQL, and Alembic SQL rendering on push and pull request.
+- **Notes**: `pytest backend\tests`, `npm.cmd run typecheck`, `npm.cmd test`, and `python -m alembic upgrade head --sql` passed from `C:\Users\jiang\Projects\fitmate-ai`.
