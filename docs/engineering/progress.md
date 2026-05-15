@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Project formally migrated to permanent root
-- **Next task:** Continue all FitMate development from `C:\Users\jiang\Projects\fitmate-ai`
+- **Current task:** Food card nutrition editor and records editing UX completed
+- **Next task:** On-device smoke test food edit, records edit/delete, intake summary, weight check-in, and mood diary
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -176,6 +176,14 @@
 - Migration copied source, backend, docs, Git metadata, iOS export artifacts, and FitMate work records from the old Codex session directory.
 - Generated dependency/cache/runtime folders were intentionally excluded from migration and regenerated where needed.
 - `npm.cmd install`, `npm.cmd test`, `npm.cmd run typecheck`, and `pytest backend\tests` passed from the new project root.
+- Food card `编辑内容` now opens a full edit page for food name, calories, protein, carbs, fat, and detailed intake notes.
+- Food records now carry structured nutrition fields so records can drive today's intake summary.
+- Records page now calculates today's intake from confirmed food records instead of relying on static summary text.
+- Confirmed records now expose edit and delete actions so users can correct mistaken records.
+- Weight check-in now opens a dedicated form for today's weight and notes.
+- Mood check-in is now a mood diary form with mood, hunger, craving scores, and detailed notes.
+- Mobile logic tests now cover food detail editing, record-page nutrition edits, and record deletion.
+- `npm.cmd test` and `npm.cmd run typecheck` passed after the food card and records UX work.
 
 ## What's Next
 - Use `docs/engineering/team.md` and `docs/engineering/backlog.md` to assign the next implementation task, then resume on-device smoke testing and production-readiness work.

@@ -10,7 +10,7 @@ export type FoodVisionInput = {
   locale: 'zh-CN';
 };
 
-export type FoodEstimate = FoodAnalysis & {
+export type FoodEstimate = Omit<FoodAnalysis, 'caloriesKcal' | 'proteinG' | 'carbsG' | 'fatG'> & {
   provider: VisionProviderId;
   detectedItems: string[];
   caloriesKcal: {

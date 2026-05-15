@@ -69,6 +69,12 @@ function mapActiveFoodAnalysis(
     calories: formatPlainRange(pending.calories_range_kcal) ?? '待估算',
     protein: `${formatPlainRange(pending.protein_g_range) ?? '待估算'}g`,
     carbs: `${formatPlainRange(pending.carbs_g_range) ?? '待估算'}g`,
+    fat: `${formatPlainRange(pending.fat_g_range) ?? '待估算'}g`,
+    caloriesKcal: rangeMidpoint(pending.calories_range_kcal),
+    proteinG: rangeMidpoint(pending.protein_g_range),
+    carbsG: rangeMidpoint(pending.carbs_g_range),
+    fatG: rangeMidpoint(pending.fat_g_range),
+    detail: stringValue(pending.user_portion_note),
     advice: stringValue(pending.user_portion_note) ?? '请确认份量，确认后才写入今日记录。',
   };
 }
@@ -126,13 +132,20 @@ function mapRecords(
 ): DailyRecord[] {
   const foodRecords = (records.food_logs ?? []).map((log) => ({
     id: stringValue(log.id) ?? 'food-log',
+    kind: 'food' as const,
     title: stringValue(log.meal_name) ?? 'Food log',
     status: stringValue(log.status) ?? 'pending',
-    text: formatCalorieRange(log.calories_range_kcal),
+    text: foodRecordText(log),
     done: stringValue(log.status) === 'confirmed',
+    caloriesKcal: rangeMidpoint(log.calories_range_kcal),
+    proteinG: rangeMidpoint(log.protein_g_range),
+    carbsG: rangeMidpoint(log.carbs_g_range),
+    fatG: rangeMidpoint(log.fat_g_range),
+    detail: stringValue(log.user_portion_note),
   }));
   const workoutRecords = (records.workout_logs ?? []).map((log) => ({
     id: stringValue(log.id) ?? 'workout-log',
+    kind: 'workout' as const,
     title: stringValue(log.workout_type) ?? 'Workout',
     status: stringValue(log.status) ?? 'pending',
     text: `${numberValue(log.duration_minutes) ?? 0} min`,
@@ -140,6 +153,15 @@ function mapRecords(
   }));
   const nextRecords = [...foodRecords, ...workoutRecords];
   return nextRecords.length ? nextRecords : fallback.records;
+}
+
+function foodRecordText(log: Record<string, unknown>) {
+  return [
+    formatCalorieRange(log.calories_range_kcal),
+    rangeMidpoint(log.protein_g_range) !== undefined ? `蛋白 ${rangeMidpoint(log.protein_g_range)}g` : null,
+    rangeMidpoint(log.carbs_g_range) !== undefined ? `碳水 ${rangeMidpoint(log.carbs_g_range)}g` : null,
+    rangeMidpoint(log.fat_g_range) !== undefined ? `脂肪 ${rangeMidpoint(log.fat_g_range)}g` : null,
+  ].filter(Boolean).join(' · ');
 }
 
 function formatProtein(value: unknown) {
@@ -164,6 +186,18 @@ function formatPlainRange(value: unknown) {
     return undefined;
   }
   return `${value[0]}-${value[1]}`;
+}
+
+function rangeMidpoint(value: unknown) {
+  if (!Array.isArray(value) || value.length === 0) {
+    return undefined;
+  }
+  const numbers = value.filter((item): item is number => typeof item === 'number' && Number.isFinite(item));
+  if (numbers.length === 0) {
+    return undefined;
+  }
+  const sum = numbers.reduce((total, item) => total + item, 0);
+  return Math.round(sum / numbers.length);
 }
 
 function summaryValue(value: unknown) {

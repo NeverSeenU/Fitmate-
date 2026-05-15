@@ -12,3 +12,8 @@
 - **Description**: Fixed confirm/edit/discard state flow for food cards and added manual food record entry from the Add Content panel.
 - **Notes**: `npm.cmd test` and `npm.cmd run typecheck` passed before migration.
 
+## 2026-05-13 - Food Nutrition Editor and Records UX
+
+- **Status**: Completed
+- **Description**: Added full food-card editing for nutrition/detail fields, editable/deletable records, intake summary from confirmed food records, and form-based weight/mood check-ins.
+- **Notes**: `npm.cmd test` and `npm.cmd run typecheck` passed from `C:\Users\jiang\Projects\fitmate-ai`.

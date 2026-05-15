@@ -73,6 +73,12 @@ export type FoodAnalysis = {
   calories: string;
   protein: string;
   carbs: string;
+  fat?: string;
+  caloriesKcal?: number;
+  proteinG?: number;
+  carbsG?: number;
+  fatG?: number;
+  detail?: string;
   advice: string;
 };
 
@@ -85,10 +91,20 @@ export type DailySummary = {
 
 export type DailyRecord = {
   id: string;
+  kind?: 'food' | 'weight' | 'mood' | 'workout' | 'summary' | 'checkin';
   title: string;
   status: string;
   text: string;
   done?: boolean;
+  caloriesKcal?: number;
+  proteinG?: number;
+  carbsG?: number;
+  fatG?: number;
+  detail?: string;
+  weightKg?: number;
+  moodLevel?: number;
+  hungerLevel?: number;
+  cravingLevel?: number;
 };
 
 export type AppDataState = {

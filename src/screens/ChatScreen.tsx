@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { BottomTabs, ChatBubble, ChatHeader, FoodAnalysisCard } from '../components/ui';
+import { BottomTabs, Button, ChatBubble, ChatHeader, FoodAnalysisCard } from '../components/ui';
 import type { AppDataState } from '../domain/models';
 import { AttachmentPanel, NewChatPanel, ThreadDrawer } from '../overlays/ChatOverlays';
-import type { createAppActions } from '../services/appActions';
+import type { createAppActions, FoodLogEditInput } from '../services/appActions';
 import { pickFoodPhoto, type PhotoPickerSource } from '../services/photoPicker';
 import { styles } from '../styles';
 import type { ChatPanel, Screen, Sheet } from '../types';
@@ -29,8 +29,8 @@ export function ChatScreen({
   const [composerText, setComposerText] = useState('');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
-  const [editingPortion, setEditingPortion] = useState(false);
-  const [portionNote, setPortionNote] = useState('');
+  const [foodEditorOpen, setFoodEditorOpen] = useState(false);
+  const [foodForm, setFoodForm] = useState(foodAnalysisToForm(appState.activeFoodAnalysis));
   const swipeResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) =>
@@ -85,8 +85,7 @@ export function ChatScreen({
         threadId: appState.threads[0]?.id ?? 'food-today',
         ...photo,
       });
-      setEditingPortion(false);
-      setPortionNote('');
+      setFoodEditorOpen(false);
       setPanel(null);
     });
   };
@@ -103,28 +102,35 @@ export function ChatScreen({
     });
   };
 
-  const submitPortionEdit = () => {
+  const openFoodEditor = () => {
+    Keyboard.dismiss();
+    setFoodForm(foodAnalysisToForm(appState.activeFoodAnalysis));
+    setFoodEditorOpen(true);
+    setStatus('');
+  };
+
+  const submitFoodEditor = () => {
     const foodLogId = appState.activeFoodAnalysis?.id;
     if (!foodLogId) {
       setStatus('当前没有待编辑的食物记录');
       return;
     }
-    const note = portionNote.trim();
-    if (!note) {
-      setStatus('请先输入份量备注');
+    const next = formToFoodInput(foodForm);
+    if (!next.title.trim()) {
+      setStatus('请先填写食物名称');
       return;
     }
-    void runAction('正在保存份量编辑...', '份量编辑已保存，仍需确认写入', async () => {
-      await actions.editFoodLogPortion(foodLogId, note);
-      setEditingPortion(false);
+    void runAction('正在保存食物编辑...', '食物内容已保存，仍需确认写入', async () => {
+      await actions.saveFoodLogDetails(foodLogId, next);
+      setFoodEditorOpen(false);
     });
   };
 
   const openManualFoodRecord = () => {
     Keyboard.dismiss();
     void actions.createManualFoodLog();
-    setEditingPortion(true);
-    setPortionNote('');
+    setFoodForm(foodAnalysisToForm(null));
+    setFoodEditorOpen(true);
     setStatus('已打开食物记录，请输入食物和份量');
     setPanel(null);
   };
@@ -148,42 +154,27 @@ export function ChatScreen({
           <FoodAnalysisCard
             analysis={appState.activeFoodAnalysis}
             busy={busy}
-            editingPortion={editingPortion}
-            portionNote={portionNote}
-            onChangePortionNote={setPortionNote}
             onConfirm={() => void runAction('正在确认食物记录...', '确认成功：已写入今日记录', async () => {
               const foodLogId = appState.activeFoodAnalysis?.id;
               if (!foodLogId) return;
               Keyboard.dismiss();
               await actions.confirmFoodLog(foodLogId);
-              setEditingPortion(false);
-              setPortionNote('');
+              setFoodEditorOpen(false);
               go('records');
             })}
-            onEdit={() => {
-              Keyboard.dismiss();
-              setEditingPortion(true);
-              setStatus('请输入真实份量后保存');
-            }}
-            onSubmitEdit={submitPortionEdit}
-            onCancelEdit={() => {
-              Keyboard.dismiss();
-              setEditingPortion(false);
-              setPortionNote('');
-            }}
+            onEdit={openFoodEditor}
             onDiscard={() => void runAction('正在丢弃记录...', '丢弃成功：已移除，不会计入今日记录', async () => {
               const foodLogId = appState.activeFoodAnalysis?.id;
               if (!foodLogId) return;
               Keyboard.dismiss();
               await actions.discardFoodLog(foodLogId);
-              setEditingPortion(false);
-              setPortionNote('');
+              setFoodEditorOpen(false);
             })}
           />
         ) : null}
         {status ? <Text style={styles.formStatus}>{status}</Text> : null}
       </ScrollView>
-      {!editingPortion ? (
+      {!foodEditorOpen ? (
         <View style={styles.composer}>
           <Pressable style={styles.iconButton} onPress={() => setPanel('attach')}>
             <Text style={styles.iconText}>＋</Text>
@@ -207,6 +198,15 @@ export function ChatScreen({
         </View>
       ) : null}
       <BottomTabs active="chat" go={go} />
+      {foodEditorOpen ? (
+        <FoodEditorPage
+          form={foodForm}
+          setForm={setFoodForm}
+          busy={busy}
+          onClose={() => setFoodEditorOpen(false)}
+          onSave={submitFoodEditor}
+        />
+      ) : null}
       {panel === 'attach' && (
         <AttachmentPanel
           close={() => setPanel(null)}
@@ -239,4 +239,125 @@ export function ChatScreen({
       {panel === 'new' && <NewChatPanel close={closePanel} createThread={actions.createThread} />}
     </KeyboardAvoidingView>
   );
+}
+
+type FoodEditorForm = {
+  title: string;
+  caloriesKcal: string;
+  proteinG: string;
+  carbsG: string;
+  fatG: string;
+  detail: string;
+};
+
+function FoodEditorPage({
+  form,
+  setForm,
+  busy,
+  onClose,
+  onSave,
+}: {
+  form: FoodEditorForm;
+  setForm: (form: FoodEditorForm) => void;
+  busy: boolean;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const update = (key: keyof FoodEditorForm, value: string) => setForm({ ...form, [key]: value });
+  return (
+    <KeyboardAvoidingView
+      style={styles.sheet}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+    >
+      <View style={styles.editorHeader}>
+        <View>
+          <Text style={styles.h1}>编辑食物记录</Text>
+          <Text style={styles.muted}>名称、营养和吃了什么都可以改</Text>
+        </View>
+        <Pressable style={styles.miniClose} onPress={onClose}>
+          <Text style={styles.iconText}>X</Text>
+        </Pressable>
+      </View>
+      <ScrollView contentContainerStyle={styles.editorContent} keyboardShouldPersistTaps="handled">
+        <View style={styles.field}>
+          <Text style={styles.label}>食物名称</Text>
+          <TextInput style={styles.input} value={form.title} onChangeText={(value) => update('title', value)} placeholder="例如：鸡胸饭、火锅、拿铁" placeholderTextColor="#777" />
+        </View>
+        <View style={styles.formGrid}>
+          <NumberField label="热量 kcal" value={form.caloriesKcal} onChangeText={(value) => update('caloriesKcal', value)} />
+          <NumberField label="蛋白 g" value={form.proteinG} onChangeText={(value) => update('proteinG', value)} />
+          <NumberField label="碳水 g" value={form.carbsG} onChangeText={(value) => update('carbsG', value)} />
+          <NumberField label="脂肪 g" value={form.fatG} onChangeText={(value) => update('fatG', value)} />
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.label}>详细内容</Text>
+          <TextInput
+            style={[styles.input, styles.detailInput]}
+            value={form.detail}
+            onChangeText={(value) => update('detail', value)}
+            placeholder="写清楚吃了什么、份量、酱料、剩了多少，后面 AI 总结和记录页都会用到。"
+            placeholderTextColor="#777"
+            multiline
+            autoFocus
+          />
+        </View>
+      </ScrollView>
+      <View style={styles.editorFooter}>
+        <Button label="取消" variant="secondary" onPress={onClose} disabled={busy} style={styles.actionButton} />
+        <Button label={busy ? '保存中...' : '保存编辑'} onPress={onSave} disabled={busy} style={styles.actionButton} />
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+function NumberField({ label, value, onChangeText }: { label: string; value: string; onChangeText: (value: string) => void }) {
+  return (
+    <View style={styles.compactField}>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput
+        style={styles.input}
+        value={value}
+        onChangeText={onChangeText}
+        keyboardType="numeric"
+        placeholder="0"
+        placeholderTextColor="#777"
+      />
+    </View>
+  );
+}
+
+function foodAnalysisToForm(analysis: AppDataState['activeFoodAnalysis']): FoodEditorForm {
+  return {
+    title: analysis?.title ?? '手动食物记录',
+    caloriesKcal: String(analysis?.caloriesKcal ?? parseLeadingNumber(analysis?.calories) ?? 0),
+    proteinG: String(analysis?.proteinG ?? parseLeadingNumber(analysis?.protein) ?? 0),
+    carbsG: String(analysis?.carbsG ?? parseLeadingNumber(analysis?.carbs) ?? 0),
+    fatG: String(analysis?.fatG ?? parseLeadingNumber(analysis?.fat) ?? 0),
+    detail: analysis?.detail ?? '',
+  };
+}
+
+function formToFoodInput(form: FoodEditorForm): FoodLogEditInput {
+  return {
+    title: form.title.trim(),
+    caloriesKcal: parsePositiveNumber(form.caloriesKcal),
+    proteinG: parsePositiveNumber(form.proteinG),
+    carbsG: parsePositiveNumber(form.carbsG),
+    fatG: parsePositiveNumber(form.fatG),
+    detail: form.detail.trim(),
+  };
+}
+
+function parsePositiveNumber(value: string) {
+  const parsed = Number(value.replace(/[^\d.]/g, ''));
+  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : 0;
+}
+
+function parseLeadingNumber(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+  const match = value.match(/\d+/);
+  return match ? Number(match[0]) : undefined;
 }

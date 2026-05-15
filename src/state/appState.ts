@@ -69,8 +69,8 @@ export const initialAppState: AppDataState = {
     hungerScore: '6/10',
   },
   records: [
-    { id: 'gym', title: '健身房有氧 + 无氧', status: '已记录', text: '120 分钟 · 强度中高 · 注意补蛋白', done: true },
-    { id: 'evening-summary', title: '晚间总结', status: 'AI', text: '今天执行力很好，明天把晚餐主食减半，训练后别硬扛饥饿。', done: true },
+    { id: 'gym', kind: 'workout', title: '健身房有氧 + 无氧', status: '已记录', text: '120 分钟 · 强度中高 · 注意补蛋白', done: true },
+    { id: 'evening-summary', kind: 'summary', title: '晚间总结', status: 'AI', text: '今天执行力很好，明天把晚餐主食减半，训练后别硬扛饥饿。', done: true },
   ],
 };
 

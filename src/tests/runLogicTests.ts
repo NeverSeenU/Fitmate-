@@ -479,15 +479,41 @@ async function testFoodActionStateLifecycle() {
   assert(state.activeFoodAnalysis?.status === 'edited', 'portion edit must keep food card visible as edited');
   assert(state.records[0].status === '已编辑待确认', 'portion edit must mark record as edited pending confirmation');
 
+  await actions.saveFoodLogDetails(firstFoodId ?? '', {
+    title: 'Chicken rice bowl',
+    caloriesKcal: 620,
+    proteinG: 42,
+    carbsG: 68,
+    fatG: 18,
+    detail: '米饭半碗，鸡胸一掌心，酱少放',
+  });
+  assert(state.activeFoodAnalysis?.title === 'Chicken rice bowl', 'food detail edit must update active card title');
+  assert(state.records[0].caloriesKcal === 620 && state.records[0].proteinG === 42, 'food detail edit must store editable nutrition');
+  assert(state.records[0].text.includes('碳水 68g'), 'food detail edit must render nutrition in record text');
+
   await actions.confirmFoodLog(firstFoodId ?? '');
   assert(state.activeFoodAnalysis?.status === 'confirmed', 'confirm must mark active food card confirmed');
   assert(state.records[0].status === '已确认写入' && state.records[0].done === true, 'confirm must mark record done');
+
+  await actions.updateRecord(firstFoodId ?? '', {
+    title: 'Edited chicken bowl',
+    caloriesKcal: 580,
+    proteinG: 45,
+    carbsG: 55,
+    fatG: 16,
+    detail: '用户在记录页修正后的内容',
+  });
+  assert(state.records[0].title === 'Edited chicken bowl', 'record edit must update food title');
+  assert(state.records[0].caloriesKcal === 580 && state.records[0].carbsG === 55, 'record edit must update nutrition after confirmation');
 
   await actions.createManualFoodLog();
   const secondFoodId = state.activeFoodAnalysis?.id;
   await actions.discardFoodLog(secondFoodId ?? '');
   assert(state.activeFoodAnalysis === null, 'discard must remove active food card');
   assert(!state.records.some((record) => record.id === secondFoodId), 'discard must remove the pending food record');
+
+  await actions.deleteRecord(firstFoodId ?? '');
+  assert(!state.records.some((record) => record.id === firstFoodId), 'delete record must remove confirmed food record');
 }
 
 async function run() {

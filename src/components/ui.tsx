@@ -32,22 +32,12 @@ export function FoodAnalysisCard({
   onEdit,
   onDiscard,
   busy,
-  editingPortion,
-  portionNote,
-  onChangePortionNote,
-  onSubmitEdit,
-  onCancelEdit,
 }: {
   analysis: FoodAnalysis;
   onConfirm: () => void;
   onEdit?: () => void;
   onDiscard?: () => void;
   busy?: boolean;
-  editingPortion?: boolean;
-  portionNote?: string;
-  onChangePortionNote?: (value: string) => void;
-  onSubmitEdit?: () => void;
-  onCancelEdit?: () => void;
 }) {
   const canManage = analysis.status === 'pending' || analysis.status === 'edited';
   return (
@@ -69,31 +59,11 @@ export function FoodAnalysisCard({
       <Text style={styles.muted}>{analysis.advice}</Text>
       {canManage ? (
         <>
-          {editingPortion ? (
-            <View style={styles.portionEditor}>
-              <Text style={styles.label}>编辑份量备注</Text>
-              <TextInput
-                style={[styles.input, styles.portionInput]}
-                value={portionNote ?? ''}
-                onChangeText={onChangePortionNote}
-                placeholder="例如：米饭吃了一半，酱少放，肉大约一掌心"
-                placeholderTextColor="#777"
-                editable={!busy}
-                multiline
-                autoFocus
-              />
-              <View style={styles.actionGrid}>
-                <Button label={busy ? '保存中...' : '保存编辑'} onPress={onSubmitEdit} disabled={busy} style={styles.actionButton} />
-                <Button label="取消" variant="secondary" onPress={onCancelEdit} disabled={busy} style={styles.actionButton} />
-              </View>
-            </View>
-          ) : (
-            <View style={styles.actionGrid}>
-              <Button label={busy ? '处理中...' : '确认并写入'} onPress={onConfirm} disabled={busy} style={styles.actionButton} />
-              <Button label="编辑份量" variant="secondary" onPress={onEdit} disabled={busy} style={styles.actionButton} />
-              <Button label="丢弃" variant="secondary" onPress={onDiscard} disabled={busy} style={styles.actionButton} />
-            </View>
-          )}
+          <View style={styles.actionGrid}>
+            <Button label={busy ? '处理中...' : '确认并写入'} onPress={onConfirm} disabled={busy} style={styles.actionButton} />
+            <Button label="编辑内容" variant="secondary" onPress={onEdit} disabled={busy} style={styles.actionButton} />
+            <Button label="丢弃" variant="secondary" onPress={onDiscard} disabled={busy} style={styles.actionButton} />
+          </View>
         </>
       ) : null}
     </View>
@@ -323,11 +293,15 @@ export function RecordCard({
   status,
   text,
   done,
+  onEdit,
+  onDelete,
 }: {
   title: string;
   status: string;
   text: string;
   done?: boolean;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }) {
   return (
     <View style={styles.recordCard}>
@@ -336,6 +310,12 @@ export function RecordCard({
         <Text style={[styles.status, done && styles.doneStatus]}>{status}</Text>
       </View>
       <Text style={styles.muted}>{text}</Text>
+      {(onEdit || onDelete) ? (
+        <View style={styles.recordActions}>
+          {onEdit ? <Button label="编辑" variant="secondary" onPress={onEdit} style={styles.actionButton} /> : null}
+          {onDelete ? <Button label="删除" variant="secondary" onPress={onDelete} style={styles.actionButton} /> : null}
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -43,6 +43,15 @@ export type CheckinInput = {
   notes?: string;
 };
 
+export type FoodLogEditInput = {
+  title: string;
+  caloriesKcal: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  detail: string;
+};
+
 export type ProfileUpdateInput = Partial<Pick<
   UserProfile,
   'displayName' | 'phone' | 'heightCm' | 'weightKg' | 'age' | 'gender' | 'goalLabel' | 'trainingFrequency' | 'dietPreference' | 'healthRiskNote'
@@ -135,9 +144,15 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         title: '手动食物记录',
         status: 'pending',
         confidence: 0.5,
-        calories: '待填写',
-        protein: '待填写',
-        carbs: '待填写',
+        calories: '0',
+        protein: '0g',
+        carbs: '0g',
+        fat: '0g',
+        caloriesKcal: 0,
+        proteinG: 0,
+        carbsG: 0,
+        fatG: 0,
+        detail: '',
         advice: '请点“编辑份量”写下食物和份量，保存后再确认写入今日记录。',
       };
       setActiveFoodAnalysis(getState, setState, manual, '已打开手动食物记录，请先编辑份量。');
@@ -154,11 +169,13 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         });
       }
       const state = getState();
-      const title = input.weightKg !== undefined ? '体重打卡' : '心情打卡';
+      const title = input.weightKg !== undefined ? '体重打卡' : '心情日记';
       const text = [
         input.weightKg !== undefined ? `${input.weightKg} kg` : null,
         input.hungerLevel !== undefined ? `饥饿 ${input.hungerLevel}/10` : null,
         input.moodLevel !== undefined ? `心情 ${input.moodLevel}/10` : null,
+        input.cravingLevel !== undefined ? `嘴馋 ${input.cravingLevel}/10` : null,
+        input.notes,
       ].filter(Boolean).join(' · ');
       setState({
         ...state,
@@ -170,10 +187,16 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         records: [
           {
             id: `checkin-${Date.now()}`,
+            kind: input.weightKg !== undefined ? 'weight' : 'mood',
             title,
             status: '已记录',
             text: text || input.notes || '已同步到今日记录',
             done: true,
+            weightKg: input.weightKg,
+            hungerLevel: input.hungerLevel,
+            moodLevel: input.moodLevel,
+            cravingLevel: input.cravingLevel,
+            detail: input.notes,
           },
           ...state.records,
         ],
@@ -201,11 +224,74 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       );
     },
 
+    async saveFoodLogDetails(foodLogId: string, input: FoodLogEditInput) {
+      if (!isLocalOnlyFoodLog(foodLogId)) {
+        await api?.food.patchLog(foodLogId, {
+          meal_name: input.title,
+          user_portion_note: input.detail,
+        });
+      }
+      updateFoodLogDetails(getState, setState, foodLogId, input);
+    },
+
     async discardFoodLog(foodLogId: string) {
       if (!isLocalOnlyFoodLog(foodLogId)) {
         await api?.food.discardLog(foodLogId);
       }
       updateFoodLogState(getState, setState, foodLogId, 'discarded', '丢弃成功：这条食物不会计入今日记录。');
+    },
+
+    async updateRecord(recordId: string, input: Partial<FoodLogEditInput & CheckinInput & { title: string; detail: string }>) {
+      const state = getState();
+      setState({
+        ...state,
+        records: state.records.map((record) => {
+          if (record.id !== recordId) {
+            return record;
+          }
+          if (record.kind === 'food') {
+            const caloriesKcal = input.caloriesKcal ?? record.caloriesKcal ?? 0;
+            const proteinG = input.proteinG ?? record.proteinG ?? 0;
+            const carbsG = input.carbsG ?? record.carbsG ?? 0;
+            const fatG = input.fatG ?? record.fatG ?? 0;
+            const detail = input.detail ?? record.detail ?? '';
+            return {
+              ...record,
+              title: input.title ?? record.title,
+              caloriesKcal,
+              proteinG,
+              carbsG,
+              fatG,
+              detail,
+              text: formatFoodRecordText({ caloriesKcal, proteinG, carbsG, fatG, detail }),
+            };
+          }
+          const weightKg = input.weightKg ?? record.weightKg;
+          const moodLevel = input.moodLevel ?? record.moodLevel;
+          const hungerLevel = input.hungerLevel ?? record.hungerLevel;
+          const cravingLevel = input.cravingLevel ?? record.cravingLevel;
+          const detail = input.detail ?? input.notes ?? record.detail ?? '';
+          return {
+            ...record,
+            title: input.title ?? record.title,
+            weightKg,
+            moodLevel,
+            hungerLevel,
+            cravingLevel,
+            detail,
+            text: formatCheckinRecordText({ weightKg, moodLevel, hungerLevel, cravingLevel, notes: detail }),
+          };
+        }),
+      });
+    },
+
+    async deleteRecord(recordId: string) {
+      const state = getState();
+      setState({
+        ...state,
+        activeFoodAnalysis: state.activeFoodAnalysis?.id === recordId ? null : state.activeFoodAnalysis,
+        records: state.records.filter((record) => record.id !== recordId),
+      });
     },
 
     async restoreSubscription(productId: string, receipt: string) {
@@ -319,6 +405,46 @@ function updateFoodLogState(
   });
 }
 
+function updateFoodLogDetails(
+  getState: () => AppDataState,
+  setState: (state: AppDataState) => void,
+  foodLogId: string,
+  input: FoodLogEditInput,
+) {
+  const state = getState();
+  const active = state.activeFoodAnalysis?.id === foodLogId ? state.activeFoodAnalysis : null;
+  const nextAnalysis = active
+    ? {
+      ...active,
+      title: input.title,
+      status: active.status === 'confirmed' ? 'confirmed' as const : 'edited' as const,
+      calories: String(input.caloriesKcal),
+      protein: `${input.proteinG}g`,
+      carbs: `${input.carbsG}g`,
+      fat: `${input.fatG}g`,
+      caloriesKcal: input.caloriesKcal,
+      proteinG: input.proteinG,
+      carbsG: input.carbsG,
+      fatG: input.fatG,
+      detail: input.detail,
+      advice: input.detail || '营养信息已编辑，请确认后写入今日记录。',
+    }
+    : null;
+  setState({
+    ...state,
+    activeFoodAnalysis: nextAnalysis ?? state.activeFoodAnalysis,
+    records: upsertFoodRecord(state.records, nextAnalysis, nextAnalysis?.status ?? 'edited'),
+    chatMessages: [
+      ...state.chatMessages,
+      {
+        id: `food-edit-${Date.now()}`,
+        role: 'assistant',
+        text: `已更新 ${input.title}：${input.caloriesKcal} kcal，蛋白 ${input.proteinG}g，碳水 ${input.carbsG}g。`,
+      },
+    ],
+  });
+}
+
 function setActiveFoodAnalysis(
   getState: () => AppDataState,
   setState: (state: AppDataState) => void,
@@ -347,19 +473,59 @@ function upsertFoodRecord(
   }
   const nextRecord = {
     id: analysis.id,
+    kind: 'food' as const,
     title: analysis.title,
     status: foodStatusLabel(status),
-    text: [
-      `${analysis.calories} kcal`,
-      analysis.protein ? `蛋白 ${analysis.protein}` : null,
-      portionNote ? `份量备注：${portionNote}` : null,
-    ].filter(Boolean).join(' · '),
+    text: formatFoodRecordText({
+      caloriesKcal: analysis.caloriesKcal,
+      proteinG: analysis.proteinG,
+      carbsG: analysis.carbsG,
+      fatG: analysis.fatG,
+      detail: portionNote ?? analysis.detail,
+      fallbackCalories: analysis.calories,
+      fallbackProtein: analysis.protein,
+      fallbackCarbs: analysis.carbs,
+    }),
     done: status === 'confirmed',
+    caloriesKcal: analysis.caloriesKcal,
+    proteinG: analysis.proteinG,
+    carbsG: analysis.carbsG,
+    fatG: analysis.fatG,
+    detail: portionNote ?? analysis.detail,
   };
   const exists = records.some((record) => record.id === analysis.id);
   return exists
     ? records.map((record) => (record.id === analysis.id ? { ...record, ...nextRecord } : record))
     : [nextRecord, ...records];
+}
+
+function formatFoodRecordText(input: {
+  caloriesKcal?: number;
+  proteinG?: number;
+  carbsG?: number;
+  fatG?: number;
+  detail?: string;
+  fallbackCalories?: string;
+  fallbackProtein?: string;
+  fallbackCarbs?: string;
+}) {
+  return [
+    input.caloriesKcal !== undefined ? `${input.caloriesKcal} kcal` : input.fallbackCalories ? `${input.fallbackCalories} kcal` : null,
+    input.proteinG !== undefined ? `蛋白 ${input.proteinG}g` : input.fallbackProtein ? `蛋白 ${input.fallbackProtein}` : null,
+    input.carbsG !== undefined ? `碳水 ${input.carbsG}g` : input.fallbackCarbs ? `碳水 ${input.fallbackCarbs}` : null,
+    input.fatG !== undefined ? `脂肪 ${input.fatG}g` : null,
+    input.detail,
+  ].filter(Boolean).join(' · ');
+}
+
+function formatCheckinRecordText(input: CheckinInput) {
+  return [
+    input.weightKg !== undefined ? `${input.weightKg} kg` : null,
+    input.hungerLevel !== undefined ? `饥饿 ${input.hungerLevel}/10` : null,
+    input.moodLevel !== undefined ? `心情 ${input.moodLevel}/10` : null,
+    input.cravingLevel !== undefined ? `嘴馋 ${input.cravingLevel}/10` : null,
+    input.notes,
+  ].filter(Boolean).join(' · ') || '已同步到今日记录';
 }
 
 function isLocalOnlyFoodLog(foodLogId: string) {
@@ -392,10 +558,24 @@ function toFoodAnalysis(response: FoodPhotoAnalysisResponse): FoodAnalysis {
     calories: rangeLabel(analysis.calories_range_kcal),
     protein: `${rangeLabel(analysis.protein_g_range)}g`,
     carbs: `${rangeLabel(analysis.carbs_g_range)}g`,
+    fat: `${rangeLabel(analysis.fat_g_range)}g`,
+    caloriesKcal: rangeMidpoint(analysis.calories_range_kcal),
+    proteinG: rangeMidpoint(analysis.protein_g_range),
+    carbsG: rangeMidpoint(analysis.carbs_g_range),
+    fatG: rangeMidpoint(analysis.fat_g_range),
+    detail: analysis.needs_follow_up && analysis.follow_up_question ? analysis.follow_up_question : '',
     advice: analysis.needs_follow_up && analysis.follow_up_question
       ? analysis.follow_up_question
       : '已按图片估算营养区间，请确认份量后记录。',
   };
+}
+
+function rangeMidpoint(values: number[]) {
+  if (values.length === 0) {
+    return undefined;
+  }
+  const sum = values.reduce((total, value) => total + value, 0);
+  return Math.round(sum / values.length);
 }
 
 function toFoodStatus(status: string): FoodAnalysis['status'] {
