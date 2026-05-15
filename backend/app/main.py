@@ -10,10 +10,11 @@ from app.api.records import router as records_router
 from app.api.safety import router as safety_router
 from app.api.subscription import router as subscription_router
 from app.api.workouts import router as workouts_router
-from app.config import get_settings
+from app.config import get_settings, validate_runtime_settings
 
 
 settings = get_settings()
+validate_runtime_settings(settings)
 
 app = FastAPI(
     title=settings.app_name,

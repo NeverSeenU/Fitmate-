@@ -29,3 +29,9 @@
 - **Status**: Completed
 - **Description**: Added a backend test cleanup guard that refuses destructive table truncation unless the environment is local/test and the database target is an approved localhost FitMate database.
 - **Notes**: `pytest backend\tests`, `npm.cmd run typecheck`, and `npm.cmd test` passed from `C:\Users\jiang\Projects\fitmate-ai`.
+
+## 2026-05-14 - Backend Secret Baseline
+
+- **Status**: Completed
+- **Description**: Added production runtime validation for auth/admin secrets and removed password reset debug token exposure outside local-style runtimes.
+- **Notes**: `pytest backend\tests`, `npm.cmd run typecheck`, and `npm.cmd test` passed from `C:\Users\jiang\Projects\fitmate-ai`.

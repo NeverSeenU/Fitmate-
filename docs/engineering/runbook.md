@@ -92,6 +92,12 @@ EXPO_PUBLIC_USE_MOCK_API=true
 
 For real provider smoke tests, inject Xiaomi/Qwen keys into the backend process environment only.
 
+Production runtime rules:
+
+- `AUTH_SECRET_KEY` and `ADMIN_SECRET` must be real strong secrets, not local defaults.
+- Production startup fails if either secret is shorter than 32 characters.
+- Password reset request responses include `debug_reset_token` only in `development`, `local`, or `test`.
+
 ## GitHub Backup
 
 Remote:

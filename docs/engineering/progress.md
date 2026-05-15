@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Safe test database guard completed
-- **Next task:** Backend secret baseline, then CI quality gates
+- **Current task:** Backend secret baseline completed
+- **Next task:** GitHub CI quality gates
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -195,9 +195,13 @@
 - Test database guard coverage now lives in `backend/tests/test_database_guard.py`.
 - Runbook and `.env.example` now document the local/test database cleanup boundary.
 - `pytest backend\tests`, `npm.cmd run typecheck`, and `npm.cmd test` passed after the safe test database guard.
+- Production startup now validates `AUTH_SECRET_KEY` and `ADMIN_SECRET`, rejecting local defaults and short secrets.
+- Password reset requests now hide `debug_reset_token` outside development/local/test runtimes.
+- Runtime security tests now live in `backend/tests/test_config_security.py`, and auth tests cover production password-reset response behavior.
+- `pytest backend\tests`, `npm.cmd run typecheck`, and `npm.cmd test` passed after the backend secret baseline.
 
 ## What's Next
-- Continue P1 safety and production readiness work with backend secret hardening, then GitHub CI quality gates.
+- Continue P1 safety and production readiness work with GitHub CI quality gates.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

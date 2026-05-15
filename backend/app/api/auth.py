@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_auth_service
+from app.config import get_settings, is_local_runtime
 from app.services.auth_service import AuthService
 
 
@@ -94,7 +95,8 @@ def request_password_reset(
     service: AuthServiceDependency,
 ) -> PasswordResetRequestResponse:
     token = service.request_password_reset(payload.email)
-    return PasswordResetRequestResponse(accepted=True, debug_reset_token=token)
+    debug_token = token if is_local_runtime(get_settings()) else None
+    return PasswordResetRequestResponse(accepted=True, debug_reset_token=debug_token)
 
 
 @router.post("/password-reset/confirm", response_model=PasswordResetConfirmResponse)

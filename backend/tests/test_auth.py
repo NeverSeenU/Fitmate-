@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import pytest
 
 from app.main import app
 
@@ -104,3 +105,21 @@ def test_password_reset_request_and_confirm() -> None:
     )
     assert old_login.status_code == 401
     assert new_login.status_code == 200
+
+
+def test_password_reset_request_hides_debug_token_outside_local(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = {
+        "email": "reset-production@example.com",
+        "password": "StrongPass123",
+        "display_name": "Production Reset",
+    }
+    assert client.post("/v1/auth/register", json=payload).status_code == 201
+
+    monkeypatch.setenv("FITMATE_ENV", "production")
+    request_response = client.post(
+        "/v1/auth/password-reset/request",
+        json={"email": "reset-production@example.com"},
+    )
+
+    assert request_response.status_code == 202
+    assert request_response.json()["debug_reset_token"] is None

@@ -16,12 +16,6 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ## Priority 1: Safety And Production Readiness
 
-### P1-2: Backend Secret Baseline
-- Owner: Backend Lead
-- Files: `backend/app/config.py`, `backend/app/api/auth.py`, `backend/app/api/admin.py`, `backend/app/services/auth_service.py`
-- Problem: production defaults and password reset debug behavior are not hardened.
-- Done when: production startup fails without strong secrets; password reset no longer returns debug tokens outside local development.
-
 ### P1-3: CI Quality Gates
 - Owner: DevOps Lead / QA Lead
 - Files: `.github/workflows/*`, `package.json`, `backend/pyproject.toml`

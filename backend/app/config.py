@@ -39,6 +39,20 @@ def get_settings() -> Settings:
     )
 
 
+def validate_runtime_settings(settings: Settings) -> None:
+    if settings.environment.lower() != "production":
+        return
+
+    if _is_weak_secret(settings.auth_secret_key, Settings.auth_secret_key):
+        raise RuntimeError("AUTH_SECRET_KEY must be set to a strong production secret.")
+    if _is_weak_secret(settings.admin_secret, Settings.admin_secret):
+        raise RuntimeError("ADMIN_SECRET must be set to a strong production secret.")
+
+
+def is_local_runtime(settings: Settings) -> bool:
+    return settings.environment.lower() in {"development", "local", "test"}
+
+
 def assert_safe_test_database_cleanup(settings: Settings) -> None:
     parsed = urlparse(settings.database_url)
     environment = settings.environment.lower()
@@ -59,3 +73,7 @@ def assert_safe_test_database_cleanup(settings: Settings) -> None:
             "Unsafe test database cleanup refused: set FITMATE_ENV=local or test, "
             "use a localhost database, and target an approved FitMate local database."
         )
+
+
+def _is_weak_secret(value: str, local_default: str) -> bool:
+    return value == local_default or len(value) < 32
