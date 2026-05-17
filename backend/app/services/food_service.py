@@ -85,6 +85,7 @@ class FoodService:
         thread_id: str,
         image_bytes: bytes,
         image_filename: str,
+        image_content_type: str,
         user_note: str | None,
         vision_router: Any,
     ) -> dict | None:
@@ -96,8 +97,18 @@ class FoodService:
         stored_image = self.storage.put(
             key=image_object_key,
             content=image_bytes,
-            content_type=self._content_type(image_filename),
+            content_type=image_content_type,
         )
+        try:
+            analysis = vision_router.analyze_food_photo(
+                image_bytes=image_bytes,
+                user_note=user_note,
+                user_id=user_id,
+            )
+        except Exception:
+            self.storage.delete(stored_image.object_key)
+            raise
+
         image_message = self.chat_service.store.add_message(
             StoredMessage(
                 id=str(uuid.uuid4()),
@@ -109,11 +120,6 @@ class FoodService:
                 image_object_key=stored_image.object_key,
                 structured_json={"image_object_key": stored_image.object_key},
             )
-        )
-        analysis = vision_router.analyze_food_photo(
-            image_bytes=image_bytes,
-            user_note=user_note,
-            user_id=user_id,
         )
         subscription = self.subscription_service.get_current(user_id)
         should_auto_record = bool(subscription["entitlements"]["automatic_recording"])
@@ -228,13 +234,6 @@ class FoodService:
     def _object_key(self, user_id: str, filename: str) -> str:
         safe_filename = filename or "food-photo.jpg"
         return f"food-photos/{user_id}/{uuid.uuid4()}-{safe_filename}"
-
-    def _content_type(self, filename: str) -> str:
-        if filename.lower().endswith(".png"):
-            return "image/png"
-        if filename.lower().endswith(".webp"):
-            return "image/webp"
-        return "image/jpeg"
 
 
 food_service = FoodService()

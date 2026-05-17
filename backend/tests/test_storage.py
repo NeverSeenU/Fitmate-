@@ -33,6 +33,16 @@ class FakeVisionRouter:
         return dict(VISION_ANALYSIS)
 
 
+class FailingVisionRouter:
+    def analyze_food_photo(
+        self,
+        image_bytes: bytes,
+        user_note: str | None = None,
+        user_id: str | None = None,
+    ) -> dict:
+        raise RuntimeError("provider_timeout")
+
+
 def test_local_object_storage_saves_and_deletes_bytes() -> None:
     storage = LocalObjectStorage()
 
@@ -75,6 +85,7 @@ def test_food_photo_upload_uses_storage_boundary_and_logs_only_object_key() -> N
         thread_id=thread["id"],
         image_bytes=b"fake-image",
         image_filename="photo.jpg",
+        image_content_type="image/jpeg",
         user_note=None,
         vision_router=FakeVisionRouter(),
     )
@@ -86,6 +97,40 @@ def test_food_photo_upload_uses_storage_boundary_and_logs_only_object_key() -> N
     assert storage.get_bytes(log.image_object_key) == b"fake-image"
     assert log.image_object_key in chat.store.list_messages(thread["id"])[0].structured_json.values()
     assert not hasattr(log, "image_bytes")
+
+
+def test_food_photo_upload_deletes_stored_object_when_vision_fails() -> None:
+    chat = ChatService(store=InMemoryChatStore())
+    subscription = SubscriptionService(store=InMemorySubscriptionStore())
+    food_logs = InMemoryFoodLogStore()
+    storage = LocalObjectStorage()
+    service = FoodService(
+        store=food_logs,
+        chat_service_dependency=chat,
+        subscription_service_dependency=subscription,
+        storage=storage,
+    )
+    user_id = "user-1"
+    thread = chat.create_thread(user_id=user_id, title="food", kind="food")
+
+    try:
+        service.analyze_photo(
+            user_id=user_id,
+            thread_id=thread["id"],
+            image_bytes=b"fake-image",
+            image_filename="photo.jpg",
+            image_content_type="image/jpeg",
+            user_note=None,
+            vision_router=FailingVisionRouter(),
+        )
+    except RuntimeError as exc:
+        assert str(exc) == "provider_timeout"
+    else:
+        raise AssertionError("vision failure must be raised")
+
+    assert storage._objects == {}
+    assert chat.store.list_messages(thread["id"]) == []
+    assert food_logs.list_for_user(user_id) == []
 
 
 def test_photo_deletion_placeholder_calls_storage_delete() -> None:
@@ -112,6 +157,7 @@ def test_photo_deletion_placeholder_calls_storage_delete() -> None:
         thread_id=thread["id"],
         image_bytes=b"fake-image",
         image_filename="photo.jpg",
+        image_content_type="image/jpeg",
         user_note=None,
         vision_router=FakeVisionRouter(),
     )

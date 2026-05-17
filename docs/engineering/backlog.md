@@ -24,11 +24,6 @@ This is the formal task queue for the main Codex conversation and subagent team.
 - Scope: login/register, chat send, food upload, confirm/edit/discard, manual food record, check-in, subscription restore, profile editing.
 - Done when: each flow is tested in Expo Go against the local backend and failures are logged as backlog items.
 
-### P2-2: AI Photo Path Hardening
-- Owner: AI/Vision Lead / Backend Lead
-- Files: `backend/app/api/food.py`, `backend/app/ai/router.py`, `backend/app/ai/providers/openai_compatible.py`, `backend/app/services/food_service.py`
-- Done when: upload size/MIME checks, timeout behavior, provider-missing feedback, provider error responses, and object-storage cleanup are covered by tests.
-
 ### P2-3: Replace Contract Mocks
 - Owner: Backend Lead / Product Lead
 - Files: `backend/app/services/chat_service.py`, `backend/app/services/subscription_service.py`, `src/services/*`

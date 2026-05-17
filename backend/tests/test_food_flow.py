@@ -121,6 +121,36 @@ def test_free_user_receives_analysis_without_auto_created_food_log() -> None:
     assert "焦虑" in body["assistant_message"]["content_text"]
 
 
+def test_photo_rejects_unsupported_upload_type() -> None:
+    headers = auth_headers("unsupported-photo@example.com")
+    thread_id = create_thread(headers)
+
+    response = client.post(
+        "/v1/chat/photo",
+        headers=headers,
+        data={"thread_id": thread_id},
+        files={"image": ("notes.txt", b"not-an-image", "text/plain")},
+    )
+
+    assert response.status_code == 415
+    assert response.json()["detail"]["code"] == "unsupported_image_type"
+
+
+def test_photo_rejects_uploads_larger_than_limit() -> None:
+    headers = auth_headers("large-photo@example.com")
+    thread_id = create_thread(headers)
+
+    response = client.post(
+        "/v1/chat/photo",
+        headers=headers,
+        data={"thread_id": thread_id},
+        files={"image": ("large.jpg", b"x" * (8 * 1024 * 1024 + 1), "image/jpeg")},
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"]["code"] == "image_too_large"
+
+
 def test_pro_user_photo_creates_pending_food_log() -> None:
     headers = auth_headers("pro-food@example.com")
     restore_plan(headers, "fitmate.pro.monthly")

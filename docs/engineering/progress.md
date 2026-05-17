@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** iPhone Files picker integration completed
-- **Next task:** Re-run Expo Go smoke for file picker, then continue AI photo path hardening
+- **Current task:** AI photo path hardening completed
+- **Next task:** Re-run Expo Go smoke, then replace remaining contract mocks
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -217,9 +217,14 @@
 - Chat attachment File now opens the system document picker for PDF, Word, Excel, CSV, TXT, and common image files.
 - Selected file metadata is shown in chat, including filename, MIME type, and size.
 - File contents are intentionally not uploaded or parsed yet; the next backend task is an explicit upload and parsing pipeline with privacy deletion coverage.
+- Food photo upload now rejects unsupported MIME types before entering the analysis service.
+- Food photo upload now rejects images larger than 8 MB with a stable `image_too_large` error.
+- Food photo analysis now deletes a just-stored object if the vision provider fails after storage, preventing orphaned photo objects.
+- Food photo hardening tests now cover unsupported upload type, upload size limit, provider-unavailable response, and object-storage cleanup on vision failure.
+- `python -m pytest backend\tests`, `npm.cmd run typecheck`, and `npm.cmd test` passed after AI photo path hardening.
 
 ## What's Next
-- Re-run the Expo Go smoke checklist for workout record cards, food-photo unavailable feedback, and iPhone Files selection, then continue AI photo hardening.
+- Re-run the Expo Go smoke checklist for workout record cards, food-photo unavailable feedback, and iPhone Files selection, then replace remaining contract mocks.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

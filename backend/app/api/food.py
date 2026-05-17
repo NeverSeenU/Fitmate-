@@ -12,6 +12,8 @@ from app.services.food_service import FoodService
 
 router = APIRouter(tags=["food"])
 FoodServiceDependency = Annotated[FoodService, Depends(get_food_service)]
+MAX_PHOTO_UPLOAD_BYTES = 8 * 1024 * 1024
+SUPPORTED_PHOTO_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
 def get_food_vision_router(db: DbSession) -> FoodVisionRouter:
@@ -38,13 +40,30 @@ async def analyze_chat_photo(
     user_note: str | None = Form(default=None),
     vision_router: FoodVisionRouter = Depends(get_food_vision_router),
 ) -> dict:
+    if image.content_type not in SUPPORTED_PHOTO_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail={
+                "code": "unsupported_image_type",
+                "message": "Food photo uploads must be JPEG, PNG, or WebP images.",
+            },
+        )
     image_bytes = await image.read()
+    if len(image_bytes) > MAX_PHOTO_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail={
+                "code": "image_too_large",
+                "message": "Food photo uploads must be 8 MB or smaller.",
+            },
+        )
     try:
         result = service.analyze_photo(
             user_id=user["id"],
             thread_id=thread_id,
             image_bytes=image_bytes,
             image_filename=image.filename or "food-photo.jpg",
+            image_content_type=image.content_type or "image/jpeg",
             user_note=user_note,
             vision_router=vision_router,
         )
