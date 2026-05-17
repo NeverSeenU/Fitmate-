@@ -10,6 +10,7 @@ def test_initial_schema_contains_required_tables() -> None:
         "chat_threads",
         "chat_messages",
         "food_logs",
+        "uploaded_files",
         "workout_logs",
         "checkins",
         "memory_items",

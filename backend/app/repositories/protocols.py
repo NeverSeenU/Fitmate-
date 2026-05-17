@@ -76,6 +76,13 @@ class WorkoutLogRepository(Protocol):
 
 
 @runtime_checkable
+class FileUploadRepository(Protocol):
+    def create(self, upload: Any) -> Any: ...
+
+    def list_for_user(self, user_id: str) -> list[Any]: ...
+
+
+@runtime_checkable
 class CheckinRepository(Protocol):
     def create(self, checkin: Any) -> Any: ...
 

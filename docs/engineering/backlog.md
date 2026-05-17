@@ -26,11 +26,11 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ## Priority 3: Product Expansion
 
-### P3-4: File Upload And Parsing Pipeline
-- Owner: Backend Lead / AI-Vision Lead / Frontend Lead
-- Files: `backend/app/api/*`, `backend/app/storage/*`, `src/services/*`, `src/screens/ChatScreen.tsx`
-- Scope: add an explicit backend endpoint for user-approved file upload, storage, parsing, and privacy deletion.
-- Done when: selected files can be uploaded only after clear user intent, parsed summaries appear in chat, storage keys are privacy-deletable, and tests cover supported and unsupported file types.
+### P3-5: Deep File Parsing
+- Owner: Backend Lead / AI-Vision Lead
+- Files: `backend/app/services/file_service.py`, provider/parser modules to be selected
+- Scope: replace metadata/text-preview parsing with PDF, Word, Excel, and report-specific extraction.
+- Done when: uploaded body check reports, menus, and workout plans produce structured summaries with tests for parser success and failure cases.
 
 ## Subagent Assignment Template
 

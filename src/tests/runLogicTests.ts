@@ -446,6 +446,15 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
           return {};
         },
       },
+      files: {
+        async upload(input: { threadId: string; filename: string; mimeType: string }) {
+          calls.push(`file:${input.threadId}:${input.filename}:${input.mimeType}`);
+          return {
+            assistant_message: { id: 'assistant-file', content_text: 'file summary reply' },
+            file_upload: { summary_text: 'file summary fallback' },
+          };
+        },
+      },
       subscription: {
         async restore(payload: { provider: string; productId: string; receipt: string }) {
           calls.push(`restore:${payload.productId}`);
@@ -487,6 +496,12 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
   await actions.discardFoodLog('food-live');
   await actions.createCheckin({ weightKg: 71.2, moodLevel: 6 });
   await actions.createWorkoutLog('力量训练 45 分钟');
+  await actions.attachFile({
+    uri: 'file:///report.txt',
+    name: 'report.txt',
+    mimeType: 'text/plain',
+    sizeBytes: 128,
+  });
   await actions.restoreSubscription('fitmate.pro.monthly', 'receipt');
   await actions.updateProfile({ weightKg: 70.8, goalLabel: 'Lean wedding cut' });
   await actions.deletePhotos();
@@ -500,6 +515,7 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
   assert(calls.includes('discardFood:food-live'), 'discard food action must call backend');
   assert(calls.includes('checkin:71.2:6'), 'checkin action must map payload');
   assert(calls.includes('workout:力量训练 45 分钟'), 'workout action must call backend');
+  assert(calls.includes('file:food-today:report.txt:text/plain'), 'file upload action must call backend');
   assert(calls.includes('restore:fitmate.pro.monthly'), 'restore action must call backend');
   assert(calls.includes('profile:70.8:Lean wedding cut'), 'profile action must map backend payload');
   assert(calls.includes('deletePhotos'), 'deletePhotos action must call backend');

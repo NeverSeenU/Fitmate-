@@ -33,6 +33,9 @@ type AppActionsApi = {
     discardLog(foodLogId: string): Promise<unknown>;
     deleteLog(foodLogId: string): Promise<unknown>;
   };
+  files: {
+    upload(input: { threadId: string; fileUri: string; filename: string; mimeType: string }): Promise<unknown>;
+  };
   subscription: {
     restore(payload: { provider: string; productId: string; receipt: string }): Promise<{
       entitlements: AppDataState['entitlements'];
@@ -244,6 +247,30 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
     },
 
     async attachFile(file: PickedFile) {
+      if (api) {
+        const response = await api.files.upload({
+          threadId: getState().threads[0]?.id ?? 'food-today',
+          fileUri: file.uri,
+          filename: file.name,
+          mimeType: file.mimeType,
+        }) as {
+          assistant_message?: { id?: string; content_text?: string };
+          file_upload?: { summary_text?: string };
+        };
+        addMessages(getState, setState, [
+          {
+            id: `file-user-${Date.now()}`,
+            role: 'user',
+            text: `上传文件：${file.name}`,
+          },
+          {
+            id: response.assistant_message?.id ?? `file-assistant-${Date.now()}`,
+            role: 'assistant',
+            text: response.assistant_message?.content_text ?? response.file_upload?.summary_text ?? `已上传 ${file.name}。`,
+          },
+        ]);
+        return;
+      }
       addMessages(getState, setState, [
         {
           id: `file-user-${Date.now()}`,

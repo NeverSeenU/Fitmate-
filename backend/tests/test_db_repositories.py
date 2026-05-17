@@ -8,6 +8,7 @@ from app.repositories.protocols import (
     ChatRepository,
     CheckinRepository,
     FoodLogRepository,
+    FileUploadRepository,
     ModelCallRepository,
     ProfileRepository,
     SafetyEventRepository,
@@ -17,6 +18,7 @@ from app.repositories.protocols import (
 )
 from app.repositories.sqlalchemy.auth import SqlAlchemyAuthRepository
 from app.repositories.sqlalchemy.chat import SqlAlchemyChatRepository
+from app.repositories.sqlalchemy.files import SqlAlchemyFileUploadRepository
 from app.repositories.sqlalchemy.model_calls import SqlAlchemyModelCallRepository, StoredAiModelCall
 from app.repositories.sqlalchemy.records import (
     SqlAlchemyCheckinRepository,
@@ -28,6 +30,7 @@ from app.repositories.sqlalchemy.profile import SqlAlchemyProfileRepository
 from app.repositories.sqlalchemy.subscription import SqlAlchemySubscriptionRepository
 from app.repositories.sqlalchemy.usage import SqlAlchemyUsageCounterRepository
 from app.services.chat_service import StoredMessage
+from app.services.file_service import StoredFileUpload
 from app.services.food_service import StoredFoodLog
 from app.services.records_service import StoredCheckin
 from app.services.safety_service import StoredSafetyEvent
@@ -184,6 +187,35 @@ def test_sqlalchemy_chat_repository_persists_threads_and_messages() -> None:
         assert len(messages) == 1
         assert messages[0].id == message.id
         assert messages[0].structured_json == {"source": "test"}
+
+
+def test_sqlalchemy_file_upload_repository_persists_user_files() -> None:
+    with SessionLocal() as session:
+        auth_repo = SqlAlchemyAuthRepository(session)
+        file_repo = SqlAlchemyFileUploadRepository(session)
+        assert isinstance(file_repo, FileUploadRepository)
+        user = auth_repo.create_user(unique_email("db-file"), "hash", "File")
+        other_user = auth_repo.create_user(unique_email("db-file-other"), "hash", "Other")
+        session.commit()
+
+        upload = file_repo.create(
+            StoredFileUpload(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                source_message_id=None,
+                object_key="user-files/user/report.txt",
+                filename="report.txt",
+                content_type="text/plain",
+                size_bytes=12,
+                status="parsed",
+                summary_text="summary",
+            )
+        )
+        session.commit()
+
+        assert upload.filename == "report.txt"
+        assert file_repo.list_for_user(user.id)[0].object_key == "user-files/user/report.txt"
+        assert file_repo.list_for_user(other_user.id) == []
 
 
 def test_sqlalchemy_food_and_workout_repositories_persist_user_scoped_logs() -> None:

@@ -29,6 +29,7 @@ def clean_database() -> Generator[None, None, None]:
                     safety_events,
                     subscriptions,
                     usage_counters,
+                    uploaded_files,
                     user_profiles,
                     users,
                     workout_logs

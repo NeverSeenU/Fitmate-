@@ -99,7 +99,10 @@ def test_s3_object_storage_writes_and_deletes_with_prefix() -> None:
 
 
 def test_storage_factory_keeps_memory_local_and_selects_s3_for_configured_driver() -> None:
-    assert isinstance(create_object_storage(Settings(object_storage_driver="memory")), LocalObjectStorage)
+    first = create_object_storage(Settings(object_storage_driver="memory"))
+    second = create_object_storage(Settings(object_storage_driver="memory"))
+    assert isinstance(first, LocalObjectStorage)
+    assert first is second
 
 
 def test_food_photo_upload_uses_storage_boundary_and_logs_only_object_key() -> None:

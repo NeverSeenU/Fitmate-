@@ -5,8 +5,9 @@ import uuid
 
 
 class PrivacyService:
-    def __init__(self, food_service_dependency: object | None = None) -> None:
+    def __init__(self, food_service_dependency: object | None = None, file_service_dependency: object | None = None) -> None:
         self.food_service = food_service_dependency
+        self.file_service = file_service_dependency
 
     def create_export_job(self, user_id: str) -> dict:
         return {
@@ -20,6 +21,12 @@ class PrivacyService:
         job = self._scheduled_job(user_id=user_id, scope="food_photos")
         if self.food_service is not None:
             job["deleted_photo_count"] = self.food_service.delete_user_photos(user_id)
+        return job
+
+    def schedule_file_deletion(self, user_id: str) -> dict:
+        job = self._scheduled_job(user_id=user_id, scope="uploaded_files")
+        if self.file_service is not None:
+            job["deleted_file_count"] = self.file_service.delete_user_files(user_id)
         return job
 
     def schedule_account_deletion(self, user_id: str) -> dict:

@@ -25,6 +25,14 @@ def delete_food_photos(
     return service.schedule_photo_deletion(user_id=user["id"])
 
 
+@router.delete("/me/files", status_code=status.HTTP_202_ACCEPTED)
+def delete_uploaded_files(
+    user: CurrentUser,
+    service: Annotated[PrivacyService, Depends(get_privacy_service)],
+) -> dict:
+    return service.schedule_file_deletion(user_id=user["id"])
+
+
 @router.delete("/me", status_code=status.HTTP_202_ACCEPTED)
 def delete_account(
     user: CurrentUser,

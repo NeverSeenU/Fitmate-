@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.config import get_settings, is_local_runtime
 from app.repositories.sqlalchemy.auth import SqlAlchemyAuthRepository
 from app.repositories.sqlalchemy.chat import SqlAlchemyChatRepository
+from app.repositories.sqlalchemy.files import SqlAlchemyFileUploadRepository
 from app.repositories.sqlalchemy.model_calls import SqlAlchemyModelCallRepository
 from app.repositories.sqlalchemy.profile import SqlAlchemyProfileRepository
 from app.repositories.sqlalchemy.records import (
@@ -20,6 +21,7 @@ from app.repositories.sqlalchemy.usage import SqlAlchemyUsageCounterRepository
 from app.services.admin_service import AdminService
 from app.services.auth_service import AuthService
 from app.services.chat_service import ChatService
+from app.services.file_service import FileService
 from app.services.food_service import FoodService
 from app.services.privacy_service import PrivacyService
 from app.services.profile_service import ProfileService
@@ -88,8 +90,19 @@ def get_food_service(db: DbSession) -> FoodService:
     )
 
 
+def get_file_service(db: DbSession) -> FileService:
+    return FileService(
+        store=SqlAlchemyFileUploadRepository(db),
+        chat_service_dependency=get_chat_service(db),
+        storage=create_object_storage(get_settings()),
+    )
+
+
 def get_privacy_service(db: DbSession) -> PrivacyService:
-    return PrivacyService(food_service_dependency=get_food_service(db))
+    return PrivacyService(
+        food_service_dependency=get_food_service(db),
+        file_service_dependency=get_file_service(db),
+    )
 
 
 def get_workout_service(db: DbSession) -> WorkoutService:

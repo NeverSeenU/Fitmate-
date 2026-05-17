@@ -41,6 +41,13 @@ export type PhotoUploadInput = {
   userNote?: string | null;
 };
 
+export type FileUploadInput = {
+  threadId: string;
+  fileUri: string;
+  filename: string;
+  mimeType: string;
+};
+
 export type FoodPhotoAnalysisResponse = {
   food_analysis: {
     food_log_id: string | null;
@@ -134,6 +141,9 @@ export function createBackendApi(options: ApiClientOptions = {}) {
       patchLog: (foodLogId: string, payload: Record<string, unknown>) => client.patch(`/food/logs/${encodeURIComponent(foodLogId)}`, payload),
       discardLog: (foodLogId: string) => client.post(`/food/logs/${encodeURIComponent(foodLogId)}/discard`, {}),
       deleteLog: (foodLogId: string) => client.delete(`/food/logs/${encodeURIComponent(foodLogId)}`),
+    },
+    files: {
+      upload: (input: FileUploadInput) => client.multipart('/files/upload', new FileUploadBody(input)),
     },
     records: {
       today: (date?: string) => (
@@ -254,7 +264,7 @@ class ApiClient {
     return this.request(path, { method: 'DELETE' });
   }
 
-  multipart(path: string, body: PhotoUploadBody) {
+  multipart(path: string, body: PhotoUploadBody | FileUploadBody) {
     return this.request(path, { method: 'POST', body, multipart: true });
   }
 
@@ -335,10 +345,29 @@ function createPhotoUploadBody(input: PhotoUploadInput) {
   return new PhotoUploadBody(input);
 }
 
+class FileUploadBody {
+  constructor(private readonly input: FileUploadInput) {}
+
+  toFormData() {
+    const data = new FormData();
+    data.append('thread_id', this.input.threadId);
+    data.append('file', {
+      uri: this.input.fileUri,
+      name: this.input.filename,
+      type: this.input.mimeType,
+    } as unknown as Blob);
+    return data;
+  }
+
+  toString() {
+    return `thread_id=${this.input.threadId}&file=${this.input.filename}`;
+  }
+}
+
 async function defaultFetch(url: string, init: ApiRequestInit): Promise<ApiResponseLike> {
   const requestInit = {
     ...init,
-    body: init.body instanceof PhotoUploadBody ? init.body.toFormData() : init.body,
+    body: init.body instanceof PhotoUploadBody || init.body instanceof FileUploadBody ? init.body.toFormData() : init.body,
   };
   const response = await fetch(url, requestInit as RequestInit);
   return response as ApiResponseLike;

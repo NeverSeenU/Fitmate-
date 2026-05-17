@@ -60,6 +60,10 @@ def test_privacy_export_and_photo_delete_are_authenticated_placeholders() -> Non
     assert photo_delete.json()["status"] == "scheduled"
     assert photo_delete.json()["scope"] == "food_photos"
 
+    file_delete = client.delete("/v1/me/files", headers=headers)
+    assert file_delete.status_code == 202
+    assert file_delete.json()["scope"] == "uploaded_files"
+
 
 def test_account_delete_is_soft_delete_placeholder() -> None:
     headers = auth_headers("delete-account@example.com")

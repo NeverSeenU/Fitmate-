@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Mobile smoke automation and production storage adapter completed
-- **Next task:** File upload and parsing pipeline
+- **Current task:** File upload and parsing pipeline completed
+- **Next task:** Deep file parsing for PDF, Word, Excel, body reports, menus, and workout plans
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -241,9 +241,17 @@
 - Mobile workflow smoke automation now lives behind `npm.cmd run smoke:mobile` and emits structured logs for chat send, workout record, weight check-in, file metadata, and fair-use error copy.
 - Mobile API fair-use errors now map to user-readable Chinese copy.
 - `python -m pytest backend\tests`, `python -m alembic upgrade head --sql`, `npm.cmd run typecheck`, `npm.cmd test`, and `npm.cmd run smoke:mobile` passed after storage and mobile smoke automation.
+- File upload API now lives at `POST /v1/files/upload` with authenticated, user-owned thread checks.
+- Uploaded files are stored through the object-storage protocol and persisted in the `uploaded_files` table.
+- Alembic migration `0003_add_uploaded_files` adds file upload persistence.
+- Text and CSV uploads now return a parsed preview summary in chat; PDF, Word, Excel, and image files return saved metadata summaries until deep parsers are added.
+- Unsupported file types and files over 15 MB return stable API errors.
+- Uploaded files are privacy-deletable through `DELETE /v1/me/files`, which removes stored objects through the storage boundary.
+- Mobile backend mode now uploads selected files and shows the backend summary in chat; mock mode still records local file metadata without uploading.
+- Tests cover file upload auth, supported upload summaries, unsupported type, size limit, user-owned thread checks, repository persistence, and privacy deletion.
 
 ## What's Next
-- Start the file upload and parsing pipeline: explicit user-approved upload, storage, parsing summary, and privacy deletion coverage.
+- Add deep parsers for PDF, Word, Excel, body reports, menus, and workout plans, then surface structured file insights in product flows.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

@@ -6,10 +6,13 @@ from app.storage.protocols import ObjectStorage
 from app.storage.s3 import S3ObjectStorage
 
 
+_local_storage = LocalObjectStorage()
+
+
 def create_object_storage(settings: Settings) -> ObjectStorage:
     driver = settings.object_storage_driver.lower()
     if driver == "memory":
-        return LocalObjectStorage()
+        return _local_storage
     if driver == "s3":
         return S3ObjectStorage(
             bucket=settings.object_storage_bucket,
