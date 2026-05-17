@@ -9,6 +9,7 @@ export function AttachmentPanel({
   takeFoodPhoto,
   chooseFoodPhoto,
   startFoodRecord,
+  openFile,
   createCheckin,
   sendWorkout,
 }: {
@@ -16,6 +17,7 @@ export function AttachmentPanel({
   takeFoodPhoto?: () => void;
   chooseFoodPhoto?: () => void;
   startFoodRecord?: () => void;
+  openFile?: () => void;
   createCheckin?: () => void;
   sendWorkout?: () => void;
 }) {
@@ -24,7 +26,7 @@ export function AttachmentPanel({
       <View style={styles.panelGrid}>
         <PanelAction label="食物照片" hint="拍照估算热量和营养" onPress={takeFoodPhoto} />
         <PanelAction label="相册图片" hint="上传已有餐食照片" onPress={chooseFoodPhoto} />
-        <PanelAction label="文件" hint="体检、计划、菜单" />
+        <PanelAction label="文件" hint="体检、计划、菜单" onPress={openFile} />
         <PanelAction label="运动记录" hint="时长、强度、消耗" onPress={sendWorkout} />
         <PanelAction label="食物记录" hint="手动输入食物和份量" onPress={startFoodRecord} />
         <PanelAction label="体重打卡" hint="同步到记录页" onPress={createCheckin} />

@@ -147,6 +147,7 @@ export function TopBar({
   subtitle,
   badge,
   right,
+  rightVariant,
   onRight,
   compact,
 }: {
@@ -154,6 +155,7 @@ export function TopBar({
   subtitle: string;
   badge?: string;
   right: string;
+  rightVariant?: 'icon' | 'subscribe';
   onRight: () => void;
   compact?: boolean;
 }) {
@@ -166,8 +168,8 @@ export function TopBar({
           <Text style={styles.muted}>{subtitle}</Text>
         </View>
       </View>
-      <Pressable style={styles.iconButton} onPress={onRight}>
-        <Text style={styles.iconText}>{right}</Text>
+      <Pressable style={rightVariant === 'subscribe' ? styles.subscribeButton : styles.iconButton} onPress={onRight}>
+        <Text style={rightVariant === 'subscribe' ? styles.subscribeText : styles.iconText}>{right}</Text>
       </Pressable>
     </View>
   );

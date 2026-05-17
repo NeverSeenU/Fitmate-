@@ -27,7 +27,7 @@ This is the formal task queue for the main Codex conversation and subagent team.
 ### P2-2: AI Photo Path Hardening
 - Owner: AI/Vision Lead / Backend Lead
 - Files: `backend/app/api/food.py`, `backend/app/ai/router.py`, `backend/app/ai/providers/openai_compatible.py`, `backend/app/services/food_service.py`
-- Done when: upload size/MIME checks, timeout behavior, provider error responses, and object-storage cleanup are covered by tests.
+- Done when: upload size/MIME checks, timeout behavior, provider-missing feedback, provider error responses, and object-storage cleanup are covered by tests.
 
 ### P2-3: Replace Contract Mocks
 - Owner: Backend Lead / Product Lead

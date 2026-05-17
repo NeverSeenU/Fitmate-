@@ -79,13 +79,15 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       if (!text.trim()) {
         return;
       }
+      const userMessage: ChatMessage = { id: `user-${Date.now()}`, role: 'user', text };
       if (!api) {
         addMessages(getState, setState, [
-          { id: `user-${Date.now()}`, role: 'user', text },
+          userMessage,
           { id: `assistant-${Date.now()}`, role: 'assistant', text: '收到，我会按当前记录继续分析。' },
         ]);
         return;
       }
+      addMessages(getState, setState, [userMessage]);
       const response = await api.chat.sendTextMessage({ threadId, text }) as {
         message?: { id?: string; content_text?: string };
         user_message?: { id?: string; content_text?: string };
@@ -93,11 +95,6 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         food_analysis?: FoodPhotoAnalysisResponse['food_analysis'];
       };
       const messages: ChatMessage[] = [
-        {
-          id: response.user_message?.id ?? `user-${Date.now()}`,
-          role: 'user',
-          text: response.user_message?.content_text ?? text,
-        },
         {
           id: response.assistant_message?.id ?? response.message?.id ?? `assistant-${Date.now()}`,
           role: 'assistant',

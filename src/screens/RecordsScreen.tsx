@@ -60,7 +60,8 @@ export function RecordsScreen({
       <TopBar
         title="Check-in & Records"
         subtitle="今日状态和自动记录"
-        right="*"
+        right="Pro"
+        rightVariant="subscribe"
         onRight={() => openSheet('subscription')}
         compact
       />

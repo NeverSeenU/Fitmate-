@@ -202,9 +202,15 @@
 - GitHub Actions quality gates now live in `.github/workflows/quality-gates.yml`.
 - CI runs mobile `npm ci`, TypeScript typecheck, mobile logic tests, backend pytest against a PostgreSQL service, and Alembic SQL rendering on pushes and pull requests to `main`.
 - `pytest backend\tests`, `npm.cmd run typecheck`, `npm.cmd test`, and `python -m alembic upgrade head --sql` passed after adding CI.
+- P2-1 Expo Go smoke exposed mobile interaction gaps: chat send did not immediately render the user's outgoing bubble, user/profile edit fields did not reliably move above the keyboard, attachment panel file/workout/weight actions lacked visible forms or feedback, and Records used the wrong subscription button style.
+- Chat send now optimistically renders the user's message before the backend reply and has a mobile logic regression test for this behavior.
+- Chat attachment actions now open visible keyboard-aware forms for weight check-in and workout notes; file import now opens a clear placeholder panel instead of doing nothing.
+- Profile editing now uses keyboard avoidance with extra scroll padding so text fields can remain visible while typing.
+- Records top-right subscription entry now uses the same green `Pro` pill style as the AI chat screen.
+- `npm.cmd run typecheck` and `npm.cmd test` passed after the P2-1 interaction fixes.
 
 ## What's Next
-- Resume P2 product stabilization with the Expo Go smoke checklist, then harden the AI photo path.
+- Re-run the Expo Go smoke checklist for chat send, profile editing, attachment actions, Records Pro styling, and food-card flows; then harden the AI photo path and provider-missing feedback.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

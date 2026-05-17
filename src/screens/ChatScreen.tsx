@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Keyboard, KeyboardAvoidingView, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { BottomTabs, Button, ChatBubble, ChatHeader, FoodAnalysisCard } from '../components/ui';
 import type { AppDataState } from '../domain/models';
@@ -25,12 +25,15 @@ export function ChatScreen({
   actions: ReturnType<typeof createAppActions>;
 }) {
   const [panel, setPanel] = useState<ChatPanel>(null);
+  const [utilityPanel, setUtilityPanel] = useState<'weight' | 'workout' | 'file' | null>(null);
   const [panelBack, setPanelBack] = useState<ChatPanel>(null);
   const [composerText, setComposerText] = useState('');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [foodEditorOpen, setFoodEditorOpen] = useState(false);
   const [foodForm, setFoodForm] = useState(foodAnalysisToForm(appState.activeFoodAnalysis));
+  const [weightForm, setWeightForm] = useState({ weightKg: appState.profile.weightKg.toFixed(1), notes: '' });
+  const [workoutForm, setWorkoutForm] = useState({ detail: '' });
   const swipeResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) =>
@@ -135,6 +138,51 @@ export function ChatScreen({
     setPanel(null);
   };
 
+  const openWeightPanel = () => {
+    Keyboard.dismiss();
+    setPanel(null);
+    setWeightForm({ weightKg: appState.profile.weightKg.toFixed(1), notes: '' });
+    setUtilityPanel('weight');
+    setStatus('');
+  };
+
+  const submitWeightCheckin = () => {
+    void runAction('正在保存体重打卡...', '体重已写入今日记录', async () => {
+      await actions.createCheckin({
+        weightKg: parsePositiveNumber(weightForm.weightKg),
+        notes: weightForm.notes.trim(),
+      });
+      setUtilityPanel(null);
+    });
+  };
+
+  const openWorkoutPanel = () => {
+    Keyboard.dismiss();
+    setPanel(null);
+    setWorkoutForm({ detail: '' });
+    setUtilityPanel('workout');
+    setStatus('');
+  };
+
+  const submitWorkout = () => {
+    const detail = workoutForm.detail.trim();
+    if (!detail) {
+      setStatus('请先输入运动内容');
+      return;
+    }
+    void runAction('正在发送运动记录...', '运动记录已发送', async () => {
+      await actions.sendText(appState.threads[0]?.id ?? 'food-today', `运动记录：${detail}`);
+      setUtilityPanel(null);
+    });
+  };
+
+  const openFilePanel = () => {
+    Keyboard.dismiss();
+    setPanel(null);
+    setUtilityPanel('file');
+    setStatus('');
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.screen}
@@ -213,8 +261,9 @@ export function ChatScreen({
           takeFoodPhoto={() => void analyzePickedPhoto('camera')}
           chooseFoodPhoto={() => void analyzePickedPhoto('library')}
           startFoodRecord={openManualFoodRecord}
-          createCheckin={() => void runAction('正在记录体重...', '体重已写入今日记录', () => actions.createCheckin({ weightKg: appState.profile.weightKg, hungerLevel: 5 }))}
-          sendWorkout={() => void runAction('正在发送运动记录...', '运动记录已发送', () => actions.sendText(appState.threads[0]?.id ?? 'food-today', '今天训练 80 分钟，中高强度。'))}
+          openFile={openFilePanel}
+          createCheckin={openWeightPanel}
+          sendWorkout={openWorkoutPanel}
         />
       )}
       {panel === 'threads' && (
@@ -237,6 +286,34 @@ export function ChatScreen({
         />
       )}
       {panel === 'new' && <NewChatPanel close={closePanel} createThread={actions.createThread} />}
+      {utilityPanel === 'weight' ? (
+        <UtilitySheet title="体重打卡" subtitle="记录今天的体重和备注" onClose={() => setUtilityPanel(null)}>
+          <NumberField label="今日体重 kg" value={weightForm.weightKg} onChangeText={(value) => setWeightForm({ ...weightForm, weightKg: value })} />
+          <TextArea label="备注" value={weightForm.notes} onChangeText={(value) => setWeightForm({ ...weightForm, notes: value })} placeholder="例如：早上空腹、训练后、经期水肿等。" />
+          <View style={styles.editorFooter}>
+            <Button label="取消" variant="secondary" onPress={() => setUtilityPanel(null)} disabled={busy} style={styles.actionButton} />
+            <Button label={busy ? '保存中...' : '保存体重'} onPress={submitWeightCheckin} disabled={busy} style={styles.actionButton} />
+          </View>
+        </UtilitySheet>
+      ) : null}
+      {utilityPanel === 'workout' ? (
+        <UtilitySheet title="运动记录" subtitle="写下训练内容，FitMate 会放进聊天继续分析" onClose={() => setUtilityPanel(null)}>
+          <TextArea label="训练内容" value={workoutForm.detail} onChangeText={(value) => setWorkoutForm({ detail: value })} placeholder="例如：力量训练 60 分钟，卧推、深蹲、划船，最后跑步 20 分钟。" autoFocus />
+          <View style={styles.editorFooter}>
+            <Button label="取消" variant="secondary" onPress={() => setUtilityPanel(null)} disabled={busy} style={styles.actionButton} />
+            <Button label={busy ? '发送中...' : '发送运动记录'} onPress={submitWorkout} disabled={busy} style={styles.actionButton} />
+          </View>
+        </UtilitySheet>
+      ) : null}
+      {utilityPanel === 'file' ? (
+        <UtilitySheet title="文件" subtitle="体检、菜单和训练计划导入" onClose={() => setUtilityPanel(null)}>
+          <View style={styles.privacyCard}>
+            <Text style={styles.h2}>文件导入正在接入</Text>
+            <Text style={styles.muted}>当前版本还没有文件选择器。你可以先把体检、菜单或训练计划内容复制到聊天框，FitMate 会按文本继续分析。</Text>
+          </View>
+          <Button label="知道了" onPress={() => setUtilityPanel(null)} />
+        </UtilitySheet>
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -324,6 +401,68 @@ function NumberField({ label, value, onChangeText }: { label: string; value: str
         placeholderTextColor="#777"
       />
     </View>
+  );
+}
+
+function TextArea({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  autoFocus,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  autoFocus?: boolean;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput
+        style={[styles.input, styles.detailInput]}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#777"
+        multiline
+        autoFocus={autoFocus}
+      />
+    </View>
+  );
+}
+
+function UtilitySheet({
+  title,
+  subtitle,
+  onClose,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <KeyboardAvoidingView
+      style={styles.sheet}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+    >
+      <View style={styles.editorHeader}>
+        <View>
+          <Text style={styles.h1}>{title}</Text>
+          <Text style={styles.muted}>{subtitle}</Text>
+        </View>
+        <Pressable style={styles.miniClose} onPress={onClose}>
+          <Text style={styles.iconText}>X</Text>
+        </Pressable>
+      </View>
+      <ScrollView contentContainerStyle={styles.keyboardContent} keyboardShouldPersistTaps="handled">
+        {children}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

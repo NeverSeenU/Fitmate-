@@ -540,6 +540,43 @@ async function testFoodActionStateLifecycle() {
   assert(!state.records.some((record) => record.id === firstFoodId), 'delete record must remove confirmed food record');
 }
 
+async function testSendTextShowsUserMessageBeforeBackendReply() {
+  let state: AppDataState = {
+    ...initialAppState,
+    chatMessages: [],
+  };
+  let releaseReply: (() => void) | undefined;
+  const actions = createAppActions({
+    api: {
+      chat: {
+        async createThread() {
+          return {};
+        },
+        async sendTextMessage(payload: { threadId: string; text: string }) {
+          await new Promise<void>((resolve) => {
+            releaseReply = resolve;
+          });
+          return {
+            assistant_message: { id: 'assistant-delayed', content_text: `reply:${payload.text}` },
+          };
+        },
+      },
+    } as unknown as NonNullable<Parameters<typeof createAppActions>[0]['api']>,
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  const pending = actions.sendText('food-today', 'hello FitMate');
+  assert(state.chatMessages.length === 1, 'sendText must immediately show the user bubble before backend reply');
+  assert(state.chatMessages[0].role === 'user' && state.chatMessages[0].text === 'hello FitMate', 'optimistic chat bubble must preserve user text');
+  releaseReply?.();
+  await pending;
+  assert(state.chatMessages.length === 2, 'sendText must append only the assistant reply after backend response');
+  assert(state.chatMessages.filter((message) => message.role === 'user').length === 1, 'sendText must not duplicate the user bubble');
+}
+
 async function run() {
   await testSubscriptionEntitlements();
   await testVisionFallback();
@@ -553,6 +590,7 @@ async function run() {
   await testBackendAppDataHydratesLiveRecordsShape();
   await testAppActionsCallBackendMutationsAndUpdateState();
   await testFoodActionStateLifecycle();
+  await testSendTextShowsUserMessageBeforeBackendReply();
 }
 
 void run();

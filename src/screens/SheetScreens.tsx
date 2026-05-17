@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { Button, Field, Plan, SettingsRow, TopBar } from '../components/ui';
 import type { AppDataState, Gender } from '../domain/models';
 import type { createAppActions } from '../services/appActions';
@@ -178,9 +178,13 @@ export function ProfileSheet({
   };
 
   return (
-    <View style={styles.sheet}>
+    <KeyboardAvoidingView
+      style={styles.sheet}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+    >
       <TopBar title="用户资料" subtitle="身体数据仅用于营养和训练建议" right="X" onRight={close} />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.keyboardContent} keyboardShouldPersistTaps="handled">
         <View style={styles.privacyCard}>
           <Text style={styles.h2}>身体数据属于隐私信息</Text>
           <Text style={styles.muted}>这些内容不会出现在公开页面，只用于估算热量、蛋白目标和训练恢复建议。</Text>
@@ -200,7 +204,7 @@ export function ProfileSheet({
         <Button label={busy ? '保存中...' : '保存修改'} onPress={() => void save()} disabled={busy} />
         {status ? <Text style={styles.formStatus}>{status}</Text> : null}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

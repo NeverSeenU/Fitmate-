@@ -187,6 +187,12 @@ export const styles = StyleSheet.create({
     paddingBottom: compactPhone ? 18 : 24,
     gap: compactPhone ? 10 : 12,
   },
+  keyboardContent: {
+    paddingHorizontal: narrowPhone ? 12 : 14,
+    paddingTop: 12,
+    paddingBottom: compactPhone ? 130 : 150,
+    gap: compactPhone ? 10 : 12,
+  },
   field: {
     marginBottom: compactPhone ? 11 : 13,
     gap: 6,
