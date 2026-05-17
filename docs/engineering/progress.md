@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Subscription fair-use enforcement completed
-- **Next task:** Re-run Expo Go smoke, then start mobile UI automation or production storage adapter
+- **Current task:** Mobile smoke automation and production storage adapter completed
+- **Next task:** File upload and parsing pipeline
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -234,9 +234,16 @@
 - Over-limit requests now return stable `429 fair_use_limit_reached` responses without storing chat/photo/workout output.
 - Tests cover usage repository persistence, successful usage increments for all three paths, and fair-use 429 behavior for chat, food photo, and workout analysis.
 - `python -m alembic upgrade head`, `python -m pytest backend\tests`, `python -m alembic upgrade head --sql`, `npm.cmd run typecheck`, and `npm.cmd test` passed after fair-use enforcement.
+- S3-compatible object storage adapter now implements the existing `ObjectStorage` protocol for food-photo save/delete.
+- Runtime storage selection is now driven by `OBJECT_STORAGE_DRIVER`; local/test can use `memory`, production requires `s3`.
+- Production startup validation now rejects in-memory object storage and requires a non-empty object storage bucket.
+- Storage docs now cover S3-compatible endpoint, region, access keys, bucket, and key prefix environment variables.
+- Mobile workflow smoke automation now lives behind `npm.cmd run smoke:mobile` and emits structured logs for chat send, workout record, weight check-in, file metadata, and fair-use error copy.
+- Mobile API fair-use errors now map to user-readable Chinese copy.
+- `python -m pytest backend\tests`, `python -m alembic upgrade head --sql`, `npm.cmd run typecheck`, `npm.cmd test`, and `npm.cmd run smoke:mobile` passed after storage and mobile smoke automation.
 
 ## What's Next
-- Re-run the Expo Go smoke checklist for workout record cards, food-photo unavailable feedback, iPhone Files selection, and fair-use messages, then start mobile UI automation or the production storage adapter.
+- Start the file upload and parsing pipeline: explicit user-approved upload, storage, parsing summary, and privacy deletion coverage.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

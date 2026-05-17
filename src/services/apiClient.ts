@@ -358,6 +358,9 @@ function apiErrorMessage(status: number, detail: unknown) {
   if (typeof nested === 'object' && nested?.code === 'vision_unavailable') {
     return '图片识别暂时不可用：AI 识别服务还没有接入或当前不可用。你可以先用文字记录食物。';
   }
+  if (typeof nested === 'object' && nested?.code === 'fair_use_limit_reached') {
+    return '今天的使用次数已达到当前订阅的公平使用上限。你可以明天再试，或升级订阅后继续使用。';
+  }
   if (typeof nested === 'object' && typeof nested.message === 'string') {
     return nested.message;
   }

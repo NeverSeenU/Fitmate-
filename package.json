@@ -8,7 +8,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "tsc -p tsconfig.test.json && node .test-build/tests/runLogicTests.js"
+    "test": "tsc -p tsconfig.test.json && node .test-build/tests/runLogicTests.js",
+    "smoke:mobile": "tsc -p tsconfig.test.json && node .test-build/tests/runMobileSmoke.js"
   },
   "dependencies": {
     "expo": "~54.0.33",

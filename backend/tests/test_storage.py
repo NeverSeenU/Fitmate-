@@ -2,7 +2,10 @@ from app.services.chat_service import ChatService, InMemoryChatStore
 from app.services.food_service import FoodService, InMemoryFoodLogStore
 from app.services.privacy_service import PrivacyService
 from app.services.subscription_service import InMemorySubscriptionStore, SubscriptionService
+from app.storage.factory import create_object_storage
 from app.storage.local import LocalObjectStorage
+from app.storage.s3 import S3ObjectStorage
+from app.config import Settings
 
 
 VISION_ANALYSIS = {
@@ -58,6 +61,45 @@ def test_local_object_storage_saves_and_deletes_bytes() -> None:
     assert storage.delete(stored.object_key) is True
     assert storage.get_bytes(stored.object_key) is None
     assert storage.delete(stored.object_key) is False
+
+
+class FakeS3Client:
+    def __init__(self) -> None:
+        self.puts: list[dict] = []
+        self.deletes: list[dict] = []
+
+    def put_object(self, **kwargs) -> None:
+        self.puts.append(kwargs)
+
+    def delete_object(self, **kwargs) -> None:
+        self.deletes.append(kwargs)
+
+
+def test_s3_object_storage_writes_and_deletes_with_prefix() -> None:
+    client = FakeS3Client()
+    storage = S3ObjectStorage(bucket="fitmate-prod", key_prefix="prod/food-photos", client=client)
+
+    stored = storage.put("user-1/photo.jpg", b"image-bytes", "image/jpeg")
+    deleted = storage.delete(stored.object_key)
+
+    assert stored.object_key == "prod/food-photos/user-1/photo.jpg"
+    assert stored.content_type == "image/jpeg"
+    assert stored.size_bytes == len(b"image-bytes")
+    assert client.puts == [{
+        "Bucket": "fitmate-prod",
+        "Key": "prod/food-photos/user-1/photo.jpg",
+        "Body": b"image-bytes",
+        "ContentType": "image/jpeg",
+    }]
+    assert deleted is True
+    assert client.deletes == [{
+        "Bucket": "fitmate-prod",
+        "Key": "prod/food-photos/user-1/photo.jpg",
+    }]
+
+
+def test_storage_factory_keeps_memory_local_and_selects_s3_for_configured_driver() -> None:
+    assert isinstance(create_object_storage(Settings(object_storage_driver="memory")), LocalObjectStorage)
 
 
 def test_food_photo_upload_uses_storage_boundary_and_logs_only_object_key() -> None:

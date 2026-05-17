@@ -36,6 +36,12 @@ Mobile logic tests:
 npm.cmd test
 ```
 
+Mobile workflow smoke with structured logs:
+
+```powershell
+npm.cmd run smoke:mobile
+```
+
 Expo dev server:
 
 ```powershell
@@ -105,6 +111,8 @@ Production runtime rules:
 
 - `AUTH_SECRET_KEY` and `ADMIN_SECRET` must be real strong secrets, not local defaults.
 - Production startup fails if either secret is shorter than 32 characters.
+- Production startup requires `OBJECT_STORAGE_DRIVER=s3` and a non-empty `OBJECT_STORAGE_BUCKET`.
+- S3-compatible storage reads `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_ACCESS_KEY_ID`, `OBJECT_STORAGE_SECRET_ACCESS_KEY`, and `OBJECT_STORAGE_KEY_PREFIX`.
 - Password reset request responses include `debug_reset_token` only in `development`, `local`, or `test`.
 
 ## GitHub Backup

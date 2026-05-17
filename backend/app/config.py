@@ -10,7 +10,13 @@ class Settings:
     api_version: str = "v1"
     database_url: str = "postgresql+psycopg://fitmate:fitmate@localhost:5432/fitmate"
     redis_url: str = "redis://localhost:6379/0"
+    object_storage_driver: str = "memory"
     object_storage_bucket: str = "fitmate-food-photos"
+    object_storage_endpoint: str = ""
+    object_storage_region: str = "us-east-1"
+    object_storage_access_key_id: str = ""
+    object_storage_secret_access_key: str = ""
+    object_storage_key_prefix: str = "food-photos"
     xiaomi_model_name: str = "mimo-v2-omni"
     qwen_model_name: str = "qwen3-vl-plus"
     auth_secret_key: str = "fitmate-local-dev-secret"
@@ -25,10 +31,22 @@ def get_settings() -> Settings:
         api_version=os.getenv("FITMATE_API_VERSION", Settings.api_version),
         database_url=os.getenv("DATABASE_URL", Settings.database_url),
         redis_url=os.getenv("REDIS_URL", Settings.redis_url),
+        object_storage_driver=os.getenv("OBJECT_STORAGE_DRIVER", Settings.object_storage_driver),
         object_storage_bucket=os.getenv(
             "OBJECT_STORAGE_BUCKET",
             Settings.object_storage_bucket,
         ),
+        object_storage_endpoint=os.getenv("OBJECT_STORAGE_ENDPOINT", Settings.object_storage_endpoint),
+        object_storage_region=os.getenv("OBJECT_STORAGE_REGION", Settings.object_storage_region),
+        object_storage_access_key_id=os.getenv(
+            "OBJECT_STORAGE_ACCESS_KEY_ID",
+            Settings.object_storage_access_key_id,
+        ),
+        object_storage_secret_access_key=os.getenv(
+            "OBJECT_STORAGE_SECRET_ACCESS_KEY",
+            Settings.object_storage_secret_access_key,
+        ),
+        object_storage_key_prefix=os.getenv("OBJECT_STORAGE_KEY_PREFIX", Settings.object_storage_key_prefix),
         xiaomi_model_name=os.getenv("XIAOMI_MODEL_NAME", Settings.xiaomi_model_name),
         qwen_model_name=os.getenv("QWEN_MODEL_NAME", Settings.qwen_model_name),
         auth_secret_key=os.getenv("AUTH_SECRET_KEY", Settings.auth_secret_key),
@@ -47,6 +65,10 @@ def validate_runtime_settings(settings: Settings) -> None:
         raise RuntimeError("AUTH_SECRET_KEY must be set to a strong production secret.")
     if _is_weak_secret(settings.admin_secret, Settings.admin_secret):
         raise RuntimeError("ADMIN_SECRET must be set to a strong production secret.")
+    if settings.object_storage_driver.lower() != "s3":
+        raise RuntimeError("OBJECT_STORAGE_DRIVER must be set to s3 in production.")
+    if not settings.object_storage_bucket:
+        raise RuntimeError("OBJECT_STORAGE_BUCKET must be set in production.")
 
 
 def is_local_runtime(settings: Settings) -> bool:

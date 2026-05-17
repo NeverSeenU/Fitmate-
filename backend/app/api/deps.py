@@ -28,6 +28,7 @@ from app.services.safety_service import SafetyService
 from app.services.subscription_service import SubscriptionService
 from app.services.usage_service import UsageService
 from app.services.workout_service import WorkoutService
+from app.storage.factory import create_object_storage
 
 
 _password_reset_tokens: dict[str, str] = {}
@@ -75,6 +76,7 @@ def get_chat_service(db: DbSession) -> ChatService:
 
 
 def get_food_service(db: DbSession) -> FoodService:
+    settings = get_settings()
     subscription = get_subscription_service(db)
     chat = get_chat_service(db)
     return FoodService(
@@ -82,6 +84,7 @@ def get_food_service(db: DbSession) -> FoodService:
         chat_service_dependency=chat,
         subscription_service_dependency=subscription,
         usage_service_dependency=get_usage_service(db),
+        storage=create_object_storage(settings),
     )
 
 
@@ -109,6 +112,7 @@ def get_records_service(db: DbSession) -> RecordsService:
             store=SqlAlchemyFoodLogRepository(db),
             chat_service_dependency=get_chat_service(db),
             subscription_service_dependency=subscription,
+            storage=create_object_storage(get_settings()),
         ),
         workout_service_dependency=WorkoutService(
             store=SqlAlchemyWorkoutLogRepository(db),

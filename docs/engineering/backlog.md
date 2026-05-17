@@ -26,16 +26,6 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ## Priority 3: Product Expansion
 
-### P3-2: Mobile UI Automation
-- Owner: QA Lead / Frontend Lead
-- Files: test tooling to be selected, `src/screens/*`
-- Done when: critical mobile workflows have repeatable smoke automation with screenshots or actionable logs.
-
-### P3-3: Production Storage Adapter
-- Owner: DevOps Lead / Backend Lead
-- Files: `backend/app/storage/*`, `.env.example`, deployment docs
-- Done when: non-local object storage can save and delete food photos through the existing storage protocol.
-
 ### P3-4: File Upload And Parsing Pipeline
 - Owner: Backend Lead / AI-Vision Lead / Frontend Lead
 - Files: `backend/app/api/*`, `backend/app/storage/*`, `src/services/*`, `src/screens/ChatScreen.tsx`
