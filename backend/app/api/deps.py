@@ -4,6 +4,7 @@ from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.config import get_settings, is_local_runtime
 from app.repositories.sqlalchemy.auth import SqlAlchemyAuthRepository
 from app.repositories.sqlalchemy.chat import SqlAlchemyChatRepository
 from app.repositories.sqlalchemy.model_calls import SqlAlchemyModelCallRepository
@@ -41,7 +42,11 @@ def get_auth_service(db: DbSession) -> AuthService:
 
 
 def get_subscription_service(db: DbSession) -> SubscriptionService:
-    return SubscriptionService(store=SqlAlchemySubscriptionRepository(db))
+    settings = get_settings()
+    return SubscriptionService(
+        store=SqlAlchemySubscriptionRepository(db),
+        allow_dev_receipts=is_local_runtime(settings),
+    )
 
 
 def get_profile_service(db: DbSession) -> ProfileService:
@@ -52,7 +57,11 @@ def get_profile_service(db: DbSession) -> ProfileService:
 
 
 def get_chat_service(db: DbSession) -> ChatService:
-    return ChatService(store=SqlAlchemyChatRepository(db))
+    settings = get_settings()
+    return ChatService(
+        store=SqlAlchemyChatRepository(db),
+        allow_contract_mocks=is_local_runtime(settings),
+    )
 
 
 def get_food_service(db: DbSession) -> FoodService:

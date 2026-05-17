@@ -70,9 +70,14 @@ class InMemoryChatStore:
         return self.messages_by_thread_id.get(thread_id, [])
 
 
+class TextChatUnavailableError(RuntimeError):
+    pass
+
+
 class ChatService:
-    def __init__(self, store: InMemoryChatStore | None = None) -> None:
+    def __init__(self, store: InMemoryChatStore | None = None, allow_contract_mocks: bool = True) -> None:
         self.store = store or InMemoryChatStore()
+        self.allow_contract_mocks = allow_contract_mocks
 
     def create_thread(self, user_id: str, title: str, kind: str) -> dict:
         return self._thread_response(self.store.create_thread(user_id, title, kind))
@@ -96,6 +101,8 @@ class ChatService:
         thread = self.store.get_thread(user_id, thread_id)
         if thread is None:
             return None
+        if not self.allow_contract_mocks:
+            raise TextChatUnavailableError("text_chat_provider_not_configured")
         food_analysis = self._text_food_analysis(text)
         self.store.add_message(
             StoredMessage(

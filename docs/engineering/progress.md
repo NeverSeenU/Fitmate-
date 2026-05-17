@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** AI photo path hardening completed
-- **Next task:** Re-run Expo Go smoke, then replace remaining contract mocks
+- **Current task:** Contract mock production gates completed
+- **Next task:** Re-run Expo Go smoke, then start subscription fair-use enforcement
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -222,9 +222,14 @@
 - Food photo analysis now deletes a just-stored object if the vision provider fails after storage, preventing orphaned photo objects.
 - Food photo hardening tests now cover unsupported upload type, upload size limit, provider-unavailable response, and object-storage cleanup on vision failure.
 - `python -m pytest backend\tests`, `npm.cmd run typecheck`, and `npm.cmd test` passed after AI photo path hardening.
+- Backend text chat contract mocks are now explicitly local/test/development only through runtime dependency injection.
+- Non-local text chat paths now fail with a stable `text_chat_unavailable` response instead of silently generating mock assistant text.
+- App Store restore still supports `dev-receipt` for local/test/development smoke, but non-local paths now reject it with `subscription_provider_not_configured` until real receipt validation is wired.
+- Regression tests now cover disabled chat contract mocks and disabled dev receipt restore paths.
+- `python -m pytest backend\tests`, `npm.cmd run typecheck`, and `npm.cmd test` passed after contract mock production gates.
 
 ## What's Next
-- Re-run the Expo Go smoke checklist for workout record cards, food-photo unavailable feedback, and iPhone Files selection, then replace remaining contract mocks.
+- Re-run the Expo Go smoke checklist for workout record cards, food-photo unavailable feedback, and iPhone Files selection, then start subscription fair-use enforcement.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

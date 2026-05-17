@@ -51,8 +51,9 @@ class SubscriptionService:
         "elite": {"food_photo": 360, "chat": 1800, "workout": 360},
     }
 
-    def __init__(self, store: InMemorySubscriptionStore | None = None) -> None:
+    def __init__(self, store: InMemorySubscriptionStore | None = None, allow_dev_receipts: bool = True) -> None:
         self.store = store or InMemorySubscriptionStore()
+        self.allow_dev_receipts = allow_dev_receipts
 
     def get_current(self, user_id: str) -> dict:
         subscription = self.store.get(user_id)
@@ -76,6 +77,8 @@ class SubscriptionService:
         plan = PRODUCT_TO_PLAN.get(product_id)
         if plan is None:
             return {"error": "unknown_product_id"}
+        if not self.allow_dev_receipts:
+            return {"error": "subscription_provider_not_configured"}
         subscription = StoredSubscription(
             user_id=user_id,
             plan=plan,

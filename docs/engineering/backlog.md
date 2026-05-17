@@ -24,11 +24,6 @@ This is the formal task queue for the main Codex conversation and subagent team.
 - Scope: login/register, chat send, food upload, confirm/edit/discard, manual food record, check-in, subscription restore, profile editing.
 - Done when: each flow is tested in Expo Go against the local backend and failures are logged as backlog items.
 
-### P2-3: Replace Contract Mocks
-- Owner: Backend Lead / Product Lead
-- Files: `backend/app/services/chat_service.py`, `backend/app/services/subscription_service.py`, `src/services/*`
-- Done when: mock behavior is behind explicit local-dev flags and production paths use real provider/subscription validation contracts.
-
 ## Priority 3: Product Expansion
 
 ### P3-1: Subscription And Fair-Use Enforcement

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import CurrentUser, get_chat_service
-from app.services.chat_service import ChatService
+from app.services.chat_service import ChatService, TextChatUnavailableError
 
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -44,12 +44,21 @@ def list_messages(thread_id: str, user: CurrentUser, service: ChatServiceDepende
 
 @router.post("/messages")
 def send_text_message(payload: SendTextMessageRequest, user: CurrentUser, service: ChatServiceDependency) -> dict:
-    result = service.send_text_message(
-        user_id=user["id"],
-        thread_id=payload.thread_id,
-        text=payload.text,
-        context=payload.context,
-    )
+    try:
+        result = service.send_text_message(
+            user_id=user["id"],
+            thread_id=payload.thread_id,
+            text=payload.text,
+            context=payload.context,
+        )
+    except TextChatUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "text_chat_unavailable",
+                "message": "Text chat AI is not configured for this environment.",
+            },
+        ) from exc
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="thread_not_found")
     return result

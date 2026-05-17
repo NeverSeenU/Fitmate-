@@ -40,6 +40,8 @@ def restore_subscription(
         receipt=payload.receipt,
     )
     if "error" in result:
+        if result["error"] == "subscription_provider_not_configured":
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=result["error"])
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result["error"])
     return result
 

@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.chat_service import ChatService, InMemoryChatStore, TextChatUnavailableError
 
 
 client = TestClient(app)
@@ -77,6 +78,25 @@ def test_send_text_message_persists_user_and_mock_assistant_messages() -> None:
     ).json()["messages"]
     assert [message["role"] for message in messages] == ["user", "assistant"]
     assert messages[0]["content_text"] == "训练后很饿，想吃甜品"
+
+def test_contract_chat_mock_can_be_disabled_for_production_paths() -> None:
+    service = ChatService(store=InMemoryChatStore(), allow_contract_mocks=False)
+    thread = service.create_thread(user_id="user-1", title="Food", kind="food")
+
+    try:
+        service.send_text_message(
+            user_id="user-1",
+            thread_id=thread["id"],
+            text="训练后很饿",
+            context=None,
+        )
+    except TextChatUnavailableError as exc:
+        assert str(exc) == "text_chat_provider_not_configured"
+    else:
+        raise AssertionError("disabled contract mock must raise")
+
+    assert service.store.list_messages(thread["id"]) == []
+
 
 def test_food_text_message_returns_editable_food_analysis_card() -> None:
     headers = auth_headers("chat-food-card@example.com")

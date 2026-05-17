@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.subscription_service import InMemorySubscriptionStore, SubscriptionService
 
 
 client = TestClient(app)
@@ -72,6 +73,20 @@ def test_restore_updates_user_to_elite_entitlements() -> None:
     assert body["entitlements"]["automatic_recording"] is True
     assert body["entitlements"]["deep_review"] is True
     assert body["entitlements"]["high_confidence_auto_confirm"] is True
+
+
+def test_dev_receipt_restore_can_be_disabled_for_production_paths() -> None:
+    service = SubscriptionService(store=InMemorySubscriptionStore(), allow_dev_receipts=False)
+
+    result = service.restore_app_store_purchase(
+        user_id="user-1",
+        provider="app_store",
+        product_id="fitmate.pro.monthly",
+        receipt="dev-receipt",
+    )
+
+    assert result == {"error": "subscription_provider_not_configured"}
+    assert service.get_current("user-1")["plan"] == "free"
 
 
 def test_checkout_returns_storekit_product_ids() -> None:
