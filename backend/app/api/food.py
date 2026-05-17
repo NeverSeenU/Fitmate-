@@ -4,7 +4,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from pydantic import BaseModel, ConfigDict
 
-from app.ai.router import FoodVisionRouter
+from app.ai.router import FoodVisionRouter, FoodVisionUnavailableError
 from app.api.deps import CurrentUser, DbSession, get_food_service
 from app.repositories.sqlalchemy.model_calls import SqlAlchemyModelCallRepository
 from app.services.food_service import FoodService
@@ -39,14 +39,23 @@ async def analyze_chat_photo(
     vision_router: FoodVisionRouter = Depends(get_food_vision_router),
 ) -> dict:
     image_bytes = await image.read()
-    result = service.analyze_photo(
-        user_id=user["id"],
-        thread_id=thread_id,
-        image_bytes=image_bytes,
-        image_filename=image.filename or "food-photo.jpg",
-        user_note=user_note,
-        vision_router=vision_router,
-    )
+    try:
+        result = service.analyze_photo(
+            user_id=user["id"],
+            thread_id=thread_id,
+            image_bytes=image_bytes,
+            image_filename=image.filename or "food-photo.jpg",
+            user_note=user_note,
+            vision_router=vision_router,
+        )
+    except FoodVisionUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "vision_unavailable",
+                "message": "Food photo analysis is not available yet. Configure Xiaomi/Qwen provider keys or try again later.",
+            },
+        ) from exc
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="thread_not_found")
     return result

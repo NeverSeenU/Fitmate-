@@ -378,6 +378,30 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
           return {};
         },
       },
+      workouts: {
+        async analyze(text: string) {
+          calls.push(`workout:${text}`);
+          return {
+            assistant_message: { id: 'assistant-workout', content_text: 'workout reply' },
+            workout_analysis: {
+              workout_log_id: 'workout-live',
+              workout_type: 'strength',
+              duration_minutes: 45,
+              intensity: 'medium',
+              calories_burned_range_kcal: [180, 270],
+              status: 'pending',
+            },
+          };
+        },
+        async confirmLog(workoutLogId: string) {
+          calls.push(`confirmWorkout:${workoutLogId}`);
+          return { id: workoutLogId, status: 'confirmed' };
+        },
+        async patchLog(workoutLogId: string, payload: Record<string, unknown>) {
+          calls.push(`patchWorkout:${workoutLogId}:${payload.duration_minutes}`);
+          return { id: workoutLogId, status: 'edited' };
+        },
+      },
       food: {
         async analyzePhoto(input: {
           threadId: string;
@@ -462,6 +486,7 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
   await actions.editFoodLogPortion('food-live', '米饭吃了一半');
   await actions.discardFoodLog('food-live');
   await actions.createCheckin({ weightKg: 71.2, moodLevel: 6 });
+  await actions.createWorkoutLog('力量训练 45 分钟');
   await actions.restoreSubscription('fitmate.pro.monthly', 'receipt');
   await actions.updateProfile({ weightKg: 70.8, goalLabel: 'Lean wedding cut' });
   await actions.deletePhotos();
@@ -474,6 +499,7 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
   assert(calls.includes('patchFood:food-live:米饭吃了一半'), 'edit food action must call backend');
   assert(calls.includes('discardFood:food-live'), 'discard food action must call backend');
   assert(calls.includes('checkin:71.2:6'), 'checkin action must map payload');
+  assert(calls.includes('workout:力量训练 45 分钟'), 'workout action must call backend');
   assert(calls.includes('restore:fitmate.pro.monthly'), 'restore action must call backend');
   assert(calls.includes('profile:70.8:Lean wedding cut'), 'profile action must map backend payload');
   assert(calls.includes('deletePhotos'), 'deletePhotos action must call backend');
@@ -538,6 +564,11 @@ async function testFoodActionStateLifecycle() {
 
   await actions.deleteRecord(firstFoodId ?? '');
   assert(!state.records.some((record) => record.id === firstFoodId), 'delete record must remove confirmed food record');
+
+  await actions.createWorkoutLog('力量训练 45 分钟，卧推和深蹲');
+  assert(state.records[0].kind === 'workout', 'workout action must create a records-page workout card');
+  assert(state.records[0].text.includes('力量训练 45 分钟'), 'workout card must preserve user-entered workout detail');
+  assert(state.chatMessages.some((message) => message.text.includes('已生成运动记录')), 'workout action must give visible chat feedback');
 }
 
 async function testSendTextShowsUserMessageBeforeBackendReply() {

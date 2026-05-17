@@ -171,8 +171,9 @@ export function ChatScreen({
       return;
     }
     void runAction('正在发送运动记录...', '运动记录已发送', async () => {
-      await actions.sendText(appState.threads[0]?.id ?? 'food-today', `运动记录：${detail}`);
+      await actions.createWorkoutLog(detail);
       setUtilityPanel(null);
+      go('records');
     });
   };
 

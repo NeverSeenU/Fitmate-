@@ -208,9 +208,15 @@
 - Profile editing now uses keyboard avoidance with extra scroll padding so text fields can remain visible while typing.
 - Records top-right subscription entry now uses the same green `Pro` pill style as the AI chat screen.
 - `npm.cmd run typecheck` and `npm.cmd test` passed after the P2-1 interaction fixes.
+- Workout notes now create a real workout record card on the Records page instead of only sending a chat message.
+- Workout record creation uses the backend workout analysis API when available and falls back to a local workout card when running without backend support.
+- Food-photo analysis now returns a stable `503 vision_unavailable` response when Xiaomi/Qwen providers are not configured or unavailable.
+- Mobile API errors now show a user-readable Chinese message for unavailable image recognition so food-photo upload does not fail silently while AI keys are not connected.
+- File import remains an explicit placeholder; iPhone Files picker integration is deferred to a dedicated task.
+- `npm.cmd run typecheck`, `npm.cmd test`, and full backend `pytest backend\tests` passed after workout card and AI-unavailable feedback work.
 
 ## What's Next
-- Re-run the Expo Go smoke checklist for chat send, profile editing, attachment actions, Records Pro styling, and food-card flows; then harden the AI photo path and provider-missing feedback.
+- Re-run the Expo Go smoke checklist for workout record cards and food-photo unavailable feedback, then implement iPhone Files picker integration and continue AI photo hardening.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

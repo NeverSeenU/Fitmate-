@@ -23,6 +23,10 @@ class ModelCallRepository(Protocol):
         ...
 
 
+class FoodVisionUnavailableError(RuntimeError):
+    pass
+
+
 class FoodVisionRouter:
     def __init__(
         self,
@@ -56,7 +60,7 @@ class FoodVisionRouter:
         if fallback_result is None:
             if primary_result is not None:
                 return primary_result
-            raise FoodVisionSchemaError("all_vision_providers_failed")
+            raise FoodVisionUnavailableError("all_vision_providers_failed")
         return fallback_result
 
     def _try_provider_with_retry(

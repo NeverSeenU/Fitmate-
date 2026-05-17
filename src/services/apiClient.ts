@@ -64,7 +64,7 @@ export class ApiError extends Error {
     public readonly status: number,
     public readonly detail: unknown,
   ) {
-    super(`FitMate API request failed with status ${status}`);
+    super(apiErrorMessage(status, detail));
   }
 }
 
@@ -350,6 +350,24 @@ async function readErrorDetail(response: ApiResponseLike) {
   } catch {
     return response.text();
   }
+}
+
+function apiErrorMessage(status: number, detail: unknown) {
+  const body = detail as { detail?: unknown; message?: unknown };
+  const nested = body?.detail as { code?: unknown; message?: unknown } | string | undefined;
+  if (typeof nested === 'object' && nested?.code === 'vision_unavailable') {
+    return '图片识别暂时不可用：AI 识别服务还没有接入或当前不可用。你可以先用文字记录食物。';
+  }
+  if (typeof nested === 'object' && typeof nested.message === 'string') {
+    return nested.message;
+  }
+  if (typeof body?.message === 'string') {
+    return body.message;
+  }
+  if (typeof nested === 'string') {
+    return nested;
+  }
+  return `FitMate API request failed with status ${status}`;
 }
 
 function toAuthSession(payload: unknown): AuthSession {

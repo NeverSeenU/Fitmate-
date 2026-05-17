@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.ai.router import FoodVisionUnavailableError
 from app.main import app
 
 
@@ -33,6 +34,16 @@ class FakeVisionRouter:
     ) -> dict:
         assert image_bytes == b"fake-image"
         return dict(VISION_ANALYSIS)
+
+
+class UnavailableVisionRouter:
+    def analyze_food_photo(
+        self,
+        image_bytes: bytes,
+        user_note: str | None = None,
+        user_id: str | None = None,
+    ) -> dict:
+        raise FoodVisionUnavailableError("all_vision_providers_failed")
 
 
 def auth_headers(email: str) -> dict[str, str]:
@@ -132,6 +143,26 @@ def test_pro_user_photo_creates_pending_food_log() -> None:
     assert len(logs) == 1
     assert logs[0]["id"] == body["food_analysis"]["food_log_id"]
     assert logs[0]["status"] == "pending"
+
+
+def test_photo_analysis_returns_stable_unavailable_error_when_providers_are_missing() -> None:
+    from app.api.food import get_food_vision_router
+
+    app.dependency_overrides[get_food_vision_router] = lambda: UnavailableVisionRouter()
+    headers = auth_headers("vision-unavailable@example.com")
+    thread_id = create_thread(headers)
+
+    response = client.post(
+        "/v1/chat/photo",
+        headers=headers,
+        data={"thread_id": thread_id, "user_note": "晚餐"},
+        files={"image": ("food.jpg", b"fake-image", "image/jpeg")},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "vision_unavailable"
+
+    app.dependency_overrides[get_food_vision_router] = lambda: FakeVisionRouter()
 
 
 def test_confirm_edit_and_discard_food_log() -> None:

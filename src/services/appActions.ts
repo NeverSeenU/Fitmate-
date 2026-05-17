@@ -20,6 +20,11 @@ type AppActionsApi = {
     patchCheckin(checkinId: string, payload: Record<string, unknown>): Promise<unknown>;
     deleteCheckin(checkinId: string): Promise<unknown>;
   };
+  workouts: {
+    analyze(text: string): Promise<unknown>;
+    confirmLog(workoutLogId: string): Promise<unknown>;
+    patchLog(workoutLogId: string, payload: Record<string, unknown>): Promise<unknown>;
+  };
   food: {
     analyzePhoto(input: PhotoUploadInput): Promise<FoodPhotoAnalysisResponse>;
     confirmLog(foodLogId: string): Promise<unknown>;
@@ -200,6 +205,39 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
             detail: input.notes,
           },
           ...state.records,
+        ],
+      });
+    },
+
+    async createWorkoutLog(text: string) {
+      const detail = text.trim();
+      if (!detail) {
+        return;
+      }
+      const response = api ? await api.workouts.analyze(detail) as {
+        assistant_message?: { id?: string; content_text?: string };
+        workout_analysis?: {
+          workout_log_id?: string | null;
+          workout_type?: string;
+          duration_minutes?: number;
+          intensity?: string;
+          calories_burned_range_kcal?: number[];
+          status?: string;
+        };
+      } : null;
+      const analysis = response?.workout_analysis;
+      const record = toWorkoutRecord(analysis, detail);
+      const state = getState();
+      setState({
+        ...state,
+        records: [record, ...state.records],
+        chatMessages: [
+          ...state.chatMessages,
+          {
+            id: response?.assistant_message?.id ?? `workout-assistant-${Date.now()}`,
+            role: 'assistant',
+            text: response?.assistant_message?.content_text ?? `已生成运动记录：${record.text}`,
+          },
         ],
       });
     },
@@ -552,6 +590,57 @@ function formatCheckinRecordText(input: CheckinInput) {
     input.cravingLevel !== undefined ? `嘴馋 ${input.cravingLevel}/10` : null,
     input.notes,
   ].filter(Boolean).join(' · ') || '已同步到今日记录';
+}
+
+function toWorkoutRecord(
+  analysis: {
+    workout_log_id?: string | null;
+    workout_type?: string;
+    duration_minutes?: number;
+    intensity?: string;
+    calories_burned_range_kcal?: number[];
+    status?: string;
+  } | undefined,
+  fallbackText: string,
+) {
+  const duration = analysis?.duration_minutes;
+  const calories = rangeLabel(analysis?.calories_burned_range_kcal ?? []);
+  const status = analysis?.status === 'pending'
+    ? '待确认'
+    : analysis?.status === 'confirmed'
+      ? '已记录'
+      : analysis?.status === 'edited'
+        ? '已编辑'
+        : '已记录';
+  const title = workoutTitle(analysis?.workout_type, fallbackText);
+  return {
+    id: analysis?.workout_log_id ?? `workout-${Date.now()}`,
+    kind: 'workout' as const,
+    title,
+    status,
+    text: [
+      duration !== undefined ? `${duration} 分钟` : fallbackText,
+      analysis?.intensity ? `强度 ${workoutIntensityLabel(analysis.intensity)}` : null,
+      analysis?.calories_burned_range_kcal?.length ? `消耗 ${calories} kcal` : null,
+      fallbackText,
+    ].filter(Boolean).join(' · '),
+    done: analysis?.status !== 'pending',
+    detail: fallbackText,
+  };
+}
+
+function workoutTitle(type: string | undefined, fallbackText: string) {
+  if (type === 'cardio_plus_strength') return '有氧 + 力量训练';
+  if (type === 'running') return '跑步训练';
+  if (type === 'strength') return '力量训练';
+  if (type === 'mixed') return '综合训练';
+  return fallbackText.length > 18 ? `${fallbackText.slice(0, 18)}...` : fallbackText;
+}
+
+function workoutIntensityLabel(intensity: string) {
+  if (intensity === 'high') return '高';
+  if (intensity === 'low') return '低';
+  return '中';
 }
 
 function isLocalOnlyFoodLog(foodLogId: string) {
