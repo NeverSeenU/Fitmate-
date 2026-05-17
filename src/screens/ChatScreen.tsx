@@ -4,6 +4,7 @@ import { BottomTabs, Button, ChatBubble, ChatHeader, FoodAnalysisCard } from '..
 import type { AppDataState } from '../domain/models';
 import { AttachmentPanel, NewChatPanel, ThreadDrawer } from '../overlays/ChatOverlays';
 import type { createAppActions, FoodLogEditInput } from '../services/appActions';
+import { pickFitMateFile } from '../services/filePicker';
 import { pickFoodPhoto, type PhotoPickerSource } from '../services/photoPicker';
 import { styles } from '../styles';
 import type { ChatPanel, Screen, Sheet } from '../types';
@@ -25,7 +26,7 @@ export function ChatScreen({
   actions: ReturnType<typeof createAppActions>;
 }) {
   const [panel, setPanel] = useState<ChatPanel>(null);
-  const [utilityPanel, setUtilityPanel] = useState<'weight' | 'workout' | 'file' | null>(null);
+  const [utilityPanel, setUtilityPanel] = useState<'weight' | 'workout' | null>(null);
   const [panelBack, setPanelBack] = useState<ChatPanel>(null);
   const [composerText, setComposerText] = useState('');
   const [status, setStatus] = useState('');
@@ -177,11 +178,26 @@ export function ChatScreen({
     });
   };
 
-  const openFilePanel = () => {
+  const openFilePicker = () => {
     Keyboard.dismiss();
     setPanel(null);
-    setUtilityPanel('file');
-    setStatus('');
+    setBusy(true);
+    setStatus('正在打开文件选择器...');
+    void (async () => {
+      try {
+        const file = await pickFitMateFile();
+        if (!file) {
+          setStatus('已取消选择文件');
+          return;
+        }
+        await actions.attachFile(file);
+        setStatus('文件已添加到聊天，暂未上传内容');
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : '文件选择失败');
+      } finally {
+        setBusy(false);
+      }
+    })();
   };
 
   return (
@@ -262,7 +278,7 @@ export function ChatScreen({
           takeFoodPhoto={() => void analyzePickedPhoto('camera')}
           chooseFoodPhoto={() => void analyzePickedPhoto('library')}
           startFoodRecord={openManualFoodRecord}
-          openFile={openFilePanel}
+          openFile={openFilePicker}
           createCheckin={openWeightPanel}
           sendWorkout={openWorkoutPanel}
         />
@@ -304,15 +320,6 @@ export function ChatScreen({
             <Button label="取消" variant="secondary" onPress={() => setUtilityPanel(null)} disabled={busy} style={styles.actionButton} />
             <Button label={busy ? '发送中...' : '发送运动记录'} onPress={submitWorkout} disabled={busy} style={styles.actionButton} />
           </View>
-        </UtilitySheet>
-      ) : null}
-      {utilityPanel === 'file' ? (
-        <UtilitySheet title="文件" subtitle="体检、菜单和训练计划导入" onClose={() => setUtilityPanel(null)}>
-          <View style={styles.privacyCard}>
-            <Text style={styles.h2}>文件导入正在接入</Text>
-            <Text style={styles.muted}>当前版本还没有文件选择器。你可以先把体检、菜单或训练计划内容复制到聊天框，FitMate 会按文本继续分析。</Text>
-          </View>
-          <Button label="知道了" onPress={() => setUtilityPanel(null)} />
         </UtilitySheet>
       ) : null}
     </KeyboardAvoidingView>

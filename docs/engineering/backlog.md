@@ -29,12 +29,6 @@ This is the formal task queue for the main Codex conversation and subagent team.
 - Files: `backend/app/api/food.py`, `backend/app/ai/router.py`, `backend/app/ai/providers/openai_compatible.py`, `backend/app/services/food_service.py`
 - Done when: upload size/MIME checks, timeout behavior, provider-missing feedback, provider error responses, and object-storage cleanup are covered by tests.
 
-### P2-4: iPhone Files Import
-- Owner: Frontend Lead / Mobile Services Lead
-- Files: `src/screens/ChatScreen.tsx`, `src/overlays/ChatOverlays.tsx`, `src/services/*`, `app.json`
-- Scope: connect the File action to the iPhone Files picker for body check reports, menus, and workout plans.
-- Done when: tapping File opens the iOS document picker, selected file metadata is visible in chat, unsupported file types show clear feedback, and no file contents are uploaded without an explicit backend endpoint.
-
 ### P2-3: Replace Contract Mocks
 - Owner: Backend Lead / Product Lead
 - Files: `backend/app/services/chat_service.py`, `backend/app/services/subscription_service.py`, `src/services/*`
@@ -56,6 +50,12 @@ This is the formal task queue for the main Codex conversation and subagent team.
 - Owner: DevOps Lead / Backend Lead
 - Files: `backend/app/storage/*`, `.env.example`, deployment docs
 - Done when: non-local object storage can save and delete food photos through the existing storage protocol.
+
+### P3-4: File Upload And Parsing Pipeline
+- Owner: Backend Lead / AI-Vision Lead / Frontend Lead
+- Files: `backend/app/api/*`, `backend/app/storage/*`, `src/services/*`, `src/screens/ChatScreen.tsx`
+- Scope: add an explicit backend endpoint for user-approved file upload, storage, parsing, and privacy deletion.
+- Done when: selected files can be uploaded only after clear user intent, parsed summaries appear in chat, storage keys are privacy-deletable, and tests cover supported and unsupported file types.
 
 ## Subagent Assignment Template
 

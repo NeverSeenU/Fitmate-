@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** GitHub CI quality gates completed
-- **Next task:** On-device smoke test pass, then AI photo path hardening
+- **Current task:** iPhone Files picker integration completed
+- **Next task:** Re-run Expo Go smoke for file picker, then continue AI photo path hardening
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -212,11 +212,14 @@
 - Workout record creation uses the backend workout analysis API when available and falls back to a local workout card when running without backend support.
 - Food-photo analysis now returns a stable `503 vision_unavailable` response when Xiaomi/Qwen providers are not configured or unavailable.
 - Mobile API errors now show a user-readable Chinese message for unavailable image recognition so food-photo upload does not fail silently while AI keys are not connected.
-- File import remains an explicit placeholder; iPhone Files picker integration is deferred to a dedicated task.
 - `npm.cmd run typecheck`, `npm.cmd test`, and full backend `pytest backend\tests` passed after workout card and AI-unavailable feedback work.
+- `expo-document-picker` is now installed for native iOS document selection.
+- Chat attachment File now opens the system document picker for PDF, Word, Excel, CSV, TXT, and common image files.
+- Selected file metadata is shown in chat, including filename, MIME type, and size.
+- File contents are intentionally not uploaded or parsed yet; the next backend task is an explicit upload and parsing pipeline with privacy deletion coverage.
 
 ## What's Next
-- Re-run the Expo Go smoke checklist for workout record cards and food-photo unavailable feedback, then implement iPhone Files picker integration and continue AI photo hardening.
+- Re-run the Expo Go smoke checklist for workout record cards, food-photo unavailable feedback, and iPhone Files selection, then continue AI photo hardening.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

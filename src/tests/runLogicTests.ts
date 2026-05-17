@@ -569,6 +569,16 @@ async function testFoodActionStateLifecycle() {
   assert(state.records[0].kind === 'workout', 'workout action must create a records-page workout card');
   assert(state.records[0].text.includes('力量训练 45 分钟'), 'workout card must preserve user-entered workout detail');
   assert(state.chatMessages.some((message) => message.text.includes('已生成运动记录')), 'workout action must give visible chat feedback');
+
+  await actions.attachFile({
+    uri: 'file:///body-check.pdf',
+    name: 'body-check.pdf',
+    mimeType: 'application/pdf',
+    sizeBytes: 2048,
+  });
+  assert(state.chatMessages.some((message) => message.text.includes('body-check.pdf')), 'file action must show selected filename in chat');
+  assert(state.chatMessages.some((message) => message.text.includes('2.0 KB')), 'file action must show selected file size in chat');
+  assert(state.chatMessages.some((message) => message.text.includes('暂不上传')), 'file action must explain that file contents are not uploaded yet');
 }
 
 async function testSendTextShowsUserMessageBeforeBackendReply() {

@@ -1,5 +1,6 @@
 import type { AppDataState, ChatMessage, ConversationThread, Entitlements, FoodAnalysis, SubscriptionTier, UserProfile } from '../domain/models';
 import type { FoodPhotoAnalysisResponse, PhotoUploadInput } from './apiClient';
+import type { PickedFile } from './filePicker';
 
 type AppActionsOptions = {
   api?: AppActionsApi;
@@ -240,6 +241,21 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           },
         ],
       });
+    },
+
+    async attachFile(file: PickedFile) {
+      addMessages(getState, setState, [
+        {
+          id: `file-user-${Date.now()}`,
+          role: 'user',
+          text: `选择了文件：${file.name}`,
+        },
+        {
+          id: `file-assistant-${Date.now()}`,
+          role: 'assistant',
+          text: `已读取文件信息：${file.name} · ${file.mimeType} · ${formatAttachmentFileSize(file.sizeBytes)}。当前版本只记录文件信息，暂不上传或解析文件内容。`,
+        },
+      ]);
     },
 
     async confirmFoodLog(foodLogId: string) {
@@ -768,4 +784,17 @@ function addMessages(
     ...state,
     chatMessages: [...state.chatMessages, ...messages],
   });
+}
+
+function formatAttachmentFileSize(sizeBytes?: number) {
+  if (!sizeBytes || sizeBytes <= 0) {
+    return '大小未知';
+  }
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`;
+  }
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }
