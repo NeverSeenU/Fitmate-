@@ -7,6 +7,7 @@ import uuid
 
 from app.services.chat_service import StoredMessage, chat_service
 from app.services.subscription_service import subscription_service
+from app.services.usage_service import usage_service
 from app.storage.local import LocalObjectStorage
 from app.storage.protocols import ObjectStorage
 
@@ -72,11 +73,13 @@ class FoodService:
         store: InMemoryFoodLogStore | None = None,
         chat_service_dependency: Any | None = None,
         subscription_service_dependency: Any | None = None,
+        usage_service_dependency: Any | None = None,
         storage: ObjectStorage | None = None,
     ) -> None:
         self.store = store or InMemoryFoodLogStore()
         self.chat_service = chat_service_dependency or chat_service
         self.subscription_service = subscription_service_dependency or subscription_service
+        self.usage_service = usage_service_dependency or usage_service
         self.storage = storage or LocalObjectStorage()
 
     def analyze_photo(
@@ -93,6 +96,7 @@ class FoodService:
         if thread is None:
             return None
 
+        self.usage_service.ensure_allowed(user_id, "food_photo")
         image_object_key = self._object_key(user_id, image_filename)
         stored_image = self.storage.put(
             key=image_object_key,
@@ -159,6 +163,7 @@ class FoodService:
                 model_name=analysis.get("model_name"),
             )
         )
+        self.usage_service.increment(user_id, "food_photo")
         return {
             "assistant_message": self.chat_service._message_response(assistant_message),
             "food_analysis": self._analysis_response(analysis, food_log),

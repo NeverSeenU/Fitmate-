@@ -26,11 +26,6 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ## Priority 3: Product Expansion
 
-### P3-1: Subscription And Fair-Use Enforcement
-- Owner: Backend Lead
-- Files: `backend/app/services/subscription_service.py`, `backend/app/db/models.py`, `backend/app/repositories/sqlalchemy/*`
-- Done when: usage counters are read and incremented on chat/photo/workout paths and entitlement behavior is tested.
-
 ### P3-2: Mobile UI Automation
 - Owner: QA Lead / Frontend Lead
 - Files: test tooling to be selected, `src/screens/*`

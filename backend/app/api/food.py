@@ -8,6 +8,7 @@ from app.ai.router import FoodVisionRouter, FoodVisionUnavailableError
 from app.api.deps import CurrentUser, DbSession, get_food_service
 from app.repositories.sqlalchemy.model_calls import SqlAlchemyModelCallRepository
 from app.services.food_service import FoodService
+from app.services.usage_service import UsageLimitExceededError
 
 
 router = APIRouter(tags=["food"])
@@ -73,6 +74,15 @@ async def analyze_chat_photo(
             detail={
                 "code": "vision_unavailable",
                 "message": "Food photo analysis is not available yet. Configure Xiaomi/Qwen provider keys or try again later.",
+            },
+        ) from exc
+    except UsageLimitExceededError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "code": "fair_use_limit_reached",
+                "purpose": exc.purpose,
+                "message": "Daily fair-use limit reached for your current plan.",
             },
         ) from exc
     if result is None:

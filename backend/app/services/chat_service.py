@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from typing import Any
 import uuid
 
+from app.services.usage_service import usage_service
+
 
 @dataclass
 class StoredThread:
@@ -75,9 +77,15 @@ class TextChatUnavailableError(RuntimeError):
 
 
 class ChatService:
-    def __init__(self, store: InMemoryChatStore | None = None, allow_contract_mocks: bool = True) -> None:
+    def __init__(
+        self,
+        store: InMemoryChatStore | None = None,
+        allow_contract_mocks: bool = True,
+        usage_service_dependency=None,
+    ) -> None:
         self.store = store or InMemoryChatStore()
         self.allow_contract_mocks = allow_contract_mocks
+        self.usage_service = usage_service_dependency or usage_service
 
     def create_thread(self, user_id: str, title: str, kind: str) -> dict:
         return self._thread_response(self.store.create_thread(user_id, title, kind))
@@ -103,6 +111,7 @@ class ChatService:
             return None
         if not self.allow_contract_mocks:
             raise TextChatUnavailableError("text_chat_provider_not_configured")
+        self.usage_service.ensure_allowed(user_id, "chat")
         food_analysis = self._text_food_analysis(text)
         self.store.add_message(
             StoredMessage(
@@ -135,6 +144,7 @@ class ChatService:
         response = {"message": self._message_response(assistant_message), "created_records": []}
         if food_analysis:
             response["food_analysis"] = food_analysis
+        self.usage_service.increment(user_id, "chat")
         return response
 
     def _mock_ai_response(self, text: str) -> str:

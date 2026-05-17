@@ -16,6 +16,7 @@ from app.repositories.sqlalchemy.records import (
     SqlAlchemyWorkoutLogRepository,
 )
 from app.repositories.sqlalchemy.subscription import SqlAlchemySubscriptionRepository
+from app.repositories.sqlalchemy.usage import SqlAlchemyUsageCounterRepository
 from app.services.admin_service import AdminService
 from app.services.auth_service import AuthService
 from app.services.chat_service import ChatService
@@ -25,6 +26,7 @@ from app.services.profile_service import ProfileService
 from app.services.records_service import RecordsService
 from app.services.safety_service import SafetyService
 from app.services.subscription_service import SubscriptionService
+from app.services.usage_service import UsageService
 from app.services.workout_service import WorkoutService
 
 
@@ -49,6 +51,13 @@ def get_subscription_service(db: DbSession) -> SubscriptionService:
     )
 
 
+def get_usage_service(db: DbSession) -> UsageService:
+    return UsageService(
+        store=SqlAlchemyUsageCounterRepository(db),
+        subscription_service_dependency=get_subscription_service(db),
+    )
+
+
 def get_profile_service(db: DbSession) -> ProfileService:
     return ProfileService(
         store=SqlAlchemyProfileRepository(db),
@@ -61,6 +70,7 @@ def get_chat_service(db: DbSession) -> ChatService:
     return ChatService(
         store=SqlAlchemyChatRepository(db),
         allow_contract_mocks=is_local_runtime(settings),
+        usage_service_dependency=get_usage_service(db),
     )
 
 
@@ -71,6 +81,7 @@ def get_food_service(db: DbSession) -> FoodService:
         store=SqlAlchemyFoodLogRepository(db),
         chat_service_dependency=chat,
         subscription_service_dependency=subscription,
+        usage_service_dependency=get_usage_service(db),
     )
 
 
@@ -82,6 +93,7 @@ def get_workout_service(db: DbSession) -> WorkoutService:
     return WorkoutService(
         store=SqlAlchemyWorkoutLogRepository(db),
         subscription_service_dependency=get_subscription_service(db),
+        usage_service_dependency=get_usage_service(db),
     )
 
 
@@ -101,6 +113,7 @@ def get_records_service(db: DbSession) -> RecordsService:
         workout_service_dependency=WorkoutService(
             store=SqlAlchemyWorkoutLogRepository(db),
             subscription_service_dependency=subscription,
+            usage_service_dependency=get_usage_service(db),
         ),
         profile_service_dependency=profile,
     )

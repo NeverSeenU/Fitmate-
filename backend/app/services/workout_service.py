@@ -6,6 +6,7 @@ import re
 import uuid
 
 from app.services.subscription_service import subscription_service
+from app.services.usage_service import usage_service
 
 
 @dataclass
@@ -49,11 +50,18 @@ class InMemoryWorkoutLogStore:
 
 
 class WorkoutService:
-    def __init__(self, store: InMemoryWorkoutLogStore | None = None, subscription_service_dependency=None) -> None:
+    def __init__(
+        self,
+        store: InMemoryWorkoutLogStore | None = None,
+        subscription_service_dependency=None,
+        usage_service_dependency=None,
+    ) -> None:
         self.store = store or InMemoryWorkoutLogStore()
         self.subscription_service = subscription_service_dependency or subscription_service
+        self.usage_service = usage_service_dependency or usage_service
 
     def analyze_text(self, user_id: str, text: str) -> dict:
+        self.usage_service.ensure_allowed(user_id, "workout")
         analysis = self._analyze(text)
         subscription = self.subscription_service.get_current(user_id)
         should_auto_record = bool(subscription["entitlements"]["automatic_recording"])
@@ -72,7 +80,7 @@ class WorkoutService:
                 )
             )
 
-        return {
+        response = {
             "assistant_message": {
                 "role": "assistant",
                 "message_type": "workout_analysis",
@@ -80,6 +88,8 @@ class WorkoutService:
             },
             "workout_analysis": self._analysis_response(analysis, workout_log),
         }
+        self.usage_service.increment(user_id, "workout")
+        return response
 
     def list_logs(self, user_id: str, target_date: date | None = None) -> list[dict]:
         return [self._log_response(log) for log in self.store.list_for_user(user_id, target_date)]

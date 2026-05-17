@@ -32,6 +32,13 @@ class SubscriptionRepository(Protocol):
 
 
 @runtime_checkable
+class UsageCounterRepository(Protocol):
+    def get_or_create(self, user_id: str, target_date: date) -> Any: ...
+
+    def increment(self, user_id: str, target_date: date, purpose: str, amount: int = 1) -> Any: ...
+
+
+@runtime_checkable
 class ChatRepository(Protocol):
     def create_thread(self, user_id: str, title: str, kind: str) -> Any: ...
 

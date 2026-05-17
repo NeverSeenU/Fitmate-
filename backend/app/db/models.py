@@ -99,6 +99,7 @@ class UsageCounter(Base):
     date: Mapped[date] = mapped_column(Date, nullable=False)
     ai_text_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     food_photo_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    workout_analysis_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     fallback_model_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     deep_review_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     estimated_cost_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")

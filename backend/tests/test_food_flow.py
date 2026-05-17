@@ -1,7 +1,10 @@
 from fastapi.testclient import TestClient
 
 from app.ai.router import FoodVisionUnavailableError
+from app.db.session import SessionLocal
 from app.main import app
+from app.repositories.sqlalchemy.auth import SqlAlchemyAuthRepository
+from app.repositories.sqlalchemy.usage import SqlAlchemyUsageCounterRepository
 
 
 client = TestClient(app)
@@ -77,6 +80,15 @@ def restore_plan(headers: dict[str, str], product_id: str) -> None:
     assert response.status_code == 200
 
 
+def usage_for_email(email: str):
+    from datetime import date
+
+    with SessionLocal() as session:
+        user = SqlAlchemyAuthRepository(session).get_user_by_email(email)
+        assert user is not None
+        return SqlAlchemyUsageCounterRepository(session).get_or_create(user.id, date.today())
+
+
 def setup_module() -> None:
     try:
         from app.api.food import get_food_vision_router
@@ -102,7 +114,8 @@ def test_photo_requires_authentication() -> None:
 
 
 def test_free_user_receives_analysis_without_auto_created_food_log() -> None:
-    headers = auth_headers("free-food@example.com")
+    email = "free-food@example.com"
+    headers = auth_headers(email)
     thread_id = create_thread(headers)
 
     response = client.post(
@@ -119,6 +132,7 @@ def test_free_user_receives_analysis_without_auto_created_food_log() -> None:
     assert body["food_analysis"]["meal_name"] == "韩式石锅拌饭"
     assert body["assistant_message"]["message_type"] == "food_analysis"
     assert "焦虑" in body["assistant_message"]["content_text"]
+    assert usage_for_email(email).food_photo_count == 1
 
 
 def test_photo_rejects_unsupported_upload_type() -> None:
@@ -149,6 +163,31 @@ def test_photo_rejects_uploads_larger_than_limit() -> None:
 
     assert response.status_code == 413
     assert response.json()["detail"]["code"] == "image_too_large"
+
+
+def test_photo_fair_use_limit_returns_429_before_analysis() -> None:
+    from datetime import date
+
+    email = "photo-limit@example.com"
+    headers = auth_headers(email)
+    thread_id = create_thread(headers)
+    with SessionLocal() as session:
+        user = SqlAlchemyAuthRepository(session).get_user_by_email(email)
+        assert user is not None
+        usage_repo = SqlAlchemyUsageCounterRepository(session)
+        for _ in range(10):
+            usage_repo.increment(user.id, date.today(), "food_photo")
+        session.commit()
+
+    response = client.post(
+        "/v1/chat/photo",
+        headers=headers,
+        data={"thread_id": thread_id},
+        files={"image": ("food.jpg", b"fake-image", "image/jpeg")},
+    )
+
+    assert response.status_code == 429
+    assert response.json()["detail"]["purpose"] == "food_photo"
 
 
 def test_pro_user_photo_creates_pending_food_log() -> None:
@@ -191,6 +230,7 @@ def test_photo_analysis_returns_stable_unavailable_error_when_providers_are_miss
 
     assert response.status_code == 503
     assert response.json()["detail"]["code"] == "vision_unavailable"
+    assert usage_for_email("vision-unavailable@example.com").food_photo_count == 0
 
     app.dependency_overrides[get_food_vision_router] = lambda: FakeVisionRouter()
 

@@ -1,6 +1,9 @@
 from fastapi.testclient import TestClient
 
+from app.db.session import SessionLocal
 from app.main import app
+from app.repositories.sqlalchemy.auth import SqlAlchemyAuthRepository
+from app.repositories.sqlalchemy.usage import SqlAlchemyUsageCounterRepository
 
 
 client = TestClient(app)
@@ -27,6 +30,15 @@ def restore_plan(headers: dict[str, str], product_id: str) -> None:
         json={"provider": "app_store", "product_id": product_id, "receipt": "dev-receipt"},
     )
     assert response.status_code == 200
+
+
+def usage_for_email(email: str):
+    from datetime import date
+
+    with SessionLocal() as session:
+        user = SqlAlchemyAuthRepository(session).get_user_by_email(email)
+        assert user is not None
+        return SqlAlchemyUsageCounterRepository(session).get_or_create(user.id, date.today())
 
 
 def test_records_today_requires_authentication() -> None:
@@ -135,7 +147,8 @@ def test_checkin_patch_and_delete_flow() -> None:
 
 
 def test_pro_workout_analysis_creates_pending_log_and_confirm_flow() -> None:
-    headers = auth_headers("records-workout@example.com")
+    email = "records-workout@example.com"
+    headers = auth_headers(email)
     restore_plan(headers, "fitmate.pro.monthly")
 
     response = client.post(
@@ -150,6 +163,7 @@ def test_pro_workout_analysis_creates_pending_log_and_confirm_flow() -> None:
     assert body["workout_analysis"]["status"] == "pending"
     assert body["workout_analysis"]["duration_minutes"] == 80
     assert body["workout_analysis"]["calories_burned_range_kcal"] == [360, 560]
+    assert usage_for_email(email).workout_analysis_count == 1
 
     today = client.get("/v1/records/today", headers=headers).json()
     assert len(today["workout_logs"]) == 1
@@ -171,7 +185,8 @@ def test_pro_workout_analysis_creates_pending_log_and_confirm_flow() -> None:
 
 
 def test_free_workout_analysis_does_not_auto_create_log() -> None:
-    headers = auth_headers("records-free-workout@example.com")
+    email = "records-free-workout@example.com"
+    headers = auth_headers(email)
 
     response = client.post(
         "/v1/workouts/analyze",
@@ -183,4 +198,28 @@ def test_free_workout_analysis_does_not_auto_create_log() -> None:
     body = response.json()
     assert body["workout_analysis"]["workout_log_id"] is None
     assert body["workout_analysis"]["status"] == "analysis_only"
+    assert usage_for_email(email).workout_analysis_count == 1
     assert client.get("/v1/records/today", headers=headers).json()["workout_logs"] == []
+
+
+def test_workout_fair_use_limit_returns_429() -> None:
+    from datetime import date
+
+    email = "records-workout-limit@example.com"
+    headers = auth_headers(email)
+    with SessionLocal() as session:
+        user = SqlAlchemyAuthRepository(session).get_user_by_email(email)
+        assert user is not None
+        usage_repo = SqlAlchemyUsageCounterRepository(session)
+        for _ in range(20):
+            usage_repo.increment(user.id, date.today(), "workout")
+        session.commit()
+
+    response = client.post(
+        "/v1/workouts/analyze",
+        headers=headers,
+        json={"text": "跑步 30 分钟"},
+    )
+
+    assert response.status_code == 429
+    assert response.json()["detail"]["purpose"] == "workout"

@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import CurrentUser, get_chat_service
 from app.services.chat_service import ChatService, TextChatUnavailableError
+from app.services.usage_service import UsageLimitExceededError
 
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -57,6 +58,15 @@ def send_text_message(payload: SendTextMessageRequest, user: CurrentUser, servic
             detail={
                 "code": "text_chat_unavailable",
                 "message": "Text chat AI is not configured for this environment.",
+            },
+        ) from exc
+    except UsageLimitExceededError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "code": "fair_use_limit_reached",
+                "purpose": exc.purpose,
+                "message": "Daily fair-use limit reached for your current plan.",
             },
         ) from exc
     if result is None:

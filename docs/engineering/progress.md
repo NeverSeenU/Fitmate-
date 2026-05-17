@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Contract mock production gates completed
-- **Next task:** Re-run Expo Go smoke, then start subscription fair-use enforcement
+- **Current task:** Subscription fair-use enforcement completed
+- **Next task:** Re-run Expo Go smoke, then start mobile UI automation or production storage adapter
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -227,9 +227,16 @@
 - App Store restore still supports `dev-receipt` for local/test/development smoke, but non-local paths now reject it with `subscription_provider_not_configured` until real receipt validation is wired.
 - Regression tests now cover disabled chat contract mocks and disabled dev receipt restore paths.
 - `python -m pytest backend\tests`, `npm.cmd run typecheck`, and `npm.cmd test` passed after contract mock production gates.
+- Usage counter repository now persists daily per-user counts for text chat, food photos, and workout analysis.
+- Alembic migration `0002_add_workout_usage_count` adds `workout_analysis_count` to the existing backend-only usage counter table.
+- Text chat, food-photo analysis, and workout analysis now check the user's current plan against backend fair-use thresholds before doing work.
+- Successful text chat, food-photo analysis, and workout analysis requests now increment their daily usage counters.
+- Over-limit requests now return stable `429 fair_use_limit_reached` responses without storing chat/photo/workout output.
+- Tests cover usage repository persistence, successful usage increments for all three paths, and fair-use 429 behavior for chat, food photo, and workout analysis.
+- `python -m alembic upgrade head`, `python -m pytest backend\tests`, `python -m alembic upgrade head --sql`, `npm.cmd run typecheck`, and `npm.cmd test` passed after fair-use enforcement.
 
 ## What's Next
-- Re-run the Expo Go smoke checklist for workout record cards, food-photo unavailable feedback, and iPhone Files selection, then start subscription fair-use enforcement.
+- Re-run the Expo Go smoke checklist for workout record cards, food-photo unavailable feedback, iPhone Files selection, and fair-use messages, then start mobile UI automation or the production storage adapter.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

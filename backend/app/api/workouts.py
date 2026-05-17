@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import CurrentUser, get_workout_service
+from app.services.usage_service import UsageLimitExceededError
 from app.services.workout_service import WorkoutService
 
 
@@ -28,7 +29,17 @@ class PatchWorkoutLogRequest(BaseModel):
 
 @router.post("/analyze")
 def analyze_workout(payload: AnalyzeWorkoutRequest, user: CurrentUser, service: WorkoutServiceDependency) -> dict:
-    return service.analyze_text(user_id=user["id"], text=payload.text)
+    try:
+        return service.analyze_text(user_id=user["id"], text=payload.text)
+    except UsageLimitExceededError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "code": "fair_use_limit_reached",
+                "purpose": exc.purpose,
+                "message": "Daily fair-use limit reached for your current plan.",
+            },
+        ) from exc
 
 
 @router.post("/logs/{workout_log_id}/confirm")

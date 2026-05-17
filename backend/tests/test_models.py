@@ -40,6 +40,9 @@ def test_food_log_keeps_estimates_as_ranges() -> None:
 def test_usage_counters_are_backend_only_cost_control() -> None:
     usage_counters = Base.metadata.tables["usage_counters"]
 
+    assert "ai_text_count" in usage_counters.c
+    assert "food_photo_count" in usage_counters.c
+    assert "workout_analysis_count" in usage_counters.c
     assert "estimated_cost_cents" in usage_counters.c
     assert any(
         constraint.name == "uq_usage_counters_user_date"

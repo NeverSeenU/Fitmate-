@@ -12,6 +12,7 @@ from app.repositories.protocols import (
     ProfileRepository,
     SafetyEventRepository,
     SubscriptionRepository,
+    UsageCounterRepository,
     WorkoutLogRepository,
 )
 from app.repositories.sqlalchemy.auth import SqlAlchemyAuthRepository
@@ -25,6 +26,7 @@ from app.repositories.sqlalchemy.records import (
 )
 from app.repositories.sqlalchemy.profile import SqlAlchemyProfileRepository
 from app.repositories.sqlalchemy.subscription import SqlAlchemySubscriptionRepository
+from app.repositories.sqlalchemy.usage import SqlAlchemyUsageCounterRepository
 from app.services.chat_service import StoredMessage
 from app.services.food_service import StoredFoodLog
 from app.services.records_service import StoredCheckin
@@ -119,6 +121,31 @@ def test_sqlalchemy_subscription_repository_defaults_and_saves_plan() -> None:
         assert saved.plan == "pro"
         assert loaded.plan == "pro"
         assert loaded.provider_subscription_id == "fitmate.pro.monthly"
+
+
+def test_sqlalchemy_usage_counter_repository_tracks_daily_usage_by_purpose() -> None:
+    with SessionLocal() as session:
+        auth_repo = SqlAlchemyAuthRepository(session)
+        usage_repo = SqlAlchemyUsageCounterRepository(session)
+        assert isinstance(usage_repo, UsageCounterRepository)
+        user = auth_repo.create_user(unique_email("db-usage"), "hash", "Usage")
+        session.commit()
+
+        today = datetime.now(timezone.utc).date()
+        counter = usage_repo.get_or_create(user.id, today)
+        assert counter.ai_text_count == 0
+        assert counter.food_photo_count == 0
+        assert counter.workout_analysis_count == 0
+
+        usage_repo.increment(user.id, today, "chat")
+        usage_repo.increment(user.id, today, "food_photo", amount=2)
+        usage_repo.increment(user.id, today, "workout")
+        session.commit()
+
+        updated = usage_repo.get_or_create(user.id, today)
+        assert updated.ai_text_count == 1
+        assert updated.food_photo_count == 2
+        assert updated.workout_analysis_count == 1
 
 
 def test_sqlalchemy_chat_repository_persists_threads_and_messages() -> None:

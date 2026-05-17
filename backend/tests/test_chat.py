@@ -1,6 +1,11 @@
+from datetime import date
+
 from fastapi.testclient import TestClient
 
+from app.db.session import SessionLocal
 from app.main import app
+from app.repositories.sqlalchemy.auth import SqlAlchemyAuthRepository
+from app.repositories.sqlalchemy.usage import SqlAlchemyUsageCounterRepository
 from app.services.chat_service import ChatService, InMemoryChatStore, TextChatUnavailableError
 
 
@@ -18,6 +23,13 @@ def auth_headers(email: str) -> dict[str, str]:
     )
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+def usage_for_email(email: str):
+    with SessionLocal() as session:
+        user = SqlAlchemyAuthRepository(session).get_user_by_email(email)
+        assert user is not None
+        return SqlAlchemyUsageCounterRepository(session).get_or_create(user.id, date.today())
 
 
 def test_chat_threads_require_authentication() -> None:
@@ -78,6 +90,35 @@ def test_send_text_message_persists_user_and_mock_assistant_messages() -> None:
     ).json()["messages"]
     assert [message["role"] for message in messages] == ["user", "assistant"]
     assert messages[0]["content_text"] == "训练后很饿，想吃甜品"
+    assert usage_for_email("chat-message@example.com").ai_text_count == 1
+
+
+def test_chat_fair_use_limit_returns_429_without_storing_messages() -> None:
+    email = "chat-limit@example.com"
+    headers = auth_headers(email)
+    thread = client.post(
+        "/v1/chat/threads",
+        headers=headers,
+        json={"title": "Limit", "kind": "general"},
+    ).json()
+    with SessionLocal() as session:
+        user = SqlAlchemyAuthRepository(session).get_user_by_email(email)
+        assert user is not None
+        usage_repo = SqlAlchemyUsageCounterRepository(session)
+        for _ in range(80):
+            usage_repo.increment(user.id, date.today(), "chat")
+        session.commit()
+
+    response = client.post(
+        "/v1/chat/messages",
+        headers=headers,
+        json={"thread_id": thread["id"], "text": "hello"},
+    )
+
+    assert response.status_code == 429
+    assert response.json()["detail"]["code"] == "fair_use_limit_reached"
+    messages = client.get(f"/v1/chat/threads/{thread['id']}/messages", headers=headers).json()["messages"]
+    assert messages == []
 
 def test_contract_chat_mock_can_be_disabled_for_production_paths() -> None:
     service = ChatService(store=InMemoryChatStore(), allow_contract_mocks=False)
