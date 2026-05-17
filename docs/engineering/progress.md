@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** File upload and parsing pipeline completed
-- **Next task:** Deep file parsing for PDF, Word, Excel, body reports, menus, and workout plans
+- **Current task:** Deep file preview parsing completed
+- **Next task:** Structured report insights and mobile file insight UI
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -249,9 +249,16 @@
 - Uploaded files are privacy-deletable through `DELETE /v1/me/files`, which removes stored objects through the storage boundary.
 - Mobile backend mode now uploads selected files and shows the backend summary in chat; mock mode still records local file metadata without uploading.
 - Tests cover file upload auth, supported upload summaries, unsupported type, size limit, user-owned thread checks, repository persistence, and privacy deletion.
+- File parsing now extracts previews from TXT, CSV, DOCX, XLSX, and simple PDF text streams without adding heavy parser dependencies.
+- CSV previews report row/column shape, headers, and sample rows.
+- DOCX previews extract text from OpenXML `word/document.xml`.
+- XLSX previews extract shared-string and inline worksheet cell values from OpenXML spreadsheets.
+- PDF previews use a lightweight text-stream fallback for simple embedded text.
+- Real HTTP smoke started Uvicorn locally and verified register, thread creation, CSV upload, chat `file` + `file_summary` messages, and uploaded-file privacy deletion through live HTTP calls.
+- `python -m pytest backend\tests`, `npm.cmd run typecheck`, `npm.cmd test`, `python -m alembic upgrade head --sql`, `npm.cmd run smoke:mobile`, and live HTTP file-upload smoke passed after deep file preview parsing.
 
 ## What's Next
-- Add deep parsers for PDF, Word, Excel, body reports, menus, and workout plans, then surface structured file insights in product flows.
+- Convert parsed file previews into structured body-report, menu, and workout-plan insights, then surface those insights in mobile product flows.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

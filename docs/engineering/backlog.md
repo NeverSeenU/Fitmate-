@@ -26,11 +26,11 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ## Priority 3: Product Expansion
 
-### P3-5: Deep File Parsing
-- Owner: Backend Lead / AI-Vision Lead
-- Files: `backend/app/services/file_service.py`, provider/parser modules to be selected
-- Scope: replace metadata/text-preview parsing with PDF, Word, Excel, and report-specific extraction.
-- Done when: uploaded body check reports, menus, and workout plans produce structured summaries with tests for parser success and failure cases.
+### P3-6: Structured Report Insights
+- Owner: Backend Lead / AI-Vision Lead / Product Lead
+- Files: `backend/app/services/file_service.py`, parser modules, mobile file insight UI
+- Scope: turn parsed file text into structured body-report, menu, and workout-plan insights.
+- Done when: reports produce typed fields and user-facing recommendations, not just text previews.
 
 ## Subagent Assignment Template
 
