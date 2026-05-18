@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Deep file preview parsing completed
-- **Next task:** Structured report insights and mobile file insight UI
+- **Current task:** Structured report insights completed
+- **Next task:** Mobile file insight cards and profile/records sync
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -256,9 +256,12 @@
 - PDF previews use a lightweight text-stream fallback for simple embedded text.
 - Real HTTP smoke started Uvicorn locally and verified register, thread creation, CSV upload, chat `file` + `file_summary` messages, and uploaded-file privacy deletion through live HTTP calls.
 - `python -m pytest backend\tests`, `npm.cmd run typecheck`, `npm.cmd test`, `python -m alembic upgrade head --sql`, `npm.cmd run smoke:mobile`, and live HTTP file-upload smoke passed after deep file preview parsing.
+- File uploads now return structured `document_type`, `insights`, `recommendations`, and `insight_schema_version` fields alongside the existing chat summary.
+- Structured file insight heuristics classify body reports, menus, workout plans, and general documents from parsed TXT, CSV, DOCX, XLSX, and simple PDF text.
+- Backend tests now cover body-report, menu, and workout-plan insight extraction, including assistant-message `structured_json` payloads.
 
 ## What's Next
-- Convert parsed file previews into structured body-report, menu, and workout-plan insights, then surface those insights in mobile product flows.
+- Render structured file insights as mobile chat cards and optionally sync trusted body metrics into profile/check-in or records flows.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

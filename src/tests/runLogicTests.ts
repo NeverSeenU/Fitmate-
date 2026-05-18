@@ -447,11 +447,22 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
         },
       },
       files: {
-        async upload(input: { threadId: string; filename: string; mimeType: string }) {
+        async upload(input: { threadId: string; fileUri: string; filename: string; mimeType: string }) {
           calls.push(`file:${input.threadId}:${input.filename}:${input.mimeType}`);
           return {
             assistant_message: { id: 'assistant-file', content_text: 'file summary reply' },
-            file_upload: { summary_text: 'file summary fallback' },
+            file_upload: {
+              id: 'file-live',
+              filename: input.filename,
+              content_type: input.mimeType,
+              size_bytes: 128,
+              status: 'parsed',
+              summary_text: 'file summary fallback',
+              document_type: 'body_report',
+              insights: [{ label: 'weight_kg', value: '70 kg', source: 'file_text' }],
+              recommendations: ['Sync the weight value to the profile or check-in record before comparing trends.'],
+              insight_schema_version: 1,
+            },
           };
         },
       },

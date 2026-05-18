@@ -58,7 +58,12 @@ def test_file_upload_stores_file_and_returns_text_summary() -> None:
     assert body["file_upload"]["content_type"] == "text/plain"
     assert body["file_upload"]["status"] == "parsed"
     assert "protein 120g" in body["file_upload"]["summary_text"]
+    assert body["file_upload"]["document_type"] == "body_report"
+    insight_labels = {item["label"] for item in body["file_upload"]["insights"]}
+    assert {"document_type", "protein_g", "weight_kg"}.issubset(insight_labels)
+    assert body["file_upload"]["recommendations"]
     assert body["assistant_message"]["message_type"] == "file_summary"
+    assert body["assistant_message"]["structured_json"]["file_upload"]["document_type"] == "body_report"
 
     messages = client.get(f"/v1/chat/threads/{thread_id}/messages", headers=headers).json()["messages"]
     assert [message["message_type"] for message in messages] == ["file", "file_summary"]
@@ -84,6 +89,34 @@ def test_file_upload_parses_csv_docx_xlsx_and_pdf_previews() -> None:
 
         assert response.status_code == 200
         assert expected in response.json()["file_upload"]["summary_text"]
+
+
+def test_file_upload_returns_structured_insights_for_menu_and_workout_plan() -> None:
+    headers = auth_headers("file-insights@example.com")
+    thread_id = create_thread(headers)
+
+    menu = client.post(
+        "/v1/files/upload",
+        headers=headers,
+        data={"thread_id": thread_id},
+        files={"file": ("menu.csv", b"meal,nutrition\nlunch,protein 35g calories 550 kcal", "text/csv")},
+    )
+    assert menu.status_code == 200
+    menu_upload = menu.json()["file_upload"]
+    assert menu_upload["document_type"] == "menu"
+    assert {item["label"] for item in menu_upload["insights"]}.issuperset({"protein_g", "calories_kcal"})
+
+    workout = client.post(
+        "/v1/files/upload",
+        headers=headers,
+        data={"thread_id": thread_id},
+        files={"file": ("workout-plan.txt", b"workout plan strength training 4 days/week sets reps", "text/plain")},
+    )
+    assert workout.status_code == 200
+    workout_upload = workout.json()["file_upload"]
+    assert workout_upload["document_type"] == "workout_plan"
+    assert any(item["label"] == "training_frequency" and item["value"] == "4 days/week" for item in workout_upload["insights"])
+    assert workout_upload["recommendations"]
 
 
 def test_file_upload_rejects_unsupported_type_and_large_file() -> None:

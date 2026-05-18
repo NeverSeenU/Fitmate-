@@ -48,6 +48,22 @@ export type FileUploadInput = {
   mimeType: string;
 };
 
+export type FileUploadResponse = {
+  file_upload: {
+    id: string;
+    filename: string;
+    content_type: string;
+    size_bytes: number;
+    status: string;
+    summary_text: string;
+    document_type?: string;
+    insights?: Array<{ label: string; value: string; source?: string }>;
+    recommendations?: string[];
+    insight_schema_version?: number;
+  };
+  assistant_message?: { id?: string; content_text?: string; message_type?: string; structured_json?: unknown };
+};
+
 export type FoodPhotoAnalysisResponse = {
   food_analysis: {
     food_log_id: string | null;
@@ -143,7 +159,7 @@ export function createBackendApi(options: ApiClientOptions = {}) {
       deleteLog: (foodLogId: string) => client.delete(`/food/logs/${encodeURIComponent(foodLogId)}`),
     },
     files: {
-      upload: (input: FileUploadInput) => client.multipart('/files/upload', new FileUploadBody(input)),
+      upload: (input: FileUploadInput) => client.multipart('/files/upload', new FileUploadBody(input)) as Promise<FileUploadResponse>,
     },
     records: {
       today: (date?: string) => (

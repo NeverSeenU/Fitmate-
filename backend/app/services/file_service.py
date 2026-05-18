@@ -28,6 +28,7 @@ SUPPORTED_FILE_CONTENT_TYPES = {
     "image/webp",
 }
 MAX_FILE_UPLOAD_BYTES = 15 * 1024 * 1024
+FILE_INSIGHT_SCHEMA_VERSION = 1
 
 
 @dataclass
@@ -84,6 +85,7 @@ class FileService:
         object_key = self._object_key(user_id, filename)
         stored = self.storage.put(key=object_key, content=content, content_type=content_type)
         summary = self._summary(filename=filename, content=content, content_type=content_type)
+        file_insights = build_file_insights(filename=filename, content=content, content_type=content_type)
         file_message = self.chat_service.store.add_message(
             StoredMessage(
                 id=str(uuid.uuid4()),
@@ -114,6 +116,7 @@ class FileService:
                 summary_text=summary,
             )
         )
+        upload_response = self._upload_response(upload, file_insights)
         assistant_message = self.chat_service.store.add_message(
             StoredMessage(
                 id=str(uuid.uuid4()),
@@ -122,12 +125,12 @@ class FileService:
                 role="assistant",
                 message_type="file_summary",
                 content_text=summary,
-                structured_json={"file_upload": self._upload_response(upload)},
+                structured_json={"file_upload": upload_response, "file_insights": file_insights},
             )
         )
         return {
             "assistant_message": self.chat_service._message_response(assistant_message),
-            "file_upload": self._upload_response(upload),
+            "file_upload": upload_response,
         }
 
     def delete_user_files(self, user_id: str) -> int:
@@ -144,10 +147,15 @@ class FileService:
             return f"已上传并解析 {filename}（{size_label}）。{parsed}"
         return f"已上传 {filename}（{content_type}，{size_label}）。当前版本已保存文件并记录元信息，暂未抽取到可读文本。"
 
-    def _upload_response(self, upload: StoredFileUpload) -> dict:
+    def _upload_response(self, upload: StoredFileUpload, file_insights: dict | None = None) -> dict:
         data = asdict(upload)
         data["created_at"] = upload.created_at.isoformat()
         data["updated_at"] = upload.updated_at.isoformat()
+        if file_insights is not None:
+            data["document_type"] = file_insights["document_type"]
+            data["insights"] = file_insights["insights"]
+            data["recommendations"] = file_insights["recommendations"]
+            data["insight_schema_version"] = file_insights["schema_version"]
         return data
 
     def _object_key(self, user_id: str, filename: str) -> str:
@@ -180,6 +188,142 @@ def parse_file_preview(filename: str, content: bytes, content_type: str) -> str:
     if content_type == "application/pdf" or filename.lower().endswith(".pdf"):
         return _pdf_preview(content)
     return ""
+
+
+def extract_file_text(filename: str, content: bytes, content_type: str) -> str:
+    if content_type == "text/csv" or filename.lower().endswith(".csv"):
+        return _clean_text(content.decode("utf-8-sig", errors="replace"))
+    if content_type == "text/plain" or filename.lower().endswith(".txt"):
+        return _clean_text(content.decode("utf-8", errors="replace"))
+    if (
+        content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        or filename.lower().endswith(".docx")
+    ):
+        return _docx_text(content)
+    if (
+        content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        or filename.lower().endswith(".xlsx")
+    ):
+        return _xlsx_text(content)
+    if content_type == "application/pdf" or filename.lower().endswith(".pdf"):
+        return _pdf_text(content)
+    return ""
+
+
+def build_file_insights(filename: str, content: bytes, content_type: str) -> dict:
+    text = extract_file_text(filename=filename, content=content, content_type=content_type)
+    searchable = f"{filename} {text}".lower()
+    document_type = _document_type(searchable)
+    insights = _extract_insights(searchable)
+    insights.insert(0, {"label": "document_type", "value": document_type, "source": "heuristic"})
+    return {
+        "schema_version": FILE_INSIGHT_SCHEMA_VERSION,
+        "document_type": document_type,
+        "insights": insights[:8],
+        "recommendations": _recommendations(document_type, insights),
+    }
+
+
+def _document_type(text: str) -> str:
+    type_keywords = {
+        "body_report": [
+            "bmi",
+            "body fat",
+            "weight",
+            "glucose",
+            "cholesterol",
+            "blood report",
+            "body report",
+            "体脂",
+            "体重",
+            "血糖",
+            "血脂",
+            "报告",
+        ],
+        "menu": [
+            "menu",
+            "meal",
+            "breakfast",
+            "lunch",
+            "dinner",
+            "calories",
+            "protein",
+            "kcal",
+            "菜单",
+            "早餐",
+            "午餐",
+            "晚餐",
+            "热量",
+            "蛋白",
+        ],
+        "workout_plan": [
+            "workout",
+            "training",
+            "sets",
+            "reps",
+            "strength",
+            "cardio",
+            "run",
+            "days/week",
+            "训练",
+            "卧推",
+            "深蹲",
+            "有氧",
+            "无氧",
+        ],
+    }
+    scores = {
+        document_type: sum(1 for keyword in keywords if keyword in text)
+        for document_type, keywords in type_keywords.items()
+    }
+    best_type = max(scores, key=lambda key: scores[key])
+    return best_type if scores[best_type] > 0 else "general"
+
+
+def _extract_insights(text: str) -> list[dict[str, str]]:
+    specs = [
+        ("weight_kg", r"(?:weight|体重)\D{0,12}(\d+(?:\.\d+)?)\s*kg"),
+        ("bmi", r"\bbmi\D{0,8}(\d+(?:\.\d+)?)"),
+        ("body_fat_percent", r"(?:body fat|体脂)\D{0,12}(\d+(?:\.\d+)?)\s*%"),
+        ("protein_g", r"(?:protein|蛋白)\D{0,12}(\d+(?:\.\d+)?)\s*g"),
+        ("calories_kcal", r"(?:calories|kcal|热量)\D{0,12}(\d+(?:\.\d+)?)"),
+        ("training_frequency", r"(\d+)\s*(?:days/week|天/周|次/周)"),
+    ]
+    insights: list[dict[str, str]] = []
+    for label, pattern in specs:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if not match:
+            continue
+        value = match.group(1)
+        if label == "weight_kg":
+            value = f"{value} kg"
+        elif label == "body_fat_percent":
+            value = f"{value}%"
+        elif label == "protein_g":
+            value = f"{value}g"
+        elif label == "calories_kcal":
+            value = f"{value} kcal"
+        elif label == "training_frequency":
+            value = f"{value} days/week"
+        insights.append({"label": label, "value": value, "source": "file_text"})
+    return insights
+
+
+def _recommendations(document_type: str, insights: list[dict[str, str]]) -> list[str]:
+    labels = {item["label"] for item in insights}
+    if document_type == "body_report":
+        recommendations = ["Use abnormal markers as follow-up signals, not as a diagnosis."]
+        if "weight_kg" in labels:
+            recommendations.append("Sync the weight value to the profile or check-in record before comparing trends.")
+        return recommendations
+    if document_type == "menu":
+        recommendations = ["Check whether total calories and protein match the current fat-loss target."]
+        if "protein_g" not in labels:
+            recommendations.append("Add protein grams per meal so FitMate can estimate daily protein coverage.")
+        return recommendations
+    if document_type == "workout_plan":
+        return ["Keep the weekly training frequency visible and schedule recovery days around strength sessions."]
+    return ["Readable content was extracted; send the key section to FitMate for a more specific analysis."]
 
 
 def _text_preview(content: bytes) -> str:
@@ -243,6 +387,49 @@ def _pdf_preview(content: bytes) -> str:
     snippets = re.findall(r"\(([^()]{2,120})\)", text)
     preview = _clean_text(" ".join(_pdf_unescape(item) for item in snippets))[:360]
     return f"PDF 文本预览：{preview}" if preview else ""
+
+
+def _docx_text(content: bytes) -> str:
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            xml = archive.read("word/document.xml")
+    except (KeyError, zipfile.BadZipFile):
+        return ""
+    try:
+        root = ET.fromstring(xml)
+    except ET.ParseError:
+        return ""
+    texts = [node.text or "" for node in root.iter() if node.tag.endswith("}t")]
+    return _clean_text(" ".join(texts))
+
+
+def _xlsx_text(content: bytes) -> str:
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            shared = _xlsx_shared_strings(archive)
+            sheet_names = [name for name in archive.namelist() if name.startswith("xl/worksheets/sheet") and name.endswith(".xml")]
+            cells: list[str] = []
+            for sheet_name in sheet_names[:3]:
+                root = ET.fromstring(archive.read(sheet_name))
+                for cell in root.iter():
+                    if not cell.tag.endswith("}c"):
+                        continue
+                    value = _xlsx_cell_value(cell, shared)
+                    if value:
+                        cells.append(value)
+                    if len(cells) >= 40:
+                        break
+                if len(cells) >= 40:
+                    break
+    except (KeyError, zipfile.BadZipFile, ET.ParseError):
+        return ""
+    return _clean_text(" ".join(cells))
+
+
+def _pdf_text(content: bytes) -> str:
+    text = content.decode("latin-1", errors="ignore")
+    snippets = re.findall(r"\(([^()]{2,120})\)", text)
+    return _clean_text(" ".join(_pdf_unescape(item) for item in snippets))
 
 
 def _xlsx_shared_strings(archive: zipfile.ZipFile) -> list[str]:

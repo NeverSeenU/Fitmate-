@@ -26,11 +26,11 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ## Priority 3: Product Expansion
 
-### P3-6: Structured Report Insights
-- Owner: Backend Lead / AI-Vision Lead / Product Lead
-- Files: `backend/app/services/file_service.py`, parser modules, mobile file insight UI
-- Scope: turn parsed file text into structured body-report, menu, and workout-plan insights.
-- Done when: reports produce typed fields and user-facing recommendations, not just text previews.
+### P3-7: Mobile File Insight Cards
+- Owner: Frontend Lead / Product Lead
+- Files: `src/services/appActions.ts`, `src/screens/*`, `src/components/*`
+- Scope: render backend file `document_type`, `insights`, and `recommendations` as mobile chat cards, then decide which trusted body metrics can sync into profile, check-ins, or records.
+- Done when: uploaded reports are visible as structured cards in chat and any profile/records sync path is explicit and reversible.
 
 ## Subagent Assignment Template
 

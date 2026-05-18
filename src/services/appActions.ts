@@ -1,5 +1,5 @@
 import type { AppDataState, ChatMessage, ConversationThread, Entitlements, FoodAnalysis, SubscriptionTier, UserProfile } from '../domain/models';
-import type { FoodPhotoAnalysisResponse, PhotoUploadInput } from './apiClient';
+import type { FileUploadResponse, FoodPhotoAnalysisResponse, PhotoUploadInput } from './apiClient';
 import type { PickedFile } from './filePicker';
 
 type AppActionsOptions = {
@@ -34,7 +34,7 @@ type AppActionsApi = {
     deleteLog(foodLogId: string): Promise<unknown>;
   };
   files: {
-    upload(input: { threadId: string; fileUri: string; filename: string; mimeType: string }): Promise<unknown>;
+    upload(input: { threadId: string; fileUri: string; filename: string; mimeType: string }): Promise<FileUploadResponse>;
   };
   subscription: {
     restore(payload: { provider: string; productId: string; receipt: string }): Promise<{
@@ -253,10 +253,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           fileUri: file.uri,
           filename: file.name,
           mimeType: file.mimeType,
-        }) as {
-          assistant_message?: { id?: string; content_text?: string };
-          file_upload?: { summary_text?: string };
-        };
+        });
         addMessages(getState, setState, [
           {
             id: `file-user-${Date.now()}`,
