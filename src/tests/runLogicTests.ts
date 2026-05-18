@@ -393,6 +393,10 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
             },
           };
         },
+        async createLog(payload: Record<string, unknown>) {
+          calls.push(`createWorkout:${payload.workout_type}`);
+          return { id: 'workout-created' };
+        },
         async confirmLog(workoutLogId: string) {
           calls.push(`confirmWorkout:${workoutLogId}`);
           return { id: workoutLogId, status: 'confirmed' };
@@ -428,6 +432,10 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
             },
             assistant_message: { id: 'assistant-photo' },
           };
+        },
+        async createLog(payload: Record<string, unknown>) {
+          calls.push(`createFood:${payload.meal_name}`);
+          return { id: 'food-created' };
         },
         async confirmLog(foodLogId: string) {
           calls.push(`confirmFood:${foodLogId}`);
@@ -748,7 +756,22 @@ async function testExpandedFileInsightSyncCreatesMenuAndWorkoutRecords() {
       },
     ],
   };
+  const calls: string[] = [];
   const actions = createAppActions({
+    api: {
+      food: {
+        async createLog(payload: Record<string, unknown>) {
+          calls.push(`food:${payload.meal_name}:${JSON.stringify(payload.calories_range_kcal)}:${JSON.stringify(payload.protein_g_range)}`);
+          return { id: 'food-from-file' };
+        },
+      },
+      workouts: {
+        async createLog(payload: Record<string, unknown>) {
+          calls.push(`workout:${payload.workout_type}:${payload.status}`);
+          return { id: 'workout-from-file' };
+        },
+      },
+    } as unknown as NonNullable<Parameters<typeof createAppActions>[0]['api']>,
     getState: () => state,
     setState: (next: AppDataState) => {
       state = next;
@@ -757,13 +780,17 @@ async function testExpandedFileInsightSyncCreatesMenuAndWorkoutRecords() {
 
   await actions.syncFileInsightMetrics('assistant-menu-file');
   assert(state.records[0].kind === 'food', 'menu file sync must create a nutrition record');
+  assert(state.records[0].id === 'food-from-file', 'menu file sync must use backend food log id');
   assert(state.records[0].caloriesKcal === 550 && state.records[0].proteinG === 35, 'menu sync must preserve parsed calories and protein');
   assert(state.records[0].text.includes('menu.csv'), 'menu sync record must keep the source filename visible');
+  assert(calls.some((call) => call.startsWith('food:File menu nutrition:')), 'menu sync must persist through backend food log creation');
 
   await actions.syncFileInsightMetrics('assistant-workout-file');
   assert(state.records[0].kind === 'workout', 'workout-plan file sync must create a workout record');
+  assert(state.records[0].id === 'workout-from-file', 'workout-plan file sync must use backend workout log id');
   assert(state.records[0].text.includes('4 days/week'), 'workout-plan sync must preserve training frequency');
   assert(state.records[0].text.includes('workout.txt'), 'workout-plan sync record must keep the source filename visible');
+  assert(calls.includes('workout:file_plan:confirmed'), 'workout-plan sync must persist through backend workout log creation');
 }
 
 async function testSendTextShowsUserMessageBeforeBackendReply() {

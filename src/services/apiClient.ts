@@ -153,6 +153,7 @@ export function createBackendApi(options: ApiClientOptions = {}) {
         client.multipart('/chat/photo', createPhotoUploadBody(input)) as Promise<FoodPhotoAnalysisResponse>
       ),
       listLogs: (date?: string) => client.get(date ? `/food/logs?date=${encodeURIComponent(date)}` : '/food/logs'),
+      createLog: (payload: Record<string, unknown>) => client.post('/food/logs', payload),
       confirmLog: (foodLogId: string) => client.post(`/food/logs/${encodeURIComponent(foodLogId)}/confirm`, {}),
       patchLog: (foodLogId: string, payload: Record<string, unknown>) => client.patch(`/food/logs/${encodeURIComponent(foodLogId)}`, payload),
       discardLog: (foodLogId: string) => client.post(`/food/logs/${encodeURIComponent(foodLogId)}/discard`, {}),
@@ -171,6 +172,7 @@ export function createBackendApi(options: ApiClientOptions = {}) {
     },
     workouts: {
       analyze: (text: string) => client.post('/workouts/analyze', { text }),
+      createLog: (payload: Record<string, unknown>) => client.post('/workouts/logs', payload),
       confirmLog: (workoutLogId: string) => client.post(`/workouts/logs/${encodeURIComponent(workoutLogId)}/confirm`, {}),
       patchLog: (workoutLogId: string, payload: Record<string, unknown>) => client.patch(`/workouts/logs/${encodeURIComponent(workoutLogId)}`, payload),
     },

@@ -94,6 +94,20 @@ class WorkoutService:
     def list_logs(self, user_id: str, target_date: date | None = None) -> list[dict]:
         return [self._log_response(log) for log in self.store.list_for_user(user_id, target_date)]
 
+    def create_log(self, user_id: str, data: dict) -> dict:
+        log = self.store.create(
+            StoredWorkoutLog(
+                id=str(uuid.uuid4()),
+                user_id=user_id,
+                workout_type=data["workout_type"],
+                duration_minutes=int(data.get("duration_minutes", 0)),
+                intensity=data.get("intensity", "medium"),
+                calories_burned_range_kcal=data.get("calories_burned_range_kcal") or [0, 0],
+                status=data.get("status", "confirmed"),
+            )
+        )
+        return self._log_response(log)
+
     def confirm(self, user_id: str, workout_log_id: str) -> dict | None:
         log = self.store.get_for_user(user_id, workout_log_id)
         if log is None:

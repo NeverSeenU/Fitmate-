@@ -184,6 +184,48 @@ def test_pro_workout_analysis_creates_pending_log_and_confirm_flow() -> None:
     assert confirm.json()["status"] == "confirmed"
 
 
+def test_file_synced_food_and_workout_logs_persist_to_records() -> None:
+    headers = auth_headers("records-file-sync@example.com")
+
+    food = client.post(
+        "/v1/food/logs",
+        headers=headers,
+        json={
+            "meal_name": "File menu nutrition",
+            "calories_range_kcal": [550, 550],
+            "protein_g_range": [35, 35],
+            "carbs_g_range": [0, 0],
+            "fat_g_range": [0, 0],
+            "status": "confirmed",
+            "user_portion_note": "Synced from file: menu.csv",
+        },
+    )
+    assert food.status_code == 201
+    assert food.json()["status"] == "confirmed"
+
+    workout = client.post(
+        "/v1/workouts/logs",
+        headers=headers,
+        json={
+            "workout_type": "file_plan",
+            "duration_minutes": 0,
+            "intensity": "medium",
+            "calories_burned_range_kcal": [0, 0],
+            "status": "confirmed",
+        },
+    )
+    assert workout.status_code == 201
+    assert workout.json()["status"] == "confirmed"
+
+    today = client.get("/v1/records/today", headers=headers).json()
+    assert len(today["food_logs"]) == 1
+    assert today["food_logs"][0]["meal_name"] == "File menu nutrition"
+    assert today["food_logs"][0]["user_portion_note"] == "Synced from file: menu.csv"
+    assert today["calories_range_kcal"] == [550, 550]
+    assert len(today["workout_logs"]) == 1
+    assert today["workout_logs"][0]["workout_type"] == "file_plan"
+
+
 def test_free_workout_analysis_does_not_auto_create_log() -> None:
     email = "records-free-workout@example.com"
     headers = auth_headers(email)

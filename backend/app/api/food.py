@@ -32,6 +32,21 @@ class PatchFoodLogRequest(BaseModel):
     user_portion_note: str | None = None
 
 
+class CreateFoodLogRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    meal_name: str
+    calories_range_kcal: list[int | float] = [0, 0]
+    protein_g_range: list[int | float] = [0, 0]
+    carbs_g_range: list[int | float] = [0, 0]
+    fat_g_range: list[int | float] = [0, 0]
+    confidence: float = 1.0
+    status: str = "confirmed"
+    user_portion_note: str | None = None
+    model_provider: str | None = None
+    model_name: str | None = None
+
+
 @router.post("/chat/photo")
 async def analyze_chat_photo(
     user: CurrentUser,
@@ -93,6 +108,14 @@ async def analyze_chat_photo(
 @router.get("/food/logs")
 def list_food_logs(user: CurrentUser, service: FoodServiceDependency, date: date | None = None) -> dict:
     return service.list_logs(user_id=user["id"], target_date=date)
+
+
+@router.post("/food/logs", status_code=status.HTTP_201_CREATED)
+def create_food_log(payload: CreateFoodLogRequest, user: CurrentUser, service: FoodServiceDependency) -> dict:
+    return service.create_log(
+        user_id=user["id"],
+        data=payload.model_dump(),
+    )
 
 
 @router.post("/food/logs/{food_log_id}/confirm")

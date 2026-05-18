@@ -27,6 +27,16 @@ class PatchWorkoutLogRequest(BaseModel):
     calories_burned_range_kcal: list[int] | None = None
 
 
+class CreateWorkoutLogRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workout_type: str
+    duration_minutes: int = Field(default=0, ge=0, le=600)
+    intensity: str = "medium"
+    calories_burned_range_kcal: list[int] = [0, 0]
+    status: str = "confirmed"
+
+
 @router.post("/analyze")
 def analyze_workout(payload: AnalyzeWorkoutRequest, user: CurrentUser, service: WorkoutServiceDependency) -> dict:
     try:
@@ -48,6 +58,14 @@ def confirm_workout_log(workout_log_id: str, user: CurrentUser, service: Workout
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workout_log_not_found")
     return result
+
+
+@router.post("/logs", status_code=status.HTTP_201_CREATED)
+def create_workout_log(payload: CreateWorkoutLogRequest, user: CurrentUser, service: WorkoutServiceDependency) -> dict:
+    return service.create_log(
+        user_id=user["id"],
+        data=payload.model_dump(),
+    )
 
 
 @router.patch("/logs/{workout_log_id}")

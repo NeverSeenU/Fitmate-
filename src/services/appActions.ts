@@ -23,11 +23,13 @@ type AppActionsApi = {
   };
   workouts: {
     analyze(text: string): Promise<unknown>;
+    createLog(payload: Record<string, unknown>): Promise<unknown>;
     confirmLog(workoutLogId: string): Promise<unknown>;
     patchLog(workoutLogId: string, payload: Record<string, unknown>): Promise<unknown>;
   };
   food: {
     analyzePhoto(input: PhotoUploadInput): Promise<FoodPhotoAnalysisResponse>;
+    createLog(payload: Record<string, unknown>): Promise<unknown>;
     confirmLog(foodLogId: string): Promise<unknown>;
     patchLog(foodLogId: string, payload: Record<string, unknown>): Promise<unknown>;
     discardLog(foodLogId: string): Promise<unknown>;
@@ -306,10 +308,16 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       const backendCheckin = syncPayload.checkinPayload
         ? await api?.records.createCheckin(syncPayload.checkinPayload) as { id?: string } | undefined
         : undefined;
+      const backendFoodLog = syncPayload.foodPayload
+        ? await api?.food.createLog(syncPayload.foodPayload) as { id?: string } | undefined
+        : undefined;
+      const backendWorkoutLog = syncPayload.workoutPayload
+        ? await api?.workouts.createLog(syncPayload.workoutPayload) as { id?: string } | undefined
+        : undefined;
       const nextState = getState();
       const syncedRecord = {
         ...syncPayload.record,
-        id: backendCheckin?.id ?? syncPayload.record.id,
+        id: backendCheckin?.id ?? backendFoodLog?.id ?? backendWorkoutLog?.id ?? syncPayload.record.id,
       };
       setState({
         ...nextState,
@@ -824,6 +832,8 @@ function buildFileInsightSyncPayload(insight: FileInsight | undefined): {
   weightKg?: number;
   profilePatch?: Record<string, unknown>;
   checkinPayload?: Record<string, unknown>;
+  foodPayload?: Record<string, unknown>;
+  workoutPayload?: Record<string, unknown>;
   record: AppDataState['records'][number];
 } | undefined {
   if (!insight) {
@@ -883,6 +893,15 @@ function buildFileInsightSyncPayload(insight: FileInsight | undefined): {
         proteinG,
         detail: sourceText,
       },
+      foodPayload: {
+        meal_name: 'File menu nutrition',
+        calories_range_kcal: rangeOrZero(caloriesKcal),
+        protein_g_range: rangeOrZero(proteinG),
+        carbs_g_range: [0, 0],
+        fat_g_range: [0, 0],
+        status: 'confirmed',
+        user_portion_note: `Synced from file: ${insight.filename}`,
+      },
     };
   }
   if (insight.documentType === 'workout_plan') {
@@ -900,9 +919,20 @@ function buildFileInsightSyncPayload(insight: FileInsight | undefined): {
         done: true,
         detail: `训练频率 ${frequency} · ${sourceText}`,
       },
+      workoutPayload: {
+        workout_type: 'file_plan',
+        duration_minutes: 0,
+        intensity: 'medium',
+        calories_burned_range_kcal: [0, 0],
+        status: 'confirmed',
+      },
     };
   }
   return undefined;
+}
+
+function rangeOrZero(value: number | undefined) {
+  return value === undefined ? [0, 0] : [value, value];
 }
 
 function parseInsightNumber(insight: FileInsight | undefined, label: string) {

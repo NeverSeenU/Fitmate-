@@ -32,12 +32,6 @@ This is the formal task queue for the main Codex conversation and subagent team.
 - Scope: run the already automated live file insight flow manually in Expo Go on a real phone against the live local backend.
 - Done when: file picker, insight card rendering, sync button tap target, Records navigation, and card synced state are verified on-device and any issues are logged or fixed.
 
-### P3-10: File Sync Persistence Design
-- Owner: Product Lead / Backend Lead / Frontend Lead
-- Files: `backend/app/services/file_service.py`, records/profile services, `src/services/appActions.ts`
-- Scope: decide and implement backend persistence for file-derived menu nutrition and workout-plan records, which currently sync into mobile Records locally while body-report weight persists through profile/check-in APIs.
-- Done when: every file-derived record that appears in mobile Records can survive app reload when the user expects it to persist.
-
 ### P3-11: Expanded File Insight Expo Go Verification
 - Owner: Frontend Lead / QA Lead
 - Files: `src/screens/*`, `src/components/ui.tsx`, `docs/engineering/smoke-checklist.md`

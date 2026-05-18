@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Expanded file metric sync completed
-- **Next task:** Expo Go verification and file-sync persistence design
+- **Current task:** File sync persistence completed
+- **Next task:** Expo Go verification for expanded file sync
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -273,9 +273,13 @@
 - Menu file sync can create a confirmed nutrition record from parsed calories/protein so the Records intake summary updates.
 - Workout-plan file sync can create a workout record from parsed training frequency.
 - Mobile logic tests now cover menu and workout-plan file sync in addition to body-report weight sync.
+- Backend now exposes `POST /v1/food/logs` for explicit confirmed food-log creation after user-reviewed file sync.
+- Backend now exposes `POST /v1/workouts/logs` for explicit confirmed workout-log creation after user-reviewed file sync.
+- Mobile file sync now persists menu-derived nutrition through the food-log API and workout-plan frequency through the workout-log API, then uses backend ids in Records.
+- Backend records tests now verify file-synced food and workout logs survive through `/v1/records/today`.
 
 ## What's Next
-- Run the expanded file insight flow in Expo Go, then decide whether menu/workout file-derived records need backend persistence endpoints instead of local-only Records cards.
+- Run body-report, menu, and workout-plan file insight sync in Expo Go against the live backend, checking layout, tap targets, navigation to Records, and reload persistence.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

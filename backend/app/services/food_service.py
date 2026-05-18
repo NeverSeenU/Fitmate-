@@ -177,6 +177,29 @@ class FoodService:
             ]
         }
 
+    def create_log(self, user_id: str, data: dict[str, Any]) -> dict:
+        log = self.store.create(
+            StoredFoodLog(
+                id=str(uuid.uuid4()),
+                user_id=user_id,
+                source_message_id=None,
+                image_object_key=None,
+                meal_name=data["meal_name"],
+                calories_range_kcal=data.get("calories_range_kcal") or [0, 0],
+                protein_g_range=data.get("protein_g_range") or [0, 0],
+                carbs_g_range=data.get("carbs_g_range") or [0, 0],
+                fat_g_range=data.get("fat_g_range") or [0, 0],
+                confidence=float(data.get("confidence", 1.0)),
+                status=data.get("status", "confirmed"),
+                needs_follow_up=False,
+                follow_up_question=None,
+                user_portion_note=data.get("user_portion_note"),
+                model_provider=data.get("model_provider"),
+                model_name=data.get("model_name"),
+            )
+        )
+        return self._log_response(log)
+
     def confirm(self, user_id: str, food_log_id: str) -> dict | None:
         log = self.store.get_for_user(user_id, food_log_id)
         if log is None:
