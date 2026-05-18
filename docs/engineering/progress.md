@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Structured report insights completed
-- **Next task:** Mobile file insight cards and profile/records sync
+- **Current task:** Mobile file insight cards completed
+- **Next task:** File metric sync into profile/check-ins/records
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -259,9 +259,12 @@
 - File uploads now return structured `document_type`, `insights`, `recommendations`, and `insight_schema_version` fields alongside the existing chat summary.
 - Structured file insight heuristics classify body reports, menus, workout plans, and general documents from parsed TXT, CSV, DOCX, XLSX, and simple PDF text.
 - Backend tests now cover body-report, menu, and workout-plan insight extraction, including assistant-message `structured_json` payloads.
+- Mobile chat messages now carry optional `fileInsight` card data from backend file uploads.
+- Chat bubbles now render structured file insight cards with document type, filename, key metrics, and the first recommendation.
+- Mobile logic and smoke tests now cover backend file insight data flowing into chat state.
 
 ## What's Next
-- Render structured file insights as mobile chat cards and optionally sync trusted body metrics into profile/check-in or records flows.
+- Add an explicit review-and-sync path for trusted file metrics, starting with body-report weight/body-fat values into profile, check-ins, or records.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

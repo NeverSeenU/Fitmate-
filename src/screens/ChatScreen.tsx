@@ -213,7 +213,7 @@ export function ChatScreen({
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {appState.chatMessages.map((message) => (
-          <ChatBubble key={message.id} text={message.text} user={message.role === 'user'} />
+          <ChatBubble key={message.id} text={message.text} user={message.role === 'user'} fileInsight={message.fileInsight} />
         ))}
         {appState.activeFoodAnalysis ? (
           <FoodAnalysisCard

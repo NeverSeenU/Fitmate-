@@ -1,6 +1,6 @@
 import { Pressable, Text, TextInput, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
-import type { FoodAnalysis, SubscriptionTier } from '../domain/models';
+import type { FileInsight, FoodAnalysis, SubscriptionTier } from '../domain/models';
 import type { Screen } from '../types';
 import { styles } from '../styles';
 
@@ -265,12 +265,58 @@ export function Back({ onPress }: { onPress: () => void }) {
   );
 }
 
-export function ChatBubble({ text, user }: { text: string; user?: boolean }) {
+export function ChatBubble({ text, user, fileInsight }: { text: string; user?: boolean; fileInsight?: FileInsight }) {
   return (
     <View style={[styles.bubble, user ? styles.userBubble : styles.aiBubble]}>
       <Text style={styles.body}>{text}</Text>
+      {!user && fileInsight ? <FileInsightCard insight={fileInsight} /> : null}
     </View>
   );
+}
+
+function FileInsightCard({ insight }: { insight: FileInsight }) {
+  const visibleInsights = insight.insights.filter((item) => item.label !== 'document_type').slice(0, 4);
+  return (
+    <View style={styles.fileInsightCard}>
+      <View style={styles.rowBetween}>
+        <View style={styles.fileInsightTitleWrap}>
+          <Text style={styles.bodyStrong}>{documentTypeLabel(insight.documentType)}</Text>
+          <Text style={styles.muted}>{insight.filename}</Text>
+        </View>
+        <View style={styles.pill}>
+          <Text style={styles.pillText}>{insight.documentType}</Text>
+        </View>
+      </View>
+      {visibleInsights.length ? (
+        <View style={styles.fileInsightGrid}>
+          {visibleInsights.map((item) => (
+            <View key={`${item.label}-${item.value}`} style={styles.fileInsightMetric}>
+              <Text style={styles.metricValue}>{item.value}</Text>
+              <Text style={styles.metricLabel}>{insightLabel(item.label)}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {insight.recommendations[0] ? <Text style={styles.muted}>{insight.recommendations[0]}</Text> : null}
+    </View>
+  );
+}
+
+function documentTypeLabel(documentType: string) {
+  if (documentType === 'body_report') return 'Body report';
+  if (documentType === 'menu') return 'Menu insight';
+  if (documentType === 'workout_plan') return 'Workout plan';
+  return 'File insight';
+}
+
+function insightLabel(label: string) {
+  if (label === 'weight_kg') return 'Weight';
+  if (label === 'body_fat_percent') return 'Body fat';
+  if (label === 'protein_g') return 'Protein';
+  if (label === 'calories_kcal') return 'Calories';
+  if (label === 'training_frequency') return 'Frequency';
+  if (label === 'bmi') return 'BMI';
+  return label.replace(/_/g, ' ');
 }
 
 export function Metric({ value, label }: { value: string; label: string }) {

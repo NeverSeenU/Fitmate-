@@ -1,4 +1,4 @@
-import type { AppDataState, ChatMessage, ConversationThread, Entitlements, FoodAnalysis, SubscriptionTier, UserProfile } from '../domain/models';
+import type { AppDataState, ChatMessage, ConversationThread, Entitlements, FileInsight, FoodAnalysis, SubscriptionTier, UserProfile } from '../domain/models';
 import type { FileUploadResponse, FoodPhotoAnalysisResponse, PhotoUploadInput } from './apiClient';
 import type { PickedFile } from './filePicker';
 
@@ -264,6 +264,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
             id: response.assistant_message?.id ?? `file-assistant-${Date.now()}`,
             role: 'assistant',
             text: response.assistant_message?.content_text ?? response.file_upload?.summary_text ?? `已上传 ${file.name}。`,
+            fileInsight: toFileInsight(response),
           },
         ]);
         return;
@@ -722,6 +723,23 @@ function toFoodAnalysis(response: FoodPhotoAnalysisResponse): FoodAnalysis {
     advice: analysis.needs_follow_up && analysis.follow_up_question
       ? analysis.follow_up_question
       : '已按图片估算营养区间，请确认份量后记录。',
+  };
+}
+
+function toFileInsight(response: FileUploadResponse): FileInsight | undefined {
+  const upload = response.file_upload;
+  if (!upload.document_type || !upload.insights?.length) {
+    return undefined;
+  }
+  return {
+    documentType: upload.document_type,
+    filename: upload.filename,
+    insights: upload.insights.map((item) => ({
+      label: item.label,
+      value: item.value,
+      source: item.source,
+    })),
+    recommendations: upload.recommendations ?? [],
   };
 }
 

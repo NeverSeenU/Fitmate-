@@ -338,6 +338,32 @@ export const styles = StyleSheet.create({
     fontSize: size(11),
     marginTop: 2,
   },
+  fileInsightCard: {
+    marginTop: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(200,255,61,0.28)',
+    backgroundColor: '#24241f',
+    padding: compactPhone ? 10 : 12,
+    gap: 9,
+  },
+  fileInsightTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  fileInsightGrid: {
+    flexDirection: 'row',
+    gap: 7,
+    flexWrap: 'wrap',
+  },
+  fileInsightMetric: {
+    flexGrow: 1,
+    flexBasis: narrowPhone ? '46%' : '22%',
+    minWidth: 0,
+    backgroundColor: '#191919',
+    borderRadius: 8,
+    padding: compactPhone ? 8 : 10,
+  },
   status: {
     color: colors.amber,
     fontSize: size(12),

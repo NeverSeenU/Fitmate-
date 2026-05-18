@@ -26,11 +26,11 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ## Priority 3: Product Expansion
 
-### P3-7: Mobile File Insight Cards
-- Owner: Frontend Lead / Product Lead
-- Files: `src/services/appActions.ts`, `src/screens/*`, `src/components/*`
-- Scope: render backend file `document_type`, `insights`, and `recommendations` as mobile chat cards, then decide which trusted body metrics can sync into profile, check-ins, or records.
-- Done when: uploaded reports are visible as structured cards in chat and any profile/records sync path is explicit and reversible.
+### P3-8: File Metric Sync Review
+- Owner: Frontend Lead / Backend Lead / Product Lead
+- Files: `src/services/appActions.ts`, `src/screens/*`, `backend/app/services/file_service.py`, records/profile services
+- Scope: let users review trusted file insights before writing body metrics such as weight or body-fat percentage into profile, check-ins, or records.
+- Done when: file-derived metrics can be accepted or ignored explicitly, synced values are reversible, and no file data silently mutates user records.
 
 ## Subagent Assignment Template
 

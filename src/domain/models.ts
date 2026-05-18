@@ -63,6 +63,18 @@ export type ChatMessage = {
   id: string;
   role: 'assistant' | 'user';
   text: string;
+  fileInsight?: FileInsight;
+};
+
+export type FileInsight = {
+  documentType: string;
+  filename: string;
+  insights: Array<{
+    label: string;
+    value: string;
+    source?: string;
+  }>;
+  recommendations: string[];
 };
 
 export type FoodAnalysis = {

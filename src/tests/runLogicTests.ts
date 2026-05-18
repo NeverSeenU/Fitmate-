@@ -608,6 +608,56 @@ async function testFoodActionStateLifecycle() {
   assert(state.chatMessages.some((message) => message.text.includes('暂不上传')), 'file action must explain that file contents are not uploaded yet');
 }
 
+async function testBackendFileUploadCreatesStructuredInsightMessage() {
+  let state: AppDataState = {
+    ...initialAppState,
+    chatMessages: [],
+  };
+  const actions = createAppActions({
+    api: {
+      files: {
+        async upload() {
+          return {
+            assistant_message: { id: 'assistant-file-insight', content_text: 'parsed body report' },
+            file_upload: {
+              id: 'file-1',
+              filename: 'body-report.txt',
+              content_type: 'text/plain',
+              size_bytes: 128,
+              status: 'parsed',
+              summary_text: 'parsed body report',
+              document_type: 'body_report',
+              insights: [
+                { label: 'weight_kg', value: '70 kg', source: 'file_text' },
+                { label: 'body_fat_percent', value: '21%', source: 'file_text' },
+              ],
+              recommendations: ['Sync the weight value to the profile or check-in record before comparing trends.'],
+              insight_schema_version: 1,
+            },
+          };
+        },
+      },
+    } as unknown as NonNullable<Parameters<typeof createAppActions>[0]['api']>,
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  await actions.attachFile({
+    uri: 'file:///body-report.txt',
+    name: 'body-report.txt',
+    mimeType: 'text/plain',
+    sizeBytes: 128,
+  });
+
+  const insightMessage = state.chatMessages.find((message) => message.id === 'assistant-file-insight');
+  assert(Boolean(insightMessage), 'backend file upload must append an assistant message');
+  assert(insightMessage?.fileInsight?.documentType === 'body_report', 'backend file upload must preserve document type for UI cards');
+  assert(insightMessage?.fileInsight?.insights.some((item) => item.label === 'weight_kg' && item.value === '70 kg') === true, 'file insight card must preserve typed insight values');
+  assert(insightMessage?.fileInsight?.recommendations.length === 1, 'file insight card must preserve recommendations');
+}
+
 async function testSendTextShowsUserMessageBeforeBackendReply() {
   let state: AppDataState = {
     ...initialAppState,
@@ -658,6 +708,7 @@ async function run() {
   await testBackendAppDataHydratesLiveRecordsShape();
   await testAppActionsCallBackendMutationsAndUpdateState();
   await testFoodActionStateLifecycle();
+  await testBackendFileUploadCreatesStructuredInsightMessage();
   await testSendTextShowsUserMessageBeforeBackendReply();
 }
 
