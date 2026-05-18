@@ -287,10 +287,10 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       const state = getState();
       const message = state.chatMessages.find((item) => item.id === messageId);
       const insight = message?.fileInsight;
-      const weightKg = parseInsightNumber(insight, 'weight_kg');
-      if (!insight || insight.documentType !== 'body_report' || weightKg === undefined) {
+      const syncPayload = buildFileInsightSyncPayload(insight);
+      if (!insight || !syncPayload) {
         addMessages(getState, setState, [
-          { id: `file-sync-unavailable-${Date.now()}`, role: 'assistant', text: '这个文件暂时没有可同步的体重指标。' },
+          { id: `file-sync-unavailable-${Date.now()}`, role: 'assistant', text: '这个文件暂时没有可同步的指标。' },
         ]);
         return;
       }
@@ -300,34 +300,29 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         ]);
         return;
       }
-      await api?.profile.patchProfile({ current_weight_kg: weightKg });
-      const backendCheckin = await api?.records.createCheckin({
-        weight_kg: weightKg,
-        notes: `Synced from file: ${insight.filename}`,
-      }) as { id?: string } | undefined;
+      if (syncPayload.profilePatch) {
+        await api?.profile.patchProfile(syncPayload.profilePatch);
+      }
+      const backendCheckin = syncPayload.checkinPayload
+        ? await api?.records.createCheckin(syncPayload.checkinPayload) as { id?: string } | undefined
+        : undefined;
       const nextState = getState();
-      const sourceText = `来自文件 ${insight.filename}`;
+      const syncedRecord = {
+        ...syncPayload.record,
+        id: backendCheckin?.id ?? syncPayload.record.id,
+      };
       setState({
         ...nextState,
-        profile: {
+        profile: syncPayload.weightKg === undefined ? nextState.profile : {
           ...nextState.profile,
-          weightKg,
+          weightKg: syncPayload.weightKg,
         },
         dailySummary: {
           ...nextState.dailySummary,
-          weightKg,
+          weightKg: syncPayload.weightKg ?? nextState.dailySummary.weightKg,
         },
         records: [
-          {
-            id: backendCheckin?.id ?? `file-weight-${Date.now()}`,
-            kind: 'weight',
-            title: '体重打卡',
-            status: '已同步',
-            text: `${weightKg} kg · ${sourceText}`,
-            done: true,
-            weightKg,
-            detail: sourceText,
-          },
+          syncedRecord,
           ...nextState.records,
         ],
         chatMessages: [
@@ -339,7 +334,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           {
             id: `file-sync-${Date.now()}`,
             role: 'assistant',
-            text: `已从 ${insight.filename} 同步体重 ${weightKg} kg 到档案和今日记录。`,
+            text: `已从 ${insight.filename} 同步到记录：${syncPayload.record.title}。`,
           },
         ],
       });
@@ -796,7 +791,7 @@ function toFileInsight(response: FileUploadResponse): FileInsight | undefined {
   return {
     documentType: upload.document_type,
     filename: upload.filename,
-    syncStatus: upload.document_type === 'body_report' && upload.insights.some((item) => item.label === 'weight_kg')
+    syncStatus: hasSyncableFileInsight(upload.document_type, upload.insights)
       ? 'available'
       : 'unavailable',
     insights: upload.insights.map((item) => ({
@@ -806,6 +801,108 @@ function toFileInsight(response: FileUploadResponse): FileInsight | undefined {
     })),
     recommendations: upload.recommendations ?? [],
   };
+}
+
+function hasSyncableFileInsight(documentType: string | undefined, insights: Array<{ label: string; value: string }> | undefined) {
+  if (!documentType || !insights?.length) {
+    return false;
+  }
+  const labels = new Set(insights.map((item) => item.label));
+  if (documentType === 'body_report') {
+    return labels.has('weight_kg') || labels.has('body_fat_percent');
+  }
+  if (documentType === 'menu') {
+    return labels.has('calories_kcal') || labels.has('protein_g');
+  }
+  if (documentType === 'workout_plan') {
+    return labels.has('training_frequency');
+  }
+  return false;
+}
+
+function buildFileInsightSyncPayload(insight: FileInsight | undefined): {
+  weightKg?: number;
+  profilePatch?: Record<string, unknown>;
+  checkinPayload?: Record<string, unknown>;
+  record: AppDataState['records'][number];
+} | undefined {
+  if (!insight) {
+    return undefined;
+  }
+  const sourceText = `来自文件 ${insight.filename}`;
+  if (insight.documentType === 'body_report') {
+    const weightKg = parseInsightNumber(insight, 'weight_kg');
+    const bodyFatPercent = parseInsightNumber(insight, 'body_fat_percent');
+    if (weightKg === undefined && bodyFatPercent === undefined) {
+      return undefined;
+    }
+    const text = [
+      weightKg !== undefined ? `${weightKg} kg` : null,
+      bodyFatPercent !== undefined ? `体脂 ${bodyFatPercent}%` : null,
+      sourceText,
+    ].filter(Boolean).join(' · ');
+    return {
+      weightKg,
+      profilePatch: weightKg === undefined ? undefined : { current_weight_kg: weightKg },
+      checkinPayload: weightKg === undefined ? undefined : {
+        weight_kg: weightKg,
+        notes: `Synced from file: ${insight.filename}${bodyFatPercent !== undefined ? `; body fat ${bodyFatPercent}%` : ''}`,
+      },
+      record: {
+        id: `file-body-${Date.now()}`,
+        kind: 'weight',
+        title: '体检指标同步',
+        status: '已同步',
+        text,
+        done: true,
+        weightKg,
+        bodyFatPercent,
+        detail: sourceText,
+      },
+    };
+  }
+  if (insight.documentType === 'menu') {
+    const caloriesKcal = parseInsightNumber(insight, 'calories_kcal');
+    const proteinG = parseInsightNumber(insight, 'protein_g');
+    if (caloriesKcal === undefined && proteinG === undefined) {
+      return undefined;
+    }
+    return {
+      record: {
+        id: `file-menu-${Date.now()}`,
+        kind: 'food',
+        title: '文件菜单营养',
+        status: '已同步',
+        text: [
+          caloriesKcal !== undefined ? `${caloriesKcal} kcal` : null,
+          proteinG !== undefined ? `蛋白 ${proteinG}g` : null,
+          sourceText,
+        ].filter(Boolean).join(' · '),
+        done: true,
+        caloriesKcal,
+        proteinG,
+        detail: sourceText,
+      },
+    };
+  }
+  if (insight.documentType === 'workout_plan') {
+    const frequency = insight.insights.find((item) => item.label === 'training_frequency')?.value;
+    if (!frequency) {
+      return undefined;
+    }
+    return {
+      record: {
+        id: `file-workout-${Date.now()}`,
+        kind: 'workout',
+        title: '文件训练计划',
+        status: '已同步',
+        text: `训练频率 ${frequency} · ${sourceText}`,
+        done: true,
+        detail: `训练频率 ${frequency} · ${sourceText}`,
+      },
+    };
+  }
+  return undefined;
 }
 
 function parseInsightNumber(insight: FileInsight | undefined, label: string) {

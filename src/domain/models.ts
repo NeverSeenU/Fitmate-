@@ -115,6 +115,7 @@ export type DailyRecord = {
   fatG?: number;
   detail?: string;
   weightKg?: number;
+  bodyFatPercent?: number;
   moodLevel?: number;
   hungerLevel?: number;
   cravingLevel?: number;

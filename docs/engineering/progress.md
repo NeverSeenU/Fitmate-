@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Live file insight verification completed
-- **Next task:** Expo Go file insight verification and expanded metric sync
+- **Current task:** Expanded file metric sync completed
+- **Next task:** Expo Go verification and file-sync persistence design
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -268,9 +268,14 @@
 - Live file insight smoke now runs with `npm.cmd run smoke:file-insight-live` against a running backend.
 - The live smoke verifies real register, thread creation, multipart file upload, structured body-report extraction, mobile action sync, backend profile persistence, and backend Records check-in persistence.
 - `docs/engineering/smoke-checklist.md` now includes the manual Expo Go file insight flow and the pre-device live smoke command.
+- File insight sync now supports body reports, menus, and workout plans through the same explicit user-confirmed action.
+- Body-report sync can preserve body-fat percentage on the generated record while still syncing weight to profile/check-ins when present.
+- Menu file sync can create a confirmed nutrition record from parsed calories/protein so the Records intake summary updates.
+- Workout-plan file sync can create a workout record from parsed training frequency.
+- Mobile logic tests now cover menu and workout-plan file sync in addition to body-report weight sync.
 
 ## What's Next
-- Run the file insight flow in Expo Go on a real phone, then expand explicit sync to body-fat and menu/workout-derived records with the same review pattern.
+- Run the expanded file insight flow in Expo Go, then decide whether menu/workout file-derived records need backend persistence endpoints instead of local-only Records cards.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

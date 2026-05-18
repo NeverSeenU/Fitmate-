@@ -49,6 +49,8 @@ Run this checklist in Expo Go after meaningful mobile or backend changes.
 - Verify the app navigates to Records and a weight card appears with the source filename.
 - Return to chat and verify the file card is marked as synced instead of offering a second identical sync.
 - Confirm that selecting or uploading a file does not change profile or records until the sync button is tapped.
+- Repeat with a menu file containing calories/protein; verify `同步菜单营养到记录` creates a nutrition record and updates today's intake summary.
+- Repeat with a workout-plan file containing training frequency; verify `同步训练计划到记录` creates a workout record with the source filename.
 
 ## Settings And Profile
 

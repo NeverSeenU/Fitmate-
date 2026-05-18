@@ -714,6 +714,58 @@ async function testFileInsightSyncRequiresUserActionAndCreatesWeightCheckin() {
   assert(state.records[0].text.includes('body-report.txt'), 'sync record must keep the source filename visible');
 }
 
+async function testExpandedFileInsightSyncCreatesMenuAndWorkoutRecords() {
+  let state: AppDataState = {
+    ...initialAppState,
+    records: [],
+    chatMessages: [
+      {
+        id: 'assistant-menu-file',
+        role: 'assistant',
+        text: 'parsed menu',
+        fileInsight: {
+          documentType: 'menu',
+          filename: 'menu.csv',
+          insights: [
+            { label: 'calories_kcal', value: '550 kcal', source: 'file_text' },
+            { label: 'protein_g', value: '35g', source: 'file_text' },
+          ],
+          recommendations: [],
+        },
+      },
+      {
+        id: 'assistant-workout-file',
+        role: 'assistant',
+        text: 'parsed workout',
+        fileInsight: {
+          documentType: 'workout_plan',
+          filename: 'workout.txt',
+          insights: [
+            { label: 'training_frequency', value: '4 days/week', source: 'file_text' },
+          ],
+          recommendations: [],
+        },
+      },
+    ],
+  };
+  const actions = createAppActions({
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  await actions.syncFileInsightMetrics('assistant-menu-file');
+  assert(state.records[0].kind === 'food', 'menu file sync must create a nutrition record');
+  assert(state.records[0].caloriesKcal === 550 && state.records[0].proteinG === 35, 'menu sync must preserve parsed calories and protein');
+  assert(state.records[0].text.includes('menu.csv'), 'menu sync record must keep the source filename visible');
+
+  await actions.syncFileInsightMetrics('assistant-workout-file');
+  assert(state.records[0].kind === 'workout', 'workout-plan file sync must create a workout record');
+  assert(state.records[0].text.includes('4 days/week'), 'workout-plan sync must preserve training frequency');
+  assert(state.records[0].text.includes('workout.txt'), 'workout-plan sync record must keep the source filename visible');
+}
+
 async function testSendTextShowsUserMessageBeforeBackendReply() {
   let state: AppDataState = {
     ...initialAppState,
@@ -766,6 +818,7 @@ async function run() {
   await testFoodActionStateLifecycle();
   await testBackendFileUploadCreatesStructuredInsightMessage();
   await testFileInsightSyncRequiresUserActionAndCreatesWeightCheckin();
+  await testExpandedFileInsightSyncCreatesMenuAndWorkoutRecords();
   await testSendTextShowsUserMessageBeforeBackendReply();
 }
 

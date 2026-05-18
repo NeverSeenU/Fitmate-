@@ -288,9 +288,7 @@ export function ChatBubble({
 
 function FileInsightCard({ insight, onSync }: { insight: FileInsight; onSync?: () => void }) {
   const visibleInsights = insight.insights.filter((item) => item.label !== 'document_type').slice(0, 4);
-  const canSync = insight.documentType === 'body_report'
-    && insight.syncStatus !== 'synced'
-    && insight.insights.some((item) => item.label === 'weight_kg');
+  const canSync = insight.syncStatus !== 'synced' && hasSyncableInsight(insight);
   return (
     <View style={styles.fileInsightCard}>
       <View style={styles.rowBetween}>
@@ -313,10 +311,31 @@ function FileInsightCard({ insight, onSync }: { insight: FileInsight; onSync?: (
         </View>
       ) : null}
       {insight.recommendations[0] ? <Text style={styles.muted}>{insight.recommendations[0]}</Text> : null}
-      {canSync ? <Button label="同步体重到记录" onPress={onSync} /> : null}
+      {canSync ? <Button label={syncButtonLabel(insight.documentType)} onPress={onSync} /> : null}
       {insight.syncStatus === 'synced' ? <Text style={styles.doneStatus}>已同步到档案和今日记录</Text> : null}
     </View>
   );
+}
+
+function hasSyncableInsight(insight: FileInsight) {
+  const labels = new Set(insight.insights.map((item) => item.label));
+  if (insight.documentType === 'body_report') {
+    return labels.has('weight_kg') || labels.has('body_fat_percent');
+  }
+  if (insight.documentType === 'menu') {
+    return labels.has('calories_kcal') || labels.has('protein_g');
+  }
+  if (insight.documentType === 'workout_plan') {
+    return labels.has('training_frequency');
+  }
+  return false;
+}
+
+function syncButtonLabel(documentType: string) {
+  if (documentType === 'body_report') return '同步体检指标到记录';
+  if (documentType === 'menu') return '同步菜单营养到记录';
+  if (documentType === 'workout_plan') return '同步训练计划到记录';
+  return '同步到记录';
 }
 
 function documentTypeLabel(documentType: string) {
