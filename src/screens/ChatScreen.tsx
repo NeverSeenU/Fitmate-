@@ -200,6 +200,13 @@ export function ChatScreen({
     })();
   };
 
+  const syncFileInsight = (messageId: string) => {
+    void runAction('正在同步文件指标...', '文件指标已同步到记录', async () => {
+      await actions.syncFileInsightMetrics(messageId);
+      go('records');
+    });
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.screen}
@@ -213,7 +220,14 @@ export function ChatScreen({
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {appState.chatMessages.map((message) => (
-          <ChatBubble key={message.id} text={message.text} user={message.role === 'user'} fileInsight={message.fileInsight} />
+          <ChatBubble
+            key={message.id}
+            id={message.id}
+            text={message.text}
+            user={message.role === 'user'}
+            fileInsight={message.fileInsight}
+            onSyncFileInsight={syncFileInsight}
+          />
         ))}
         {appState.activeFoodAnalysis ? (
           <FoodAnalysisCard

@@ -29,6 +29,11 @@ async function smokeChatWorkoutFileAndWeightFlows() {
   };
   const actions = createAppActions({
     api: {
+      profile: {
+        async patchProfile() {
+          return {};
+        },
+      },
       chat: {
         async createThread() {
           return {};
@@ -117,6 +122,12 @@ async function smokeChatWorkoutFileAndWeightFlows() {
   assert(state.chatMessages.some((message) => message.text.includes('body-check.pdf')), 'file metadata must appear in chat');
   assert(state.chatMessages.some((message) => message.fileInsight?.documentType === 'body_report'), 'file insight card data must appear in chat state');
   pass('file-selection', 'selected file metadata and structured insight data are visible in chat');
+
+  await actions.syncFileInsightMetrics('assistant-file-smoke');
+  assert(state.records[0].kind === 'weight' && state.records[0].weightKg === 70, 'file insight sync must create a weight record');
+  assert(state.profile.weightKg === 70, 'file insight sync must update profile weight');
+  assert(state.chatMessages.some((message) => message.fileInsight?.syncStatus === 'synced'), 'file insight sync must mark the card as synced');
+  pass('file-insight-sync', 'file-derived weight sync creates an explicit records card');
 }
 
 async function smokeFairUseErrorMessage() {

@@ -283,6 +283,68 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       ]);
     },
 
+    async syncFileInsightMetrics(messageId: string) {
+      const state = getState();
+      const message = state.chatMessages.find((item) => item.id === messageId);
+      const insight = message?.fileInsight;
+      const weightKg = parseInsightNumber(insight, 'weight_kg');
+      if (!insight || insight.documentType !== 'body_report' || weightKg === undefined) {
+        addMessages(getState, setState, [
+          { id: `file-sync-unavailable-${Date.now()}`, role: 'assistant', text: '这个文件暂时没有可同步的体重指标。' },
+        ]);
+        return;
+      }
+      if (insight.syncStatus === 'synced') {
+        addMessages(getState, setState, [
+          { id: `file-sync-duplicate-${Date.now()}`, role: 'assistant', text: '这个文件指标已经同步过了。' },
+        ]);
+        return;
+      }
+      await api?.profile.patchProfile({ current_weight_kg: weightKg });
+      const backendCheckin = await api?.records.createCheckin({
+        weight_kg: weightKg,
+        notes: `Synced from file: ${insight.filename}`,
+      }) as { id?: string } | undefined;
+      const nextState = getState();
+      const sourceText = `来自文件 ${insight.filename}`;
+      setState({
+        ...nextState,
+        profile: {
+          ...nextState.profile,
+          weightKg,
+        },
+        dailySummary: {
+          ...nextState.dailySummary,
+          weightKg,
+        },
+        records: [
+          {
+            id: backendCheckin?.id ?? `file-weight-${Date.now()}`,
+            kind: 'weight',
+            title: '体重打卡',
+            status: '已同步',
+            text: `${weightKg} kg · ${sourceText}`,
+            done: true,
+            weightKg,
+            detail: sourceText,
+          },
+          ...nextState.records,
+        ],
+        chatMessages: [
+          ...nextState.chatMessages.map((item) => (
+            item.id === messageId && item.fileInsight
+              ? { ...item, fileInsight: { ...item.fileInsight, syncStatus: 'synced' as const } }
+              : item
+          )),
+          {
+            id: `file-sync-${Date.now()}`,
+            role: 'assistant',
+            text: `已从 ${insight.filename} 同步体重 ${weightKg} kg 到档案和今日记录。`,
+          },
+        ],
+      });
+    },
+
     async confirmFoodLog(foodLogId: string) {
       if (!isLocalOnlyFoodLog(foodLogId)) {
         await api?.food.confirmLog(foodLogId);
@@ -734,6 +796,9 @@ function toFileInsight(response: FileUploadResponse): FileInsight | undefined {
   return {
     documentType: upload.document_type,
     filename: upload.filename,
+    syncStatus: upload.document_type === 'body_report' && upload.insights.some((item) => item.label === 'weight_kg')
+      ? 'available'
+      : 'unavailable',
     insights: upload.insights.map((item) => ({
       label: item.label,
       value: item.value,
@@ -741,6 +806,15 @@ function toFileInsight(response: FileUploadResponse): FileInsight | undefined {
     })),
     recommendations: upload.recommendations ?? [],
   };
+}
+
+function parseInsightNumber(insight: FileInsight | undefined, label: string) {
+  const value = insight?.insights.find((item) => item.label === label)?.value;
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Number(value.replace(/[^\d.]/g, ''));
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function rangeMidpoint(values: number[]) {

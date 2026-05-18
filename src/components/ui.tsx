@@ -265,17 +265,32 @@ export function Back({ onPress }: { onPress: () => void }) {
   );
 }
 
-export function ChatBubble({ text, user, fileInsight }: { text: string; user?: boolean; fileInsight?: FileInsight }) {
+export function ChatBubble({
+  id,
+  text,
+  user,
+  fileInsight,
+  onSyncFileInsight,
+}: {
+  id: string;
+  text: string;
+  user?: boolean;
+  fileInsight?: FileInsight;
+  onSyncFileInsight?: (messageId: string) => void;
+}) {
   return (
     <View style={[styles.bubble, user ? styles.userBubble : styles.aiBubble]}>
       <Text style={styles.body}>{text}</Text>
-      {!user && fileInsight ? <FileInsightCard insight={fileInsight} /> : null}
+      {!user && fileInsight ? <FileInsightCard insight={fileInsight} onSync={() => onSyncFileInsight?.(id)} /> : null}
     </View>
   );
 }
 
-function FileInsightCard({ insight }: { insight: FileInsight }) {
+function FileInsightCard({ insight, onSync }: { insight: FileInsight; onSync?: () => void }) {
   const visibleInsights = insight.insights.filter((item) => item.label !== 'document_type').slice(0, 4);
+  const canSync = insight.documentType === 'body_report'
+    && insight.syncStatus !== 'synced'
+    && insight.insights.some((item) => item.label === 'weight_kg');
   return (
     <View style={styles.fileInsightCard}>
       <View style={styles.rowBetween}>
@@ -298,6 +313,8 @@ function FileInsightCard({ insight }: { insight: FileInsight }) {
         </View>
       ) : null}
       {insight.recommendations[0] ? <Text style={styles.muted}>{insight.recommendations[0]}</Text> : null}
+      {canSync ? <Button label="同步体重到记录" onPress={onSync} /> : null}
+      {insight.syncStatus === 'synced' ? <Text style={styles.doneStatus}>已同步到档案和今日记录</Text> : null}
     </View>
   );
 }

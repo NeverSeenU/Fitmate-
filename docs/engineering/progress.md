@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Mobile file insight cards completed
-- **Next task:** File metric sync into profile/check-ins/records
+- **Current task:** File metric sync review completed
+- **Next task:** On-device verification and metric sync expansion
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -262,9 +262,12 @@
 - Mobile chat messages now carry optional `fileInsight` card data from backend file uploads.
 - Chat bubbles now render structured file insight cards with document type, filename, key metrics, and the first recommendation.
 - Mobile logic and smoke tests now cover backend file insight data flowing into chat state.
+- Body-report file cards now expose an explicit sync action when a `weight_kg` insight is available.
+- File-derived weight sync requires user action, patches profile weight, creates a weight check-in, updates today's summary, marks the card synced, and keeps the source filename visible in Records.
+- Mobile logic and smoke tests now cover the file metric sync path and confirm file insights do not mutate profile/records before user confirmation.
 
 ## What's Next
-- Add an explicit review-and-sync path for trusted file metrics, starting with body-report weight/body-fat values into profile, check-ins, or records.
+- Run this flow in Expo Go against the live backend, then expand file sync to body-fat and menu/workout-derived records with the same explicit review pattern.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

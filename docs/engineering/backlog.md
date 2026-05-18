@@ -26,11 +26,17 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ## Priority 3: Product Expansion
 
-### P3-8: File Metric Sync Review
-- Owner: Frontend Lead / Backend Lead / Product Lead
-- Files: `src/services/appActions.ts`, `src/screens/*`, `backend/app/services/file_service.py`, records/profile services
-- Scope: let users review trusted file insights before writing body metrics such as weight or body-fat percentage into profile, check-ins, or records.
-- Done when: file-derived metrics can be accepted or ignored explicitly, synced values are reversible, and no file data silently mutates user records.
+### P3-9: On-Device File Insight Verification
+- Owner: Frontend Lead / QA Lead
+- Files: `src/screens/*`, `src/services/appActions.ts`, `docs/engineering/smoke-checklist.md`
+- Scope: run file upload, insight card rendering, and explicit weight sync in Expo Go against the live local backend.
+- Done when: the flow is verified on-device and any UI spacing, tap target, or backend integration issues are logged or fixed.
+
+### P3-10: Expanded File Metric Sync
+- Owner: Product Lead / Backend Lead / Frontend Lead
+- Files: `backend/app/services/file_service.py`, `src/services/appActions.ts`, records/profile services
+- Scope: extend explicit sync beyond weight to body-fat, menu nutrition, and workout-plan frequency where the destination record is clear.
+- Done when: every synced metric has a visible review step, reversible record output, and no silent profile or records mutation.
 
 ## Subagent Assignment Template
 

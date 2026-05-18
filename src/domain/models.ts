@@ -69,6 +69,7 @@ export type ChatMessage = {
 export type FileInsight = {
   documentType: string;
   filename: string;
+  syncStatus?: 'available' | 'synced' | 'unavailable';
   insights: Array<{
     label: string;
     value: string;

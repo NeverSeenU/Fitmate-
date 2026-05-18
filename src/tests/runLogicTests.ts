@@ -658,6 +658,62 @@ async function testBackendFileUploadCreatesStructuredInsightMessage() {
   assert(insightMessage?.fileInsight?.recommendations.length === 1, 'file insight card must preserve recommendations');
 }
 
+async function testFileInsightSyncRequiresUserActionAndCreatesWeightCheckin() {
+  let state: AppDataState = {
+    ...initialAppState,
+    profile: { ...initialAppState.profile, weightKg: 72 },
+    dailySummary: { ...initialAppState.dailySummary, weightKg: 72 },
+    records: [],
+    chatMessages: [
+      {
+        id: 'assistant-file-insight',
+        role: 'assistant',
+        text: 'parsed body report',
+        fileInsight: {
+          documentType: 'body_report',
+          filename: 'body-report.txt',
+          insights: [
+            { label: 'weight_kg', value: '70 kg', source: 'file_text' },
+            { label: 'body_fat_percent', value: '21%', source: 'file_text' },
+          ],
+          recommendations: [],
+        },
+      },
+    ],
+  };
+  const calls: string[] = [];
+  const actions = createAppActions({
+    api: {
+      profile: {
+        async patchProfile(payload: Record<string, unknown>) {
+          calls.push(`profile:${payload.current_weight_kg}`);
+          return {};
+        },
+      },
+      records: {
+        async createCheckin(payload: Record<string, unknown>) {
+          calls.push(`checkin:${payload.weight_kg}:${payload.notes}`);
+          return { id: 'checkin-from-file' };
+        },
+      },
+    } as unknown as NonNullable<Parameters<typeof createAppActions>[0]['api']>,
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  assert(state.records.length === 0 && state.profile.weightKg === 72, 'file insights must not sync before user confirmation');
+  await actions.syncFileInsightMetrics('assistant-file-insight');
+
+  assert(calls.includes('profile:70'), 'sync must patch profile weight through backend when available');
+  assert(calls.some((call) => call.startsWith('checkin:70:')), 'sync must create a backend weight check-in');
+  assert(state.profile.weightKg === 70, 'sync must update local profile weight');
+  assert(state.dailySummary.weightKg === 70, 'sync must update local daily summary weight');
+  assert(state.records[0].id === 'checkin-from-file', 'sync must create a records-page weight card');
+  assert(state.records[0].text.includes('body-report.txt'), 'sync record must keep the source filename visible');
+}
+
 async function testSendTextShowsUserMessageBeforeBackendReply() {
   let state: AppDataState = {
     ...initialAppState,
@@ -709,6 +765,7 @@ async function run() {
   await testAppActionsCallBackendMutationsAndUpdateState();
   await testFoodActionStateLifecycle();
   await testBackendFileUploadCreatesStructuredInsightMessage();
+  await testFileInsightSyncRequiresUserActionAndCreatesWeightCheckin();
   await testSendTextShowsUserMessageBeforeBackendReply();
 }
 
