@@ -34,9 +34,10 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ### P3-11: Expanded File Insight Expo Go Verification
 - Owner: Frontend Lead / QA Lead
-- Files: `src/screens/*`, `src/components/ui.tsx`, `docs/engineering/smoke-checklist.md`
-- Scope: manually verify body-report, menu, and workout-plan file insight cards and sync buttons in Expo Go.
-- Done when: card layout, sync labels, tap targets, Records navigation, and synced-state copy are verified on-device.
+- Files: `src/screens/*`, `src/components/ui.tsx`, `src/tests/runLiveFileInsightSmoke.ts`, `docs/engineering/smoke-checklist.md`
+- Scope: manually verify body-report, menu, and workout-plan file insight cards and sync buttons in Expo Go after the automated live smoke has passed.
+- Automated baseline: `npm.cmd run smoke:file-insight-live` now verifies all three document types, sync actions, and backend persistence.
+- Done when: card layout, sync labels, tap targets, Records navigation, synced-state copy, and reload persistence are verified on-device.
 
 ## Subagent Assignment Template
 

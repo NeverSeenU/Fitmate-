@@ -8,7 +8,7 @@ Run this checklist in Expo Go after meaningful mobile or backend changes.
 - Backend: `http://127.0.0.1:8000`
 - Expo: `exp://192.168.1.71:8081`
 - Start Expo with cache clear when UI looks stale: `npx.cmd expo start --lan --port 8081 --clear`
-- Before opening Expo Go, run `npm.cmd run smoke:file-insight-live` with the backend running to verify real file upload, file insight extraction, explicit weight sync, profile persistence, and Records persistence.
+- Before opening Expo Go, run `npm.cmd run smoke:file-insight-live` with the backend running to verify body-report, menu, and workout-plan uploads, file insight extraction, explicit sync actions, profile persistence, food-log persistence, workout-log persistence, and Records persistence.
 
 ## Authentication
 
@@ -41,6 +41,8 @@ Run this checklist in Expo Go after meaningful mobile or backend changes.
 - Edit and delete weight/mood records.
 
 ## File Insight Flow
+
+- Pre-device automated baseline: `npm.cmd run smoke:file-insight-live` must pass against the same backend the phone will use.
 
 - Tap `+` then `文件`.
 - Select a TXT, CSV, PDF, Word, or Excel file that contains a body metric such as `weight 70kg`.

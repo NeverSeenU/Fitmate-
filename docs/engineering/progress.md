@@ -2,8 +2,8 @@
 
 ## Current State
 - **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** File sync persistence completed
-- **Next task:** Expo Go verification for expanded file sync
+- **Current task:** Expanded file insight automated verification completed
+- **Next task:** Expo Go real-device verification for expanded file sync
 
 ## What's Been Done
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
@@ -277,9 +277,12 @@
 - Backend now exposes `POST /v1/workouts/logs` for explicit confirmed workout-log creation after user-reviewed file sync.
 - Mobile file sync now persists menu-derived nutrition through the food-log API and workout-plan frequency through the workout-log API, then uses backend ids in Records.
 - Backend records tests now verify file-synced food and workout logs survive through `/v1/records/today`.
+- Live file insight smoke now uploads and verifies body-report, menu, and workout-plan files against a running backend.
+- The expanded live smoke verifies structured extraction, mobile sync actions, local Records cards, backend profile persistence, backend food-log persistence, and backend workout-log persistence.
+- `npm.cmd run typecheck`, `npm.cmd test`, `npm.cmd run smoke:mobile`, `npm.cmd run smoke:file-insight-live`, and `python -m pytest backend\tests\test_files.py backend\tests\test_records.py -q` passed after the expanded file insight smoke.
 
 ## What's Next
-- Run body-report, menu, and workout-plan file insight sync in Expo Go against the live backend, checking layout, tap targets, navigation to Records, and reload persistence.
+- Run body-report, menu, and workout-plan file insight sync in Expo Go against the live backend, checking real-device file picker behavior, layout, tap targets, Records navigation, synced-state copy, and reload persistence.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

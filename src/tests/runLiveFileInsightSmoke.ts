@@ -38,13 +38,45 @@ async function jsonRequest<T>(path: string, options: {
   return response.json() as Promise<T>;
 }
 
-async function uploadFile(threadId: string, token: string): Promise<FileUploadResponse> {
+type LiveFileFixture = {
+  id: string;
+  filename: string;
+  content: string;
+  expectedDocumentType: string;
+  requiredLabels: string[];
+};
+
+const fileFixtures: LiveFileFixture[] = [
+  {
+    id: 'body',
+    filename: 'body-report-smoke.txt',
+    content: 'body report weight 70kg body fat 21% protein 120g',
+    expectedDocumentType: 'body_report',
+    requiredLabels: ['weight_kg', 'body_fat_percent'],
+  },
+  {
+    id: 'menu',
+    filename: 'menu-smoke.txt',
+    content: 'daily menu lunch chicken rice protein 35g calories 550 kcal',
+    expectedDocumentType: 'menu',
+    requiredLabels: ['protein_g', 'calories_kcal'],
+  },
+  {
+    id: 'workout',
+    filename: 'workout-plan-smoke.txt',
+    content: 'workout plan strength training 4 days/week sets reps mobility',
+    expectedDocumentType: 'workout_plan',
+    requiredLabels: ['training_frequency'],
+  },
+];
+
+async function uploadFile(threadId: string, token: string, fixture: LiveFileFixture): Promise<FileUploadResponse> {
   const form = new FormData();
   form.append('thread_id', threadId);
   form.append(
     'file',
-    new Blob(['body report weight 70kg body fat 21% protein 120g'], { type: 'text/plain' }),
-    'body-report-smoke.txt',
+    new Blob([fixture.content], { type: 'text/plain' }),
+    fixture.filename,
   );
   const response = await fetch(`${baseUrl}/v1/files/upload`, {
     method: 'POST',
@@ -77,22 +109,29 @@ async function run() {
     body: { title: 'Live File Insight Smoke', kind: 'files' },
   });
 
-  const upload = await uploadFile(thread.id, session.access_token);
-  const fileUpload = upload.file_upload;
-  const labels = new Set((fileUpload.insights ?? []).map((item) => item.label));
-  assert(fileUpload.document_type === 'body_report', 'live upload must classify the file as a body report');
-  assert(labels.has('weight_kg'), 'live upload must extract weight_kg');
-  assert(labels.has('body_fat_percent'), 'live upload must extract body_fat_percent');
+  const uploads: Array<{ fixture: LiveFileFixture; response: FileUploadResponse; labels: Set<string> }> = [];
+  for (const fixture of fileFixtures) {
+    const response = await uploadFile(thread.id, session.access_token, fixture);
+    const labels = new Set((response.file_upload.insights ?? []).map((item) => item.label));
+    assert(
+      response.file_upload.document_type === fixture.expectedDocumentType,
+      `live upload must classify ${fixture.filename} as ${fixture.expectedDocumentType}`,
+    );
+    for (const label of fixture.requiredLabels) {
+      assert(labels.has(label), `live upload must extract ${label} from ${fixture.filename}`);
+    }
+    uploads.push({ fixture, response, labels });
+  }
 
   let state: AppDataState = {
     ...initialAppState,
     records: [],
-    chatMessages: [{
-      id: 'assistant-live-file',
+    chatMessages: uploads.map(({ fixture, response }) => ({
+      id: `assistant-live-file-${fixture.id}`,
       role: 'assistant',
-      text: upload.assistant_message?.content_text ?? fileUpload.summary_text,
-      fileInsight: toFileInsight(upload),
-    }],
+      text: response.assistant_message?.content_text ?? response.file_upload.summary_text,
+      fileInsight: toFileInsight(response),
+    })),
   };
   const actions = createAppActions({
     api: {
@@ -110,6 +149,20 @@ async function run() {
           body: payload,
         }),
       },
+      food: {
+        createLog: (payload: Record<string, unknown>) => jsonRequest('/food/logs', {
+          method: 'POST',
+          token: session.access_token,
+          body: payload,
+        }),
+      },
+      workouts: {
+        createLog: (payload: Record<string, unknown>) => jsonRequest('/workouts/logs', {
+          method: 'POST',
+          token: session.access_token,
+          body: payload,
+        }),
+      },
     } as unknown as NonNullable<Parameters<typeof createAppActions>[0]['api']>,
     getState: () => state,
     setState: (next) => {
@@ -117,27 +170,48 @@ async function run() {
     },
   });
 
-  await actions.syncFileInsightMetrics('assistant-live-file');
+  for (const fixture of fileFixtures) {
+    await actions.syncFileInsightMetrics(`assistant-live-file-${fixture.id}`);
+  }
   assert(state.profile.weightKg === 70, 'mobile action must sync file weight into local profile');
-  assert(state.records[0]?.kind === 'weight' && state.records[0].weightKg === 70, 'mobile action must create a local weight record');
-  assert(state.chatMessages.some((message) => message.fileInsight?.syncStatus === 'synced'), 'mobile action must mark the file card synced');
+  assert(state.records.some((record) => record.kind === 'weight' && record.weightKg === 70), 'mobile action must create a local weight record');
+  assert(state.records.some((record) => record.kind === 'food' && record.caloriesKcal === 550), 'mobile action must create a local menu nutrition record');
+  assert(state.records.some((record) => record.kind === 'workout' && record.detail?.includes('4 days/week')), 'mobile action must create a local workout plan record');
+  assert(
+    state.chatMessages.filter((message) => message.fileInsight?.syncStatus === 'synced').length === fileFixtures.length,
+    'mobile action must mark every file card synced',
+  );
 
   const me = await jsonRequest<{
     profile: { current_weight_kg?: string | number | null } | null;
   }>('/me', { token: session.access_token });
   const records = await jsonRequest<{
     checkins?: Array<{ weight_kg?: string | number | null; notes?: string | null }>;
+    food_logs?: Array<{ meal_name?: string | null; calories_range_kcal?: number[]; user_portion_note?: string | null }>;
+    workout_logs?: Array<{ workout_type?: string | null; status?: string | null }>;
   }>('/records/today', { token: session.access_token });
 
   assert(Number(me.profile?.current_weight_kg) === 70, 'backend profile must persist synced weight');
   assert((records.checkins ?? []).some((checkin) => Number(checkin.weight_kg) === 70), 'backend records must include synced weight check-in');
+  assert(
+    (records.food_logs ?? []).some((food) => food.meal_name === 'File menu nutrition' && food.user_portion_note?.includes('menu-smoke.txt')),
+    'backend records must include synced menu nutrition log',
+  );
+  assert(
+    (records.workout_logs ?? []).some((workout) => workout.workout_type === 'file_plan' && workout.status === 'confirmed'),
+    'backend records must include synced workout plan log',
+  );
 
   console.log(JSON.stringify({
     smoke: 'live-file-insight',
     status: 'passed',
     apiBaseUrl: baseUrl,
-    documentType: fileUpload.document_type,
-    labels: [...labels].sort(),
+    uploads: uploads.map(({ fixture, response, labels }) => ({
+      filename: fixture.filename,
+      documentType: response.file_upload.document_type,
+      labels: [...labels].sort(),
+    })),
+    syncedRecordKinds: state.records.map((record) => record.kind),
     syncedWeightKg: state.profile.weightKg,
   }, null, 2));
 }
