@@ -8,6 +8,7 @@ Run this checklist in Expo Go after meaningful mobile or backend changes.
 - Backend: `http://127.0.0.1:8000`
 - Expo: `exp://192.168.1.71:8081`
 - Start Expo with cache clear when UI looks stale: `npx.cmd expo start --lan --port 8081 --clear`
+- Before opening Expo Go, run `npm.cmd run smoke:file-insight-live` with the backend running to verify real file upload, file insight extraction, explicit weight sync, profile persistence, and Records persistence.
 
 ## Authentication
 
@@ -39,9 +40,18 @@ Run this checklist in Expo Go after meaningful mobile or backend changes.
 - Tap `心情日记`; verify mood, hunger, craving, and detail fields save into a record.
 - Edit and delete weight/mood records.
 
+## File Insight Flow
+
+- Tap `+` then `文件`.
+- Select a TXT, CSV, PDF, Word, or Excel file that contains a body metric such as `weight 70kg`.
+- Verify the chat shows a file insight card with document type, filename, extracted metrics, and a recommendation.
+- If the card shows `同步体重到记录`, tap it.
+- Verify the app navigates to Records and a weight card appears with the source filename.
+- Return to chat and verify the file card is marked as synced instead of offering a second identical sync.
+- Confirm that selecting or uploading a file does not change profile or records until the sync button is tapped.
+
 ## Settings And Profile
 
 - Open subscription page; plan cards respond to taps.
 - Open profile; edit and save profile values.
 - Restore purchase action shows visible feedback.
-

@@ -26,11 +26,11 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ## Priority 3: Product Expansion
 
-### P3-9: On-Device File Insight Verification
+### P3-9: Expo Go File Insight Verification
 - Owner: Frontend Lead / QA Lead
 - Files: `src/screens/*`, `src/services/appActions.ts`, `docs/engineering/smoke-checklist.md`
-- Scope: run file upload, insight card rendering, and explicit weight sync in Expo Go against the live local backend.
-- Done when: the flow is verified on-device and any UI spacing, tap target, or backend integration issues are logged or fixed.
+- Scope: run the already automated live file insight flow manually in Expo Go on a real phone against the live local backend.
+- Done when: file picker, insight card rendering, sync button tap target, Records navigation, and card synced state are verified on-device and any issues are logged or fixed.
 
 ### P3-10: Expanded File Metric Sync
 - Owner: Product Lead / Backend Lead / Frontend Lead
