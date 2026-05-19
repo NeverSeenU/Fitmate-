@@ -11,7 +11,11 @@ export type RuntimeConfig = {
   useMockApi: boolean;
 };
 
-export const runtimeConfig: RuntimeConfig = createRuntimeConfig(process.env);
+export const runtimeConfig: RuntimeConfig = createRuntimeConfig({
+  EXPO_PUBLIC_API_BASE_URL: process.env?.EXPO_PUBLIC_API_BASE_URL,
+  EXPO_PUBLIC_APP_ENV: process.env?.EXPO_PUBLIC_APP_ENV,
+  EXPO_PUBLIC_USE_MOCK_API: process.env?.EXPO_PUBLIC_USE_MOCK_API,
+});
 
 export function createRuntimeConfig(env: Record<string, string | undefined> | undefined): RuntimeConfig {
   const apiBaseUrl = env?.EXPO_PUBLIC_API_BASE_URL ?? 'https://api.fitmate.local';

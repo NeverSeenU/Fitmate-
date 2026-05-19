@@ -283,6 +283,7 @@
 - Manual Expo Go file insight fixtures now live in `docs/engineering/smoke-fixtures/` for body-report, menu, and workout-plan uploads.
 - Expo Go file uploads now default to backend mode when `EXPO_PUBLIC_API_BASE_URL` is provided, instead of silently staying in mock preview mode.
 - File attach actions now report whether a backend upload happened and whether an insight card was generated, so ChatScreen can show the correct status copy.
+- Expo public env values are now read with direct `process.env.EXPO_PUBLIC_*` access so Metro can inject them into the Expo Go bundle.
 
 ## What's Next
 - Run body-report, menu, and workout-plan file insight sync in Expo Go against the live backend, checking real-device file picker behavior, layout, tap targets, Records navigation, synced-state copy, and reload persistence.
