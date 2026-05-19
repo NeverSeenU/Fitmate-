@@ -257,8 +257,10 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       if (!api) {
         throw new Error('File insight requires the backend API. Current app runtime has no backend API, so no insight card can be generated. Restart Expo and make sure it is not Local preview mode.');
       }
+      const state = getState();
+      const threadId = await ensureBackendFileThread(api, getState, setState, state.threads[0]?.id);
       const response = await api.files.upload({
-        threadId: getState().threads[0]?.id ?? 'food-today',
+        threadId,
         fileUri: file.uri,
         filename: file.name,
         mimeType: file.mimeType,
@@ -1021,6 +1023,29 @@ function addMessages(
     ...state,
     chatMessages: [...state.chatMessages, ...messages],
   });
+}
+
+async function ensureBackendFileThread(
+  api: AppActionsApi,
+  getState: () => AppDataState,
+  setState: (state: AppDataState) => void,
+  currentThreadId: string | undefined,
+) {
+  if (currentThreadId && !isLocalFallbackThreadId(currentThreadId)) {
+    return currentThreadId;
+  }
+  const created = await api.chat.createThread({ title: 'File insight', kind: 'files' }) as { id?: string; title?: string; kind?: string };
+  const threadId = created.id ?? `thread-${Date.now()}`;
+  addThread(getState, setState, {
+    id: threadId,
+    title: created.title ?? 'File insight',
+    subtitle: created.kind ?? 'files',
+  });
+  return threadId;
+}
+
+function isLocalFallbackThreadId(threadId: string) {
+  return threadId === 'food-today' || threadId.startsWith('mock-');
 }
 
 function formatAttachmentFileSize(sizeBytes?: number) {

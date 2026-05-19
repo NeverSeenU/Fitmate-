@@ -106,6 +106,36 @@ async function testApiClientHandlesEmptyDeleteResponses() {
   assert(JSON.stringify(result) === '{}', 'delete calls must tolerate 204 empty responses');
 }
 
+async function testApiClientDoesNotMaskErrorDetailsWithAlreadyRead() {
+  const api = createBackendApi({
+    baseUrl: 'https://api.example.test',
+    fetchImpl: async () => ({
+      ok: false,
+      status: 404,
+      async json() {
+        throw new Error('invalid json');
+      },
+      async text() {
+        return 'thread_not_found';
+      },
+    }),
+  });
+
+  let message = '';
+  try {
+    await api.files.upload({
+      threadId: 'food-today',
+      fileUri: 'file:///report.txt',
+      filename: 'report.txt',
+      mimeType: 'text/plain',
+    });
+  } catch (error) {
+    message = error instanceof Error ? error.message : String(error);
+  }
+
+  assert(message === 'thread_not_found', 'API errors must preserve backend text instead of masking with Already read');
+}
+
 async function testApiClientMultipartPhotoUpload() {
   const requests: ApiRequestRecord[] = [];
   const api = createBackendApi({
@@ -559,7 +589,8 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
   assert(calls.includes('discardFood:food-live'), 'discard food action must call backend');
   assert(calls.includes('checkin:71.2:6'), 'checkin action must map payload');
   assert(calls.includes('workout:力量训练 45 分钟'), 'workout action must call backend');
-  assert(calls.includes('file:food-today:report.txt:text/plain'), 'file upload action must call backend');
+  assert(calls.includes('createThread:File insight:files'), 'file upload must create a backend file thread when only a local fallback thread exists');
+  assert(calls.includes('file:thread-new:report.txt:text/plain'), 'file upload action must use the backend-created thread id');
   assert(calls.includes('restore:fitmate.pro.monthly'), 'restore action must call backend');
   assert(calls.includes('profile:70.8:Lean wedding cut'), 'profile action must map backend payload');
   assert(calls.includes('deletePhotos'), 'deletePhotos action must call backend');
@@ -650,6 +681,14 @@ async function testBackendFileUploadCreatesStructuredInsightMessage() {
   };
   const actions = createAppActions({
     api: {
+      chat: {
+        async createThread(payload: { title: string; kind?: string }) {
+          return { id: 'thread-file-insight', title: payload.title, kind: payload.kind ?? 'files' };
+        },
+        async sendTextMessage() {
+          return {};
+        },
+      },
       files: {
         async upload() {
           return {
@@ -864,6 +903,7 @@ async function run() {
   await testPersistenceRoundTrip();
   await testApiClientAuthHeadersAndJsonBody();
   await testApiClientHandlesEmptyDeleteResponses();
+  await testApiClientDoesNotMaskErrorDetailsWithAlreadyRead();
   await testApiClientMultipartPhotoUpload();
   await testMockFallbackServicesStayAvailable();
   await testRuntimeConfigUsesBackendWhenApiBaseUrlIsProvided();

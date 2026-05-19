@@ -392,14 +392,24 @@ async function defaultFetch(url: string, init: ApiRequestInit): Promise<ApiRespo
 }
 
 async function readErrorDetail(response: ApiResponseLike) {
+  const clone = 'clone' in response && typeof (response as { clone?: unknown }).clone === 'function'
+    ? (response as Response).clone()
+    : undefined;
   try {
-    return await response.json();
-  } catch {
-    return response.text();
+    return await (clone ?? response).json();
+  } catch (jsonError) {
+    try {
+      return await response.text();
+    } catch {
+      return jsonError instanceof Error ? jsonError.message : `HTTP ${response.status}`;
+    }
   }
 }
 
 function apiErrorMessage(status: number, detail: unknown) {
+  if (typeof detail === 'string' && detail.trim().length > 0) {
+    return detail;
+  }
   const body = detail as { detail?: unknown; message?: unknown };
   const nested = body?.detail as { code?: unknown; message?: unknown } | string | undefined;
   if (typeof nested === 'object' && nested?.code === 'vision_unavailable') {

@@ -293,6 +293,11 @@
 - The local file-preview branch has been removed from `attachFile`; file uploads now either call `/v1/files/upload` or fail with a backend-required error.
 - Metro bundle verification confirmed the old `已读取文件信息` / `暂不上传` / `uploaded:false` file-preview strings are no longer present in the served JS bundle.
 
+- API error handling now preserves plain backend error text instead of masking it with React Native fetch `Already read` body-read failures.
+- File uploads now create a real backend `files` chat thread when mobile state only has local fallback thread ids such as `food-today`, preventing backend `thread_not_found` upload failures.
+- Regression tests now cover both the unmasked file-upload backend error path and backend-thread creation before file upload.
+- `npm.cmd test`, `npm.cmd run typecheck`, `npm.cmd run smoke:mobile`, and `npm.cmd run smoke:file-insight-live` passed after the file-upload thread fix.
+
 ## What's Next
 - Run body-report, menu, and workout-plan file insight sync in Expo Go against the live backend, checking real-device file picker behavior, layout, tap targets, Records navigation, synced-state copy, and reload persistence.
 
