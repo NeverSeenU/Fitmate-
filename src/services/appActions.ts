@@ -71,6 +71,11 @@ export type ProfileUpdateInput = Partial<Pick<
   'displayName' | 'phone' | 'heightCm' | 'weightKg' | 'age' | 'gender' | 'goalLabel' | 'trainingFrequency' | 'dietPreference' | 'healthRiskNote'
 >>;
 
+export type AttachFileResult = {
+  uploaded: boolean;
+  hasInsight: boolean;
+};
+
 export function createAppActions({ api, getState, setState }: AppActionsOptions) {
   return {
     async createThread(title: string, kind: string = 'general') {
@@ -256,6 +261,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           filename: file.name,
           mimeType: file.mimeType,
         });
+        const fileInsight = toFileInsight(response);
         addMessages(getState, setState, [
           {
             id: `file-user-${Date.now()}`,
@@ -266,10 +272,10 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
             id: response.assistant_message?.id ?? `file-assistant-${Date.now()}`,
             role: 'assistant',
             text: response.assistant_message?.content_text ?? response.file_upload?.summary_text ?? `已上传 ${file.name}。`,
-            fileInsight: toFileInsight(response),
+            fileInsight,
           },
         ]);
-        return;
+        return { uploaded: true, hasInsight: Boolean(fileInsight) };
       }
       addMessages(getState, setState, [
         {
@@ -283,6 +289,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           text: `已读取文件信息：${file.name} · ${file.mimeType} · ${formatAttachmentFileSize(file.sizeBytes)}。当前版本只记录文件信息，暂不上传或解析文件内容。`,
         },
       ]);
+      return { uploaded: false, hasInsight: false };
     },
 
     async syncFileInsightMetrics(messageId: string) {

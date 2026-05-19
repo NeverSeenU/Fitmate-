@@ -190,8 +190,12 @@ export function ChatScreen({
           setStatus('已取消选择文件');
           return;
         }
-        await actions.attachFile(file);
-        setStatus('文件已添加到聊天，暂未上传内容');
+        const result = await actions.attachFile(file);
+        setStatus(result.uploaded
+          ? result.hasInsight
+            ? '文件已上传并生成识别卡片，请查看聊天中的同步按钮'
+            : '文件已上传，但暂未抽取到可同步指标'
+          : '文件已添加到聊天，当前为本地预览模式，暂未上传内容');
       } catch (error) {
         setStatus(error instanceof Error ? error.message : '文件选择失败');
       } finally {

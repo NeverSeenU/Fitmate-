@@ -281,6 +281,8 @@
 - The expanded live smoke verifies structured extraction, mobile sync actions, local Records cards, backend profile persistence, backend food-log persistence, and backend workout-log persistence.
 - `npm.cmd run typecheck`, `npm.cmd test`, `npm.cmd run smoke:mobile`, `npm.cmd run smoke:file-insight-live`, and `python -m pytest backend\tests\test_files.py backend\tests\test_records.py -q` passed after the expanded file insight smoke.
 - Manual Expo Go file insight fixtures now live in `docs/engineering/smoke-fixtures/` for body-report, menu, and workout-plan uploads.
+- Expo Go file uploads now default to backend mode when `EXPO_PUBLIC_API_BASE_URL` is provided, instead of silently staying in mock preview mode.
+- File attach actions now report whether a backend upload happened and whether an insight card was generated, so ChatScreen can show the correct status copy.
 
 ## What's Next
 - Run body-report, menu, and workout-plan file insight sync in Expo Go against the live backend, checking real-device file picker behavior, layout, tap targets, Records navigation, synced-state copy, and reload persistence.

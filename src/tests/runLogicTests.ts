@@ -1,6 +1,7 @@
 import { createBackendApi, createFitMateServices, type ApiRequestRecord } from '../services/apiClient';
 import { createAppActions } from '../services/appActions';
 import { loadAppDataFromBackend } from '../services/appBackend';
+import { createRuntimeConfig } from '../config/env';
 import { createAiVisionService, type FoodVisionInput, type VisionProvider } from '../services/aiVision';
 import { evaluateEntitlement, entitlementsForTier } from '../services/subscription';
 import { initialAppState } from '../state/appState';
@@ -167,6 +168,15 @@ async function testMockFallbackServicesStayAvailable() {
 
   assert(session.accessToken === 'mock-access-token', 'mock auth service must remain available');
   assert(subscription.tier === 'pro', 'mock subscription service must remain available');
+}
+
+async function testRuntimeConfigUsesBackendWhenApiBaseUrlIsProvided() {
+  const config = createRuntimeConfig({
+    EXPO_PUBLIC_API_BASE_URL: 'http://192.168.1.71:8000',
+  });
+
+  assert(config.apiBaseUrl === 'http://192.168.1.71:8000', 'runtime config must preserve Expo LAN backend URL');
+  assert(!config.useMockApi, 'runtime config must use backend when a real API base URL is provided');
 }
 
 async function testBackendServiceFactoryReusesLoginToken() {
@@ -605,12 +615,13 @@ async function testFoodActionStateLifecycle() {
   assert(state.records[0].text.includes('力量训练 45 分钟'), 'workout card must preserve user-entered workout detail');
   assert(state.chatMessages.some((message) => message.text.includes('已生成运动记录')), 'workout action must give visible chat feedback');
 
-  await actions.attachFile({
+  const mockFileResult = await actions.attachFile({
     uri: 'file:///body-check.pdf',
     name: 'body-check.pdf',
     mimeType: 'application/pdf',
     sizeBytes: 2048,
   });
+  assert(!mockFileResult.uploaded, 'mock file action must report that no backend upload happened');
   assert(state.chatMessages.some((message) => message.text.includes('body-check.pdf')), 'file action must show selected filename in chat');
   assert(state.chatMessages.some((message) => message.text.includes('2.0 KB')), 'file action must show selected file size in chat');
   assert(state.chatMessages.some((message) => message.text.includes('暂不上传')), 'file action must explain that file contents are not uploaded yet');
@@ -652,13 +663,14 @@ async function testBackendFileUploadCreatesStructuredInsightMessage() {
     },
   });
 
-  await actions.attachFile({
+  const uploadResult = await actions.attachFile({
     uri: 'file:///body-report.txt',
     name: 'body-report.txt',
     mimeType: 'text/plain',
     sizeBytes: 128,
   });
 
+  assert(uploadResult.uploaded && uploadResult.hasInsight, 'backend file action must report uploaded insight data to the UI');
   const insightMessage = state.chatMessages.find((message) => message.id === 'assistant-file-insight');
   assert(Boolean(insightMessage), 'backend file upload must append an assistant message');
   assert(insightMessage?.fileInsight?.documentType === 'body_report', 'backend file upload must preserve document type for UI cards');
@@ -838,6 +850,7 @@ async function run() {
   await testApiClientHandlesEmptyDeleteResponses();
   await testApiClientMultipartPhotoUpload();
   await testMockFallbackServicesStayAvailable();
+  await testRuntimeConfigUsesBackendWhenApiBaseUrlIsProvided();
   await testBackendServiceFactoryReusesLoginToken();
   await testBackendAppDataHydratesUiState();
   await testBackendAppDataHydratesLiveRecordsShape();

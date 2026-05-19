@@ -11,16 +11,35 @@ export type RuntimeConfig = {
   useMockApi: boolean;
 };
 
-export const runtimeConfig: RuntimeConfig = {
-  environment: parseEnvironment(process.env?.EXPO_PUBLIC_APP_ENV),
-  apiBaseUrl: process.env?.EXPO_PUBLIC_API_BASE_URL ?? 'https://api.fitmate.local',
-  appVersion: '0.1.0',
-  useMockApi: process.env?.EXPO_PUBLIC_USE_MOCK_API !== 'false',
-};
+export const runtimeConfig: RuntimeConfig = createRuntimeConfig(process.env);
+
+export function createRuntimeConfig(env: Record<string, string | undefined> | undefined): RuntimeConfig {
+  const apiBaseUrl = env?.EXPO_PUBLIC_API_BASE_URL ?? 'https://api.fitmate.local';
+  return {
+    environment: parseEnvironment(env?.EXPO_PUBLIC_APP_ENV),
+    apiBaseUrl,
+    appVersion: '0.1.0',
+    useMockApi: parseUseMockApi(env?.EXPO_PUBLIC_USE_MOCK_API, apiBaseUrl),
+  };
+}
 
 function parseEnvironment(value: string | undefined): AppEnvironment {
   if (value === 'staging' || value === 'production') {
     return value;
   }
   return 'development';
+}
+
+function parseUseMockApi(value: string | undefined, apiBaseUrl: string) {
+  if (value === 'true') {
+    return true;
+  }
+  if (value === 'false') {
+    return false;
+  }
+  return !isExplicitBackendUrl(apiBaseUrl);
+}
+
+function isExplicitBackendUrl(apiBaseUrl: string) {
+  return apiBaseUrl !== 'https://api.fitmate.local';
 }
