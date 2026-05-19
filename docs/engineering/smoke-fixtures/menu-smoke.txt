@@ -1,0 +1,12 @@
+FitMate menu smoke fixture
+
+Document type: daily menu
+Client: Expo Go manual smoke test
+
+Lunch:
+- chicken rice bowl
+- protein 35g
+- calories 550 kcal
+
+Recommendation:
+Sync this as a reviewed menu nutrition record only after user confirmation.

@@ -1,0 +1,12 @@
+FitMate workout plan smoke fixture
+
+Document type: workout plan
+Client: Expo Go manual smoke test
+
+Plan:
+- strength training 4 days/week
+- sets and reps for full-body resistance work
+- mobility work after lifting
+
+Recommendation:
+Sync this as a reviewed workout plan record only after user confirmation.

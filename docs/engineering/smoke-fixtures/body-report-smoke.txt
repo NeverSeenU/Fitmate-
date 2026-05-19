@@ -1,0 +1,13 @@
+FitMate body report smoke fixture
+
+Document type: body report
+Client: Expo Go manual smoke test
+Measurement date: 2026-05-18
+
+Metrics:
+- weight 70kg
+- body fat 21%
+- protein target 120g
+
+Recommendation:
+Keep the same protein target and sync the weight only after user confirmation.
