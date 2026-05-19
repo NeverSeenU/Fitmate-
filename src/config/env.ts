@@ -11,6 +11,8 @@ export type RuntimeConfig = {
   useMockApi: boolean;
 };
 
+const DEFAULT_DEV_API_BASE_URL = 'http://192.168.1.71:8000';
+
 export const runtimeConfig: RuntimeConfig = createRuntimeConfig({
   EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
   EXPO_PUBLIC_APP_ENV: process.env.EXPO_PUBLIC_APP_ENV,
@@ -18,7 +20,7 @@ export const runtimeConfig: RuntimeConfig = createRuntimeConfig({
 });
 
 export function createRuntimeConfig(env: Record<string, string | undefined> | undefined): RuntimeConfig {
-  const apiBaseUrl = env?.EXPO_PUBLIC_API_BASE_URL ?? 'https://api.fitmate.local';
+  const apiBaseUrl = env?.EXPO_PUBLIC_API_BASE_URL ?? DEFAULT_DEV_API_BASE_URL;
   return {
     environment: parseEnvironment(env?.EXPO_PUBLIC_APP_ENV),
     apiBaseUrl,
@@ -41,9 +43,5 @@ function parseUseMockApi(value: string | undefined, apiBaseUrl: string) {
   if (value === 'false') {
     return false;
   }
-  return !isExplicitBackendUrl(apiBaseUrl);
-}
-
-function isExplicitBackendUrl(apiBaseUrl: string) {
-  return apiBaseUrl !== 'https://api.fitmate.local';
+  return false;
 }

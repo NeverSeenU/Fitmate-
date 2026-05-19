@@ -179,6 +179,21 @@ async function testRuntimeConfigUsesBackendWhenApiBaseUrlIsProvided() {
   assert(!config.useMockApi, 'runtime config must use backend when a real API base URL is provided');
 }
 
+async function testRuntimeConfigDefaultsToBackendForExpoGoDevelopment() {
+  const config = createRuntimeConfig(undefined);
+
+  assert(config.apiBaseUrl === 'http://192.168.1.71:8000', 'Expo Go development must default to the LAN backend URL');
+  assert(!config.useMockApi, 'Expo Go development must not silently fall back to local preview mode');
+}
+
+async function testRuntimeConfigAllowsExplicitLocalPreviewMode() {
+  const config = createRuntimeConfig({
+    EXPO_PUBLIC_USE_MOCK_API: 'true',
+  });
+
+  assert(config.useMockApi, 'runtime config must still allow explicit local preview mode');
+}
+
 async function testBackendServiceFactoryReusesLoginToken() {
   const requests: ApiRequestRecord[] = [];
   const services = createFitMateServices({
@@ -851,6 +866,8 @@ async function run() {
   await testApiClientMultipartPhotoUpload();
   await testMockFallbackServicesStayAvailable();
   await testRuntimeConfigUsesBackendWhenApiBaseUrlIsProvided();
+  await testRuntimeConfigDefaultsToBackendForExpoGoDevelopment();
+  await testRuntimeConfigAllowsExplicitLocalPreviewMode();
   await testBackendServiceFactoryReusesLoginToken();
   await testBackendAppDataHydratesUiState();
   await testBackendAppDataHydratesLiveRecordsShape();

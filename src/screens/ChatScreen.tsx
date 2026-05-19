@@ -17,6 +17,7 @@ export function ChatScreen({
   clearReturnPanel,
   appState,
   actions,
+  runtimeInfo,
 }: {
   go: (screen: Screen) => void;
   openSheet: (sheet: Sheet, backPanel?: ChatPanel) => void;
@@ -24,6 +25,7 @@ export function ChatScreen({
   clearReturnPanel: () => void;
   appState: AppDataState;
   actions: ReturnType<typeof createAppActions>;
+  runtimeInfo?: string;
 }) {
   const [panel, setPanel] = useState<ChatPanel>(null);
   const [utilityPanel, setUtilityPanel] = useState<'weight' | 'workout' | null>(null);
@@ -222,6 +224,7 @@ export function ChatScreen({
         openSubscribe={() => openSheet('subscription')}
         openThreads={() => setPanel('threads')}
       />
+      {runtimeInfo ? <Text style={styles.runtimeBanner}>{runtimeInfo}</Text> : null}
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {appState.chatMessages.map((message) => (
           <ChatBubble

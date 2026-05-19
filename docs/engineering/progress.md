@@ -286,6 +286,8 @@
 - Expo public env values are now read with direct `process.env.EXPO_PUBLIC_*` access so Metro can inject them into the Expo Go bundle.
 - Login now shows the active runtime target during manual Expo Go verification: either `Backend: <url>` or `Local preview mode`.
 - Local file-preview chat copy now explicitly says `Local preview mode` so it cannot be mistaken for a failed backend file insight.
+- Expo Go development now defaults to the LAN backend `http://192.168.1.71:8000` unless `EXPO_PUBLIC_USE_MOCK_API=true` is explicitly set.
+- Chat now shows the active runtime target above the message list, so file-smoke testing can confirm backend mode before uploading.
 
 ## What's Next
 - Run body-report, menu, and workout-plan file insight sync in Expo Go against the live backend, checking real-device file picker behavior, layout, tap targets, Records navigation, synced-state copy, and reload persistence.

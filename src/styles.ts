@@ -229,6 +229,13 @@ export const styles = StyleSheet.create({
     lineHeight: size(16),
     marginTop: 10,
   },
+  runtimeBanner: {
+    color: colors.muted,
+    fontSize: size(10),
+    lineHeight: size(14),
+    paddingHorizontal: narrowPhone ? 12 : 14,
+    paddingTop: 6,
+  },
   button: {
     minHeight: compactPhone ? 44 : 47,
     borderRadius: 12,
