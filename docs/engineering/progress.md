@@ -288,6 +288,7 @@
 - Local file-preview chat copy now explicitly says `Local preview mode` so it cannot be mistaken for a failed backend file insight.
 - Expo Go development now defaults to the LAN backend `http://192.168.1.71:8000` unless `EXPO_PUBLIC_USE_MOCK_API=true` is explicitly set.
 - Chat now shows the active runtime target above the message list, so file-smoke testing can confirm backend mode before uploading.
+- File upload no longer silently succeeds in local preview mode; if the backend API is not connected, it fails loudly instead of showing an "already read" style message without an insight card.
 
 ## What's Next
 - Run body-report, menu, and workout-plan file insight sync in Expo Go against the live backend, checking real-device file picker behavior, layout, tap targets, Records navigation, synced-state copy, and reload persistence.

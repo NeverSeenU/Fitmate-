@@ -254,6 +254,9 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
     },
 
     async attachFile(file: PickedFile) {
+      if (!api) {
+        throw new Error('File insight requires the backend API. Current app runtime has no backend API, so no insight card can be generated. Restart Expo and make sure it is not Local preview mode.');
+      }
       if (api) {
         const response = await api.files.upload({
           threadId: getState().threads[0]?.id ?? 'food-today',
