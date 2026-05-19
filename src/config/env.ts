@@ -1,7 +1,7 @@
 export type AppEnvironment = 'development' | 'staging' | 'production';
 
 declare const process: {
-  env?: Record<string, string | undefined>;
+  env: Record<string, string | undefined>;
 };
 
 export type RuntimeConfig = {
@@ -12,9 +12,9 @@ export type RuntimeConfig = {
 };
 
 export const runtimeConfig: RuntimeConfig = createRuntimeConfig({
-  EXPO_PUBLIC_API_BASE_URL: process.env?.EXPO_PUBLIC_API_BASE_URL,
-  EXPO_PUBLIC_APP_ENV: process.env?.EXPO_PUBLIC_APP_ENV,
-  EXPO_PUBLIC_USE_MOCK_API: process.env?.EXPO_PUBLIC_USE_MOCK_API,
+  EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
+  EXPO_PUBLIC_APP_ENV: process.env.EXPO_PUBLIC_APP_ENV,
+  EXPO_PUBLIC_USE_MOCK_API: process.env.EXPO_PUBLIC_USE_MOCK_API,
 });
 
 export function createRuntimeConfig(env: Record<string, string | undefined> | undefined): RuntimeConfig {

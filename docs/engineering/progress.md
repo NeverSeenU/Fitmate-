@@ -284,6 +284,8 @@
 - Expo Go file uploads now default to backend mode when `EXPO_PUBLIC_API_BASE_URL` is provided, instead of silently staying in mock preview mode.
 - File attach actions now report whether a backend upload happened and whether an insight card was generated, so ChatScreen can show the correct status copy.
 - Expo public env values are now read with direct `process.env.EXPO_PUBLIC_*` access so Metro can inject them into the Expo Go bundle.
+- Login now shows the active runtime target during manual Expo Go verification: either `Backend: <url>` or `Local preview mode`.
+- Local file-preview chat copy now explicitly says `Local preview mode` so it cannot be mistaken for a failed backend file insight.
 
 ## What's Next
 - Run body-report, menu, and workout-plan file insight sync in Expo Go against the live backend, checking real-device file picker behavior, layout, tap targets, Records navigation, synced-state copy, and reload persistence.

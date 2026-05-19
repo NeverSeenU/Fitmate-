@@ -13,9 +13,11 @@ export type AuthCredentials = {
 export function LoginScreen({
   go,
   onLogin,
+  runtimeInfo,
 }: {
   go: (screen: Screen) => void;
   onLogin: (credentials: AuthCredentials) => Promise<void>;
+  runtimeInfo?: string;
 }) {
   const [identifier, setIdentifier] = useState('jiang@example.com');
   const [password, setPassword] = useState('fitmate2026');
@@ -50,6 +52,7 @@ export function LoginScreen({
         <LinkButton label="注册" onPress={() => go('register')} />
         <LinkButton label="忘记密码" onPress={() => go('forgot')} />
       </View>
+      {runtimeInfo ? <Text style={styles.runtimeInfo}>{runtimeInfo}</Text> : null}
       <View style={styles.flex} />
       <View style={styles.authFooter}>
         <Button label="查看首次引导" variant="secondary" onPress={() => go('onboarding')} />

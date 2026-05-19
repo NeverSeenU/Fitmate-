@@ -92,7 +92,15 @@ export default function App() {
   };
 
   const content = useMemo(() => {
-    if (screen === 'login') return <LoginScreen go={setScreen} onLogin={handleLogin} />;
+    if (screen === 'login') {
+      return (
+        <LoginScreen
+          go={setScreen}
+          onLogin={handleLogin}
+          runtimeInfo={runtimeConfig.useMockApi ? 'Local preview mode' : `Backend: ${runtimeConfig.apiBaseUrl}`}
+        />
+      );
+    }
     if (screen === 'register') return <RegisterScreen go={setScreen} onRegister={handleRegister} />;
     if (screen === 'forgot') return <ForgotScreen go={setScreen} />;
     if (screen === 'onboarding') return <OnboardingScreen go={setScreen} />;

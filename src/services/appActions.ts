@@ -286,7 +286,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         {
           id: `file-assistant-${Date.now()}`,
           role: 'assistant',
-          text: `已读取文件信息：${file.name} · ${file.mimeType} · ${formatAttachmentFileSize(file.sizeBytes)}。当前版本只记录文件信息，暂不上传或解析文件内容。`,
+          text: `Local preview mode: 已读取文件信息：${file.name} · ${file.mimeType} · ${formatAttachmentFileSize(file.sizeBytes)}。当前没有连接后端，所以暂不上传或解析文件内容。`,
         },
       ]);
       return { uploaded: false, hasInsight: false };

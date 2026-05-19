@@ -223,6 +223,12 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 8,
   },
+  runtimeInfo: {
+    color: colors.muted,
+    fontSize: size(11),
+    lineHeight: size(16),
+    marginTop: 10,
+  },
   button: {
     minHeight: compactPhone ? 44 : 47,
     borderRadius: 12,
