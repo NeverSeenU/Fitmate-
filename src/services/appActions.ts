@@ -257,44 +257,28 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       if (!api) {
         throw new Error('File insight requires the backend API. Current app runtime has no backend API, so no insight card can be generated. Restart Expo and make sure it is not Local preview mode.');
       }
-      if (api) {
-        const response = await api.files.upload({
-          threadId: getState().threads[0]?.id ?? 'food-today',
-          fileUri: file.uri,
-          filename: file.name,
-          mimeType: file.mimeType,
-        });
-        const fileInsight = toFileInsight(response);
-        addMessages(getState, setState, [
-          {
-            id: `file-user-${Date.now()}`,
-            role: 'user',
-            text: `上传文件：${file.name}`,
-          },
-          {
-            id: response.assistant_message?.id ?? `file-assistant-${Date.now()}`,
-            role: 'assistant',
-            text: response.assistant_message?.content_text ?? response.file_upload?.summary_text ?? `已上传 ${file.name}。`,
-            fileInsight,
-          },
-        ]);
-        return { uploaded: true, hasInsight: Boolean(fileInsight) };
-      }
+      const response = await api.files.upload({
+        threadId: getState().threads[0]?.id ?? 'food-today',
+        fileUri: file.uri,
+        filename: file.name,
+        mimeType: file.mimeType,
+      });
+      const fileInsight = toFileInsight(response);
       addMessages(getState, setState, [
         {
           id: `file-user-${Date.now()}`,
           role: 'user',
-          text: `选择了文件：${file.name}`,
+          text: `Uploading file: ${file.name}`,
         },
         {
-          id: `file-assistant-${Date.now()}`,
+          id: response.assistant_message?.id ?? `file-assistant-${Date.now()}`,
           role: 'assistant',
-          text: `Local preview mode: 已读取文件信息：${file.name} · ${file.mimeType} · ${formatAttachmentFileSize(file.sizeBytes)}。当前没有连接后端，所以暂不上传或解析文件内容。`,
+          text: response.assistant_message?.content_text ?? response.file_upload?.summary_text ?? `Uploaded ${file.name}.`,
+          fileInsight,
         },
       ]);
-      return { uploaded: false, hasInsight: false };
+      return { uploaded: true, hasInsight: Boolean(fileInsight) };
     },
-
     async syncFileInsightMetrics(messageId: string) {
       const state = getState();
       const message = state.chatMessages.find((item) => item.id === messageId);

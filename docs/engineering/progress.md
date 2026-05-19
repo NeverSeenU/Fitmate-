@@ -290,6 +290,8 @@
 - Chat now shows the active runtime target above the message list, so file-smoke testing can confirm backend mode before uploading.
 - File upload no longer silently succeeds in local preview mode; if the backend API is not connected, it fails loudly instead of showing an "already read" style message without an insight card.
 - Backend-mode navigation now blocks unauthenticated entry into Chat and Records, so onboarding cannot bypass login and create `not_authenticated` file-upload requests.
+- The local file-preview branch has been removed from `attachFile`; file uploads now either call `/v1/files/upload` or fail with a backend-required error.
+- Metro bundle verification confirmed the old `已读取文件信息` / `暂不上传` / `uploaded:false` file-preview strings are no longer present in the served JS bundle.
 
 ## What's Next
 - Run body-report, menu, and workout-plan file insight sync in Expo Go against the live backend, checking real-device file picker behavior, layout, tap targets, Records navigation, synced-state copy, and reload persistence.
