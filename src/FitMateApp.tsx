@@ -18,6 +18,7 @@ export default function App() {
   const [sheet, setSheet] = useState<Sheet>(null);
   const [returnPanel, setReturnPanel] = useState<ChatPanel>(null);
   const [appState, setAppState] = useState(initialAppState);
+  const [authenticated, setAuthenticated] = useState(false);
   const services = useMemo(
     () => createFitMateServices({
       baseUrl: runtimeConfig.apiBaseUrl,
@@ -54,6 +55,7 @@ export default function App() {
   const handleLogin = async ({ identifier, password }: AuthCredentials) => {
     try {
       const session = await services.auth.login({ identifier, password });
+      setAuthenticated(true);
       await enterApp(session.user.displayName, session.user.email);
     } catch (error) {
       const session = await services.auth.register({
@@ -61,6 +63,7 @@ export default function App() {
         password,
         displayName: identifier.split('@')[0] || 'FitMate User',
       });
+      setAuthenticated(true);
       await enterApp(session.user.displayName, session.user.email);
     }
   };
@@ -71,7 +74,16 @@ export default function App() {
       password,
       displayName: displayName || identifier.split('@')[0] || 'FitMate User',
     });
+    setAuthenticated(true);
     await enterApp(session.user.displayName, session.user.email);
+  };
+
+  const goAuthenticated = (next: Screen) => {
+    if (services.api && !authenticated && (next === 'chat' || next === 'records')) {
+      setScreen('login');
+      return;
+    }
+    setScreen(next);
   };
 
   const openSheet = (nextSheet: Sheet, backPanel: ChatPanel = null) => {
@@ -96,21 +108,21 @@ export default function App() {
     if (screen === 'login') {
       return (
         <LoginScreen
-          go={setScreen}
+          go={goAuthenticated}
           onLogin={handleLogin}
           runtimeInfo={runtimeInfo}
         />
       );
     }
-    if (screen === 'register') return <RegisterScreen go={setScreen} onRegister={handleRegister} />;
-    if (screen === 'forgot') return <ForgotScreen go={setScreen} />;
-    if (screen === 'onboarding') return <OnboardingScreen go={setScreen} />;
+    if (screen === 'register') return <RegisterScreen go={goAuthenticated} onRegister={handleRegister} />;
+    if (screen === 'forgot') return <ForgotScreen go={goAuthenticated} />;
+    if (screen === 'onboarding') return <OnboardingScreen go={goAuthenticated} />;
     if (screen === 'records') {
-      return <RecordsScreen go={setScreen} openSheet={(next) => openSheet(next)} appState={appState} actions={actions} />;
+      return <RecordsScreen go={goAuthenticated} openSheet={(next) => openSheet(next)} appState={appState} actions={actions} />;
     }
     return (
       <ChatScreen
-        go={setScreen}
+        go={goAuthenticated}
         openSheet={openSheet}
         returnPanel={returnPanel}
         clearReturnPanel={() => setReturnPanel(null)}
@@ -119,7 +131,7 @@ export default function App() {
         runtimeInfo={runtimeInfo}
       />
     );
-  }, [screen, returnPanel, appState, actions]);
+  }, [screen, returnPanel, appState, actions, authenticated]);
 
   return (
     <SafeAreaView style={styles.app}>
