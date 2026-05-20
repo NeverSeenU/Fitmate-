@@ -37,3 +37,9 @@ This file records project-level execution decisions for the main conversation an
 - Date: 2026-05-13
 - Decision: FitMate uses six standing subagent roles: Frontend Lead, Backend Lead, AI/Vision Lead, QA Lead, DevOps Lead, and Product/PM Lead.
 - Consequence: the roles are operational templates, not permanent running agents. Main conversation launches the needed role per task using `docs/engineering/team.md`.
+
+## ED-007: Template Smoke Is Not Product Intelligence
+
+- Date: 2026-05-19
+- Decision: deterministic templates and heuristics are allowed for smoke tests, but production food, file, photo, and workout cards must be filled by an AI extraction pipeline with structured output validation.
+- Consequence: tests should keep stable fixture coverage, while product work must route real user uploads through AI/Vision providers before showing nutrition, body, or training parameters as user-facing insight.

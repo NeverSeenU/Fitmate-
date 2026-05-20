@@ -297,9 +297,12 @@
 - File uploads now create a real backend `files` chat thread when mobile state only has local fallback thread ids such as `food-today`, preventing backend `thread_not_found` upload failures.
 - Regression tests now cover both the unmasked file-upload backend error path and backend-thread creation before file upload.
 - `npm.cmd test`, `npm.cmd run typecheck`, `npm.cmd run smoke:mobile`, and `npm.cmd run smoke:file-insight-live` passed after the file-upload thread fix.
+- Failure review recorded the core lesson: user-facing upload flows need device-level UX verification, real backend error preservation, and tests for fallback-state IDs, not just happy-path backend smoke.
+- Chat file selection now uses a GPT-style pending attachment preview before upload; the backend upload and insight generation start when the user taps send.
+- Product direction is now explicit: deterministic templates are for smoke tests, while real nutrition/body/training parameters should come from validated AI extraction.
 
 ## What's Next
-- Run body-report, menu, and workout-plan file insight sync in Expo Go against the live backend, checking real-device file picker behavior, layout, tap targets, Records navigation, synced-state copy, and reload persistence.
+- Verify the pending attachment composer in Expo Go, then build the AI structured-extraction pipeline for food photos, uploaded files/images, and workout notes.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

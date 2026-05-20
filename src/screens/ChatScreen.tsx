@@ -4,7 +4,7 @@ import { BottomTabs, Button, ChatBubble, ChatHeader, FoodAnalysisCard } from '..
 import type { AppDataState } from '../domain/models';
 import { AttachmentPanel, NewChatPanel, ThreadDrawer } from '../overlays/ChatOverlays';
 import type { createAppActions, FoodLogEditInput } from '../services/appActions';
-import { pickFitMateFile } from '../services/filePicker';
+import { formatFileSize, pickFitMateFile, type PickedFile } from '../services/filePicker';
 import { pickFoodPhoto, type PhotoPickerSource } from '../services/photoPicker';
 import { styles } from '../styles';
 import type { ChatPanel, Screen, Sheet } from '../types';
@@ -31,6 +31,7 @@ export function ChatScreen({
   const [utilityPanel, setUtilityPanel] = useState<'weight' | 'workout' | null>(null);
   const [panelBack, setPanelBack] = useState<ChatPanel>(null);
   const [composerText, setComposerText] = useState('');
+  const [pendingFile, setPendingFile] = useState<PickedFile | null>(null);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [foodEditorOpen, setFoodEditorOpen] = useState(false);
@@ -98,12 +99,19 @@ export function ChatScreen({
 
   const sendComposerText = () => {
     const text = composerText.trim();
-    if (!text) {
+    const file = pendingFile;
+    if (!text && !file) {
       setStatus('请输入要发送的内容');
       return;
     }
-    void runAction('正在发送...', '消息已发送', async () => {
-      await actions.sendText(appState.threads[0]?.id ?? 'food-today', text);
+    void runAction(file ? '正在上传并分析文件...' : '正在发送...', file ? '文件已上传并生成识别卡片' : '消息已发送', async () => {
+      if (text) {
+        await actions.sendText(appState.threads[0]?.id ?? 'food-today', text);
+      }
+      if (file) {
+        await actions.attachFile(file);
+        setPendingFile(null);
+      }
       setComposerText('');
     });
   };
@@ -192,12 +200,8 @@ export function ChatScreen({
           setStatus('已取消选择文件');
           return;
         }
-        const result = await actions.attachFile(file);
-        setStatus(result.uploaded
-          ? result.hasInsight
-            ? '文件已上传并生成识别卡片，请查看聊天中的同步按钮'
-            : '文件已上传，但暂未抽取到可同步指标'
-          : '文件已添加到聊天，当前为本地预览模式，暂未上传内容');
+        setPendingFile(file);
+        setStatus('文件已添加，点发送后开始识别');
       } catch (error) {
         setStatus(error instanceof Error ? error.message : '文件选择失败');
       } finally {
@@ -262,25 +266,41 @@ export function ChatScreen({
       </ScrollView>
       {!foodEditorOpen ? (
         <View style={styles.composer}>
-          <Pressable style={styles.iconButton} onPress={() => setPanel('attach')}>
-            <Text style={styles.iconText}>＋</Text>
-          </Pressable>
-          <TextInput
-            style={styles.composerInput}
-            value={composerText}
-            onChangeText={setComposerText}
-            editable={!busy}
-            placeholder="询问 FitMate"
-            placeholderTextColor="#777"
-            returnKeyType="send"
-            onSubmitEditing={sendComposerText}
-          />
-          <Pressable
-            style={[styles.iconButton, busy && styles.disabledButton]}
-            onPress={busy ? undefined : sendComposerText}
-          >
-            <Text style={styles.iconText}>➤</Text>
-          </Pressable>
+          {pendingFile ? (
+            <View style={styles.pendingAttachment}>
+              <View style={styles.pendingAttachmentBadge}>
+                <Text style={styles.pendingAttachmentType}>{fileTypeLabel(pendingFile)}</Text>
+              </View>
+              <View style={styles.pendingAttachmentMeta}>
+                <Text style={styles.pendingAttachmentName} numberOfLines={2}>{pendingFile.name}</Text>
+                <Text style={styles.pendingAttachmentSize}>{formatFileSize(pendingFile.sizeBytes)}</Text>
+              </View>
+              <Pressable style={styles.pendingAttachmentRemove} onPress={() => setPendingFile(null)} disabled={busy}>
+                <Text style={styles.iconText}>X</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          <View style={styles.composerControls}>
+            <Pressable style={styles.iconButton} onPress={() => setPanel('attach')}>
+              <Text style={styles.iconText}>+</Text>
+            </Pressable>
+            <TextInput
+              style={styles.composerInput}
+              value={composerText}
+              onChangeText={setComposerText}
+              editable={!busy}
+              placeholder="询问 FitMate"
+              placeholderTextColor="#777"
+              returnKeyType="send"
+              onSubmitEditing={sendComposerText}
+            />
+            <Pressable
+              style={[styles.iconButton, busy && styles.disabledButton]}
+              onPress={busy ? undefined : sendComposerText}
+            >
+              <Text style={styles.iconText}>↑</Text>
+            </Pressable>
+          </View>
         </View>
       ) : null}
       <BottomTabs active="chat" go={go} />
@@ -528,4 +548,15 @@ function parseLeadingNumber(value?: string) {
   }
   const match = value.match(/\d+/);
   return match ? Number(match[0]) : undefined;
+}
+
+function fileTypeLabel(file: PickedFile) {
+  const extension = file.name.split('.').pop()?.toUpperCase();
+  if (extension && extension.length <= 5) {
+    return extension;
+  }
+  if (file.mimeType.startsWith('image/')) {
+    return 'IMG';
+  }
+  return 'FILE';
 }
