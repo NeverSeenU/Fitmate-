@@ -93,6 +93,29 @@ def test_xiaomi_provider_sends_openai_compatible_file_extraction_request(monkeyp
     assert "Filename: body-report.txt" in request["payload"]["messages"][1]["content"]
 
 
+def test_xiaomi_provider_sends_openai_compatible_workout_analysis_request(monkeypatch) -> None:
+    monkeypatch.setenv("XIAOMI_API_KEY", "xiaomi-key")
+    monkeypatch.setenv("XIAOMI_BASE_URL", "https://mimo.example/v1")
+    transport = FakeTransport(response_payload=chat_response({
+        "workout_type": "strength",
+        "duration_minutes": 45,
+        "intensity": "medium",
+        "calories_burned_range_kcal": [180, 270],
+        "confidence": 0.8,
+        "summary": "Strength training.",
+    }))
+    provider = XiaomiVisionProvider(transport=transport)
+
+    result = provider.analyze_workout_text("strength training 45 minutes")
+
+    request = transport.requests[0]
+    assert result["workout_type"] == "strength"
+    assert request["url"] == "https://mimo.example/v1/chat/completions"
+    assert request["payload"]["response_format"] == {"type": "json_object"}
+    assert request["payload"]["messages"][0]["role"] == "system"
+    assert "Workout note:" in request["payload"]["messages"][1]["content"]
+
+
 def test_qwen_provider_reads_dashscope_env_and_parses_json_content(monkeypatch) -> None:
     monkeypatch.setenv("DASHSCOPE_API_KEY", "qwen-key")
     monkeypatch.setenv("DASHSCOPE_BASE_URL", "https://dashscope.example/compatible-mode/v1")

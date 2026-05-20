@@ -7,6 +7,7 @@ import uuid
 
 from app.services.subscription_service import subscription_service
 from app.services.usage_service import usage_service
+from app.ai.router import WorkoutAnalysisRouter
 
 
 @dataclass
@@ -55,14 +56,16 @@ class WorkoutService:
         store: InMemoryWorkoutLogStore | None = None,
         subscription_service_dependency=None,
         usage_service_dependency=None,
+        workout_analysis_router: WorkoutAnalysisRouter | None = None,
     ) -> None:
         self.store = store or InMemoryWorkoutLogStore()
         self.subscription_service = subscription_service_dependency or subscription_service
         self.usage_service = usage_service_dependency or usage_service
+        self.workout_analysis_router = workout_analysis_router
 
     def analyze_text(self, user_id: str, text: str) -> dict:
         self.usage_service.ensure_allowed(user_id, "workout")
-        analysis = self._analyze(text)
+        analysis = self._analysis(user_id=user_id, text=text)
         subscription = self.subscription_service.get_current(user_id)
         should_auto_record = bool(subscription["entitlements"]["automatic_recording"])
 
@@ -138,6 +141,13 @@ class WorkoutService:
             "calories_burned_range_kcal": calories_range,
         }
 
+    def _analysis(self, user_id: str, text: str) -> dict:
+        if self.workout_analysis_router is not None:
+            ai_analysis = self.workout_analysis_router.analyze_workout_text(text=text, user_id=user_id)
+            if ai_analysis is not None:
+                return ai_analysis
+        return self._analyze(text)
+
     def _workout_type(self, text: str) -> str:
         if "椭圆" in text and "腿" in text:
             return "cardio_plus_strength"
@@ -175,6 +185,10 @@ class WorkoutService:
             "duration_minutes": analysis["duration_minutes"],
             "intensity": analysis["intensity"],
             "calories_burned_range_kcal": analysis["calories_burned_range_kcal"],
+            "model_provider": analysis.get("model_provider"),
+            "model_name": analysis.get("model_name"),
+            "confidence": analysis.get("confidence"),
+            "summary": analysis.get("summary"),
             "status": workout_log.status if workout_log else "analysis_only",
         }
 

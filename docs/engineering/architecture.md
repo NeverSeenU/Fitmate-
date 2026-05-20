@@ -63,6 +63,14 @@ The mobile client supports mock mode and backend mode through `src/config/env.ts
 5. AI output is validated into the same `document_type`, `insights`, and `recommendations` contract that the mobile file card already renders.
 6. If AI extraction is disabled, unavailable, or invalid, deterministic heuristics remain as the local smoke-test fallback.
 
+## AI Workout Text Flow
+
+1. User enters a workout note in the mobile chat utility sheet.
+2. Mobile sends the note to `POST /v1/workouts/analyze`.
+3. When `WORKOUT_AI_ANALYSIS_ENABLED=true`, the backend routes the text through the Xiaomi-first, Qwen-fallback structured workout router.
+4. AI output is validated into `workout_type`, `duration_minutes`, `intensity`, `calories_burned_range_kcal`, `confidence`, and `summary`.
+5. If AI analysis is disabled, unavailable, or invalid, the existing deterministic workout parser remains as the local smoke-test fallback.
+
 ## Subagent Work Boundaries
 
 Use file ownership to avoid conflicts:

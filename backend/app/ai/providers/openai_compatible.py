@@ -30,6 +30,16 @@ FILE_USER_PROMPT = (
     "of objects with label, value, source. Supported labels: document_type, weight_kg, bmi, "
     "body_fat_percent, protein_g, calories_kcal, training_frequency."
 )
+WORKOUT_SYSTEM_PROMPT = (
+    "You are FitMate AI's workout log analyst. Return valid JSON only. "
+    "Extract the user's actual training details without inventing exercises or precision."
+)
+WORKOUT_USER_PROMPT = (
+    "Analyze this workout note for a fitness tracking app. Required JSON fields: "
+    "workout_type, duration_minutes, intensity, calories_burned_range_kcal, confidence, summary. "
+    "workout_type must be one of running, strength, cardio_plus_strength, mixed, mobility, sports. "
+    "intensity must be low, medium, or high."
+)
 
 
 class JsonTransport(Protocol):
@@ -140,6 +150,27 @@ class OpenAICompatibleVisionProvider:
                         f"Extracted text:\n{content_text[:12000]}"
                     ),
                 },
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1,
+        }
+        response = self.transport.post_json(
+            url=f"{self.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            payload=payload,
+            timeout_seconds=self.timeout_seconds,
+        )
+        return self._extract_json_content(response)
+
+    def analyze_workout_text(self, text: str) -> object:
+        if not self.api_key:
+            raise RuntimeError(self.not_configured_error)
+
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": WORKOUT_SYSTEM_PROMPT},
+                {"role": "user", "content": f"{WORKOUT_USER_PROMPT}\n\nWorkout note:\n{text[:4000]}"},
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0.1,

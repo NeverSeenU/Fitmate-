@@ -32,6 +32,8 @@ FILE_INSIGHT_LABELS = {
     "calories_kcal",
     "training_frequency",
 }
+WORKOUT_TYPES = {"running", "strength", "cardio_plus_strength", "mixed", "mobility", "sports"}
+WORKOUT_INTENSITIES = {"low", "medium", "high"}
 
 
 class FoodVisionSchemaError(ValueError):
@@ -39,6 +41,10 @@ class FoodVisionSchemaError(ValueError):
 
 
 class FileInsightSchemaError(ValueError):
+    pass
+
+
+class WorkoutAnalysisSchemaError(ValueError):
     pass
 
 
@@ -113,4 +119,40 @@ def validate_file_insights(raw: object) -> dict[str, Any]:
         "document_type": document_type,
         "insights": normalized_insights,
         "recommendations": normalized_recommendations,
+    }
+
+
+def validate_workout_analysis(raw: object) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise WorkoutAnalysisSchemaError("workout_analysis_must_be_object")
+    workout_type = raw.get("workout_type")
+    if workout_type not in WORKOUT_TYPES:
+        raise WorkoutAnalysisSchemaError("workout_type_invalid")
+    duration = raw.get("duration_minutes")
+    if not isinstance(duration, int) or duration < 0 or duration > 600:
+        raise WorkoutAnalysisSchemaError("duration_minutes_invalid")
+    intensity = raw.get("intensity")
+    if intensity not in WORKOUT_INTENSITIES:
+        raise WorkoutAnalysisSchemaError("intensity_invalid")
+    calories = raw.get("calories_burned_range_kcal")
+    if not isinstance(calories, list) or len(calories) != 2:
+        raise WorkoutAnalysisSchemaError("calories_burned_range_kcal_invalid")
+    if not all(isinstance(item, int | float) for item in calories):
+        raise WorkoutAnalysisSchemaError("calories_burned_range_kcal_invalid")
+    if calories[0] > calories[1]:
+        raise WorkoutAnalysisSchemaError("calories_burned_range_kcal_min_gt_max")
+    confidence = raw.get("confidence", 0.7)
+    if not isinstance(confidence, int | float) or confidence < 0 or confidence > 1:
+        raise WorkoutAnalysisSchemaError("confidence_invalid")
+    summary = raw.get("summary", "")
+    if summary is not None and not isinstance(summary, str):
+        raise WorkoutAnalysisSchemaError("summary_invalid")
+
+    return {
+        "workout_type": workout_type,
+        "duration_minutes": duration,
+        "intensity": intensity,
+        "calories_burned_range_kcal": [round(calories[0]), round(calories[1])],
+        "confidence": confidence,
+        "summary": summary or "",
     }

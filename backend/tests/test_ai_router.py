@@ -1,4 +1,4 @@
-from app.ai.router import FileInsightRouter, FoodVisionRouter
+from app.ai.router import FileInsightRouter, FoodVisionRouter, WorkoutAnalysisRouter
 from app.repositories.sqlalchemy.model_calls import StoredAiModelCall
 
 
@@ -33,6 +33,13 @@ class FakeProvider:
         return response
 
     def analyze_file_text(self, filename: str, content_text: str, content_type: str) -> object:
+        self.calls += 1
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    def analyze_workout_text(self, text: str) -> object:
         self.calls += 1
         response = self.responses.pop(0)
         if isinstance(response, Exception):
@@ -191,5 +198,62 @@ def test_file_insight_router_falls_back_when_primary_schema_is_invalid() -> None
 
     assert result is not None
     assert result["document_type"] == "workout_plan"
+    assert result["model_provider"] == "qwen"
+    assert [call.status for call in model_calls.calls] == ["error", "success"]
+
+
+def test_workout_analysis_router_uses_ai_structured_output_and_logs_usage() -> None:
+    xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [
+        {
+            "workout_type": "cardio_plus_strength",
+            "duration_minutes": 80,
+            "intensity": "high",
+            "calories_burned_range_kcal": [360, 560],
+            "confidence": 0.82,
+            "summary": "Elliptical plus leg training.",
+        }
+    ])
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [])
+    model_calls = InMemoryModelCallRepository()
+    router = WorkoutAnalysisRouter(
+        primary_provider=xiaomi,
+        fallback_provider=qwen,
+        model_call_repository=model_calls,
+    )
+
+    result = router.analyze_workout_text("elliptical 45 min leg training 35 min")
+
+    assert result is not None
+    assert result["workout_type"] == "cardio_plus_strength"
+    assert result["duration_minutes"] == 80
+    assert result["model_provider"] == "xiaomi"
+    assert qwen.calls == 0
+    assert model_calls.calls[0].purpose == "workout_analysis"
+    assert model_calls.calls[0].status == "success"
+
+
+def test_workout_analysis_router_falls_back_when_primary_schema_is_invalid() -> None:
+    xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [{"workout_type": "unknown"}])
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [
+        {
+            "workout_type": "running",
+            "duration_minutes": 30,
+            "intensity": "low",
+            "calories_burned_range_kcal": [90, 150],
+            "confidence": 0.74,
+            "summary": "Easy run.",
+        }
+    ])
+    model_calls = InMemoryModelCallRepository()
+    router = WorkoutAnalysisRouter(
+        primary_provider=xiaomi,
+        fallback_provider=qwen,
+        model_call_repository=model_calls,
+    )
+
+    result = router.analyze_workout_text("easy run 30 min")
+
+    assert result is not None
+    assert result["workout_type"] == "running"
     assert result["model_provider"] == "qwen"
     assert [call.status for call in model_calls.calls] == ["error", "success"]

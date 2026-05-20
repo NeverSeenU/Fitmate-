@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.config import get_settings, is_local_runtime
-from app.ai.router import FileInsightRouter
+from app.ai.router import FileInsightRouter, WorkoutAnalysisRouter
 from app.repositories.sqlalchemy.auth import SqlAlchemyAuthRepository
 from app.repositories.sqlalchemy.chat import SqlAlchemyChatRepository
 from app.repositories.sqlalchemy.files import SqlAlchemyFileUploadRepository
@@ -113,10 +113,16 @@ def get_privacy_service(db: DbSession) -> PrivacyService:
 
 
 def get_workout_service(db: DbSession) -> WorkoutService:
+    settings = get_settings()
     return WorkoutService(
         store=SqlAlchemyWorkoutLogRepository(db),
         subscription_service_dependency=get_subscription_service(db),
         usage_service_dependency=get_usage_service(db),
+        workout_analysis_router=(
+            WorkoutAnalysisRouter(model_call_repository=SqlAlchemyModelCallRepository(db))
+            if settings.workout_ai_analysis_enabled
+            else None
+        ),
     )
 
 
