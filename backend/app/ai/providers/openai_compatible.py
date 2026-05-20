@@ -20,6 +20,16 @@ USER_PROMPT = (
     "fat_g_range, confidence, needs_follow_up, follow_up_question, fat_loss_advice, "
     "supportive_reply, safety_flags."
 )
+TEXT_FOOD_SYSTEM_PROMPT = (
+    "You are FitMate AI's text food-log nutrition analyst. Return valid JSON only. "
+    "Use ranges and uncertainty. Do not invent exact portion sizes."
+)
+TEXT_FOOD_USER_PROMPT = (
+    "Analyze this user's food text for a fat-loss coaching app. Required JSON fields: "
+    "meal_name, detected_items, calories_range_kcal, protein_g_range, carbs_g_range, "
+    "fat_g_range, confidence, needs_follow_up, follow_up_question, fat_loss_advice, "
+    "supportive_reply, safety_flags."
+)
 FILE_SYSTEM_PROMPT = (
     "You are FitMate AI's structured health document extractor. Return valid JSON only. "
     "Extract only values supported by the uploaded content. Do not invent numbers."
@@ -124,6 +134,27 @@ class OpenAICompatibleVisionProvider:
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0.2,
+        }
+        response = self.transport.post_json(
+            url=f"{self.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            payload=payload,
+            timeout_seconds=self.timeout_seconds,
+        )
+        return self._extract_json_content(response)
+
+    def analyze_food_text(self, text: str) -> object:
+        if not self.api_key:
+            raise RuntimeError(self.not_configured_error)
+
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": TEXT_FOOD_SYSTEM_PROMPT},
+                {"role": "user", "content": f"{TEXT_FOOD_USER_PROMPT}\n\nFood text:\n{text[:4000]}"},
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1,
         }
         response = self.transport.post_json(
             url=f"{self.base_url}/chat/completions",

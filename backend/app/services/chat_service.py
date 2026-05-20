@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 import uuid
 
+from app.ai.router import TextFoodAnalysisRouter
 from app.services.usage_service import usage_service
 
 
@@ -82,10 +83,12 @@ class ChatService:
         store: InMemoryChatStore | None = None,
         allow_contract_mocks: bool = True,
         usage_service_dependency=None,
+        text_food_analysis_router: TextFoodAnalysisRouter | None = None,
     ) -> None:
         self.store = store or InMemoryChatStore()
         self.allow_contract_mocks = allow_contract_mocks
         self.usage_service = usage_service_dependency or usage_service
+        self.text_food_analysis_router = text_food_analysis_router
 
     def create_thread(self, user_id: str, title: str, kind: str) -> dict:
         return self._thread_response(self.store.create_thread(user_id, title, kind))
@@ -109,10 +112,12 @@ class ChatService:
         thread = self.store.get_thread(user_id, thread_id)
         if thread is None:
             return None
-        if not self.allow_contract_mocks:
+        if not self.allow_contract_mocks and self.text_food_analysis_router is None:
             raise TextChatUnavailableError("text_chat_provider_not_configured")
         self.usage_service.ensure_allowed(user_id, "chat")
-        food_analysis = self._text_food_analysis(text)
+        food_analysis = self._text_food_analysis(user_id, text)
+        if not self.allow_contract_mocks and food_analysis is None:
+            raise TextChatUnavailableError("text_chat_provider_not_configured")
         self.store.add_message(
             StoredMessage(
                 id=str(uuid.uuid4()),
@@ -152,26 +157,44 @@ class ChatService:
             return "先喝水，等 10 分钟；如果还饿，选高蛋白小份。你不是没自控力，是训练后身体需要恢复。"
         return "我先帮你记录重点，再给你一个可执行的小步骤。"
 
-    def _text_food_analysis(self, text: str) -> dict[str, Any] | None:
+    def _text_food_analysis(self, user_id: str, text: str) -> dict[str, Any] | None:
         if not self._looks_like_food_log(text):
             return None
+        if self.text_food_analysis_router is not None:
+            ai_analysis = self.text_food_analysis_router.analyze_food_text(text=text, user_id=user_id)
+            if ai_analysis is not None:
+                return self._food_analysis_response(ai_analysis)
         calories = self._estimate_calories(text)
         protein = self._estimate_protein(text)
         carbs = self._estimate_carbs(text)
         fat = self._estimate_fat(text)
-        return {
-            "food_log_id": None,
+        return self._food_analysis_response({
             "meal_name": self._meal_name_from_text(text),
             "calories_range_kcal": [max(calories - 80, 0), calories + 80],
             "protein_g_range": [max(protein - 8, 0), protein + 8],
             "carbs_g_range": [max(carbs - 12, 0), carbs + 12],
             "fat_g_range": [max(fat - 6, 0), fat + 6],
             "confidence": 0.55,
-            "status": "pending",
             "needs_follow_up": False,
             "follow_up_question": None,
             "model_provider": "mock",
             "model_name": "fitmate-text-food-card",
+        })
+
+    def _food_analysis_response(self, analysis: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "food_log_id": None,
+            "meal_name": analysis["meal_name"],
+            "calories_range_kcal": analysis["calories_range_kcal"],
+            "protein_g_range": analysis["protein_g_range"],
+            "carbs_g_range": analysis["carbs_g_range"],
+            "fat_g_range": analysis["fat_g_range"],
+            "confidence": analysis["confidence"],
+            "status": "pending",
+            "needs_follow_up": analysis.get("needs_follow_up", False),
+            "follow_up_question": analysis.get("follow_up_question"),
+            "model_provider": analysis.get("model_provider"),
+            "model_name": analysis.get("model_name"),
         }
 
     def _looks_like_food_log(self, text: str) -> bool:

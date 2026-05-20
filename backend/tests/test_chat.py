@@ -9,6 +9,26 @@ from app.repositories.sqlalchemy.usage import SqlAlchemyUsageCounterRepository
 from app.services.chat_service import ChatService, InMemoryChatStore, TextChatUnavailableError
 
 
+class FakeTextFoodRouter:
+    def analyze_food_text(self, text: str, user_id: str | None = None) -> dict:
+        return {
+            "meal_name": "AI chicken rice",
+            "detected_items": ["chicken", "rice"],
+            "calories_range_kcal": [520, 680],
+            "protein_g_range": [35, 48],
+            "carbs_g_range": [55, 75],
+            "fat_g_range": [12, 20],
+            "confidence": 0.84,
+            "needs_follow_up": False,
+            "follow_up_question": None,
+            "fat_loss_advice": "Keep sauce light.",
+            "supportive_reply": "Logged as a range.",
+            "safety_flags": [],
+            "model_provider": "xiaomi",
+            "model_name": "mimo-test",
+        }
+
+
 client = TestClient(app)
 
 
@@ -137,6 +157,27 @@ def test_contract_chat_mock_can_be_disabled_for_production_paths() -> None:
         raise AssertionError("disabled contract mock must raise")
 
     assert service.store.list_messages(thread["id"]) == []
+
+
+def test_text_food_ai_router_can_create_food_card_without_contract_mocks() -> None:
+    service = ChatService(
+        store=InMemoryChatStore(),
+        allow_contract_mocks=False,
+        text_food_analysis_router=FakeTextFoodRouter(),
+    )
+    thread = service.create_thread(user_id="user-1", title="Food", kind="food")
+
+    response = service.send_text_message(
+        user_id="user-1",
+        thread_id=thread["id"],
+        text="我吃了鸡胸饭",
+        context=None,
+    )
+
+    assert response is not None
+    assert response["message"]["message_type"] == "food_analysis"
+    assert response["food_analysis"]["meal_name"] == "AI chicken rice"
+    assert response["food_analysis"]["model_provider"] == "xiaomi"
 
 
 def test_food_text_message_returns_editable_food_analysis_card() -> None:

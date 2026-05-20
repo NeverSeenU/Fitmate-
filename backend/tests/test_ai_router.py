@@ -1,4 +1,4 @@
-from app.ai.router import FileInsightRouter, FoodVisionRouter, WorkoutAnalysisRouter
+from app.ai.router import FileInsightRouter, FoodVisionRouter, TextFoodAnalysisRouter, WorkoutAnalysisRouter
 from app.repositories.sqlalchemy.model_calls import StoredAiModelCall
 
 
@@ -26,6 +26,13 @@ class FakeProvider:
         self.calls = 0
 
     def analyze_food_photo(self, image_bytes: bytes, user_note: str | None = None) -> object:
+        self.calls += 1
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    def analyze_food_text(self, text: str) -> object:
         self.calls += 1
         response = self.responses.pop(0)
         if isinstance(response, Exception):
@@ -255,5 +262,43 @@ def test_workout_analysis_router_falls_back_when_primary_schema_is_invalid() -> 
 
     assert result is not None
     assert result["workout_type"] == "running"
+    assert result["model_provider"] == "qwen"
+    assert [call.status for call in model_calls.calls] == ["error", "success"]
+
+
+def test_text_food_analysis_router_uses_ai_structured_output_and_logs_usage() -> None:
+    xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [VALID_ANALYSIS | {"meal_name": "chicken rice"}])
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [])
+    model_calls = InMemoryModelCallRepository()
+    router = TextFoodAnalysisRouter(
+        primary_provider=xiaomi,
+        fallback_provider=qwen,
+        model_call_repository=model_calls,
+    )
+
+    result = router.analyze_food_text("ate chicken rice")
+
+    assert result is not None
+    assert result["meal_name"] == "chicken rice"
+    assert result["model_provider"] == "xiaomi"
+    assert qwen.calls == 0
+    assert model_calls.calls[0].purpose == "food_text"
+    assert model_calls.calls[0].status == "success"
+
+
+def test_text_food_analysis_router_falls_back_when_primary_schema_is_invalid() -> None:
+    xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [{"meal_name": "bad"}])
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [VALID_ANALYSIS | {"meal_name": "latte"}])
+    model_calls = InMemoryModelCallRepository()
+    router = TextFoodAnalysisRouter(
+        primary_provider=xiaomi,
+        fallback_provider=qwen,
+        model_call_repository=model_calls,
+    )
+
+    result = router.analyze_food_text("latte")
+
+    assert result is not None
+    assert result["meal_name"] == "latte"
     assert result["model_provider"] == "qwen"
     assert [call.status for call in model_calls.calls] == ["error", "success"]

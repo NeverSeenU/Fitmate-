@@ -71,6 +71,14 @@ The mobile client supports mock mode and backend mode through `src/config/env.ts
 4. AI output is validated into `workout_type`, `duration_minutes`, `intensity`, `calories_burned_range_kcal`, `confidence`, and `summary`.
 5. If AI analysis is disabled, unavailable, or invalid, the existing deterministic workout parser remains as the local smoke-test fallback.
 
+## AI Food Text Flow
+
+1. User sends a food description in chat.
+2. Backend detects food-like text and, when `TEXT_FOOD_AI_ANALYSIS_ENABLED=true`, routes it through the Xiaomi-first, Qwen-fallback text food router.
+3. AI output uses the same structured nutrition schema as food-photo analysis.
+4. Chat service adapts the validated AI output into the existing editable food-card response contract.
+5. If AI analysis is disabled, unavailable, or invalid, the deterministic text food parser remains as the local smoke-test fallback.
+
 ## Subagent Work Boundaries
 
 Use file ownership to avoid conflicts:

@@ -93,6 +93,22 @@ def test_xiaomi_provider_sends_openai_compatible_file_extraction_request(monkeyp
     assert "Filename: body-report.txt" in request["payload"]["messages"][1]["content"]
 
 
+def test_xiaomi_provider_sends_openai_compatible_text_food_request(monkeypatch) -> None:
+    monkeypatch.setenv("XIAOMI_API_KEY", "xiaomi-key")
+    monkeypatch.setenv("XIAOMI_BASE_URL", "https://mimo.example/v1")
+    transport = FakeTransport()
+    provider = XiaomiVisionProvider(transport=transport)
+
+    result = provider.analyze_food_text("ate chicken rice")
+
+    request = transport.requests[0]
+    assert result["meal_name"] == "bibimbap"
+    assert request["url"] == "https://mimo.example/v1/chat/completions"
+    assert request["payload"]["response_format"] == {"type": "json_object"}
+    assert request["payload"]["messages"][0]["role"] == "system"
+    assert "Food text:" in request["payload"]["messages"][1]["content"]
+
+
 def test_xiaomi_provider_sends_openai_compatible_workout_analysis_request(monkeypatch) -> None:
     monkeypatch.setenv("XIAOMI_API_KEY", "xiaomi-key")
     monkeypatch.setenv("XIAOMI_BASE_URL", "https://mimo.example/v1")

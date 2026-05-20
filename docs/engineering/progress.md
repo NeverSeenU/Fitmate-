@@ -304,9 +304,11 @@
 - AI file extraction validates output into the existing mobile card contract and falls back to deterministic heuristics when disabled, unavailable, or invalid.
 - Backend now has a first-pass AI workout text router for exercise notes, using Xiaomi first and Qwen fallback behind `WORKOUT_AI_ANALYSIS_ENABLED=true`.
 - AI workout analysis validates output into the existing workout card contract and falls back to the deterministic parser when disabled, unavailable, or invalid.
+- Backend now has a first-pass AI food text router for chat food descriptions, using Xiaomi first and Qwen fallback behind `TEXT_FOOD_AI_ANALYSIS_ENABLED=true`.
+- AI food text analysis reuses the food-photo nutrition schema, adapts into the existing editable food-card contract, and falls back to the deterministic text parser when disabled, unavailable, or invalid.
 
 ## What's Next
-- Verify the pending attachment composer in Expo Go, then enable/provider-test AI file and workout extraction with real keys and extend the same structured extraction approach to food text chat.
+- Verify the pending attachment composer in Expo Go, then enable/provider-test AI extraction with real keys across food text, food photo, files, and workout notes.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.config import get_settings, is_local_runtime
-from app.ai.router import FileInsightRouter, WorkoutAnalysisRouter
+from app.ai.router import FileInsightRouter, TextFoodAnalysisRouter, WorkoutAnalysisRouter
 from app.repositories.sqlalchemy.auth import SqlAlchemyAuthRepository
 from app.repositories.sqlalchemy.chat import SqlAlchemyChatRepository
 from app.repositories.sqlalchemy.files import SqlAlchemyFileUploadRepository
@@ -75,6 +75,11 @@ def get_chat_service(db: DbSession) -> ChatService:
         store=SqlAlchemyChatRepository(db),
         allow_contract_mocks=is_local_runtime(settings),
         usage_service_dependency=get_usage_service(db),
+        text_food_analysis_router=(
+            TextFoodAnalysisRouter(model_call_repository=SqlAlchemyModelCallRepository(db))
+            if settings.text_food_ai_analysis_enabled
+            else None
+        ),
     )
 
 
