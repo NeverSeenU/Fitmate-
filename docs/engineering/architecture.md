@@ -54,6 +54,15 @@ The mobile client supports mock mode and backend mode through `src/config/env.ts
 6. Backend creates chat and food-log state according to user entitlement.
 7. Mobile app renders a confirmation card for confirm/edit/discard.
 
+## AI File Insight Flow
+
+1. User selects a file in the mobile chat composer and sees a pending attachment preview.
+2. User taps send; mobile uploads the file to `POST /v1/files/upload`.
+3. Backend stores the file and extracts readable text from TXT, CSV, DOCX, XLSX, and simple PDFs.
+4. When `FILE_AI_EXTRACTION_ENABLED=true`, the backend routes extracted text through the Xiaomi-first, Qwen-fallback structured extraction router.
+5. AI output is validated into the same `document_type`, `insights`, and `recommendations` contract that the mobile file card already renders.
+6. If AI extraction is disabled, unavailable, or invalid, deterministic heuristics remain as the local smoke-test fallback.
+
 ## Subagent Work Boundaries
 
 Use file ownership to avoid conflicts:

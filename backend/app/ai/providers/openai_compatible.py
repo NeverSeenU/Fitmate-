@@ -20,6 +20,16 @@ USER_PROMPT = (
     "fat_g_range, confidence, needs_follow_up, follow_up_question, fat_loss_advice, "
     "supportive_reply, safety_flags."
 )
+FILE_SYSTEM_PROMPT = (
+    "You are FitMate AI's structured health document extractor. Return valid JSON only. "
+    "Extract only values supported by the uploaded content. Do not invent numbers."
+)
+FILE_USER_PROMPT = (
+    "Classify the uploaded content as one of: body_report, menu, workout_plan, general. "
+    "Return JSON fields: document_type, insights, recommendations. insights must be a list "
+    "of objects with label, value, source. Supported labels: document_type, weight_kg, bmi, "
+    "body_fat_percent, protein_g, calories_kcal, training_frequency."
+)
 
 
 class JsonTransport(Protocol):
@@ -104,6 +114,35 @@ class OpenAICompatibleVisionProvider:
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0.2,
+        }
+        response = self.transport.post_json(
+            url=f"{self.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            payload=payload,
+            timeout_seconds=self.timeout_seconds,
+        )
+        return self._extract_json_content(response)
+
+    def analyze_file_text(self, filename: str, content_text: str, content_type: str) -> object:
+        if not self.api_key:
+            raise RuntimeError(self.not_configured_error)
+
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": FILE_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": (
+                        f"{FILE_USER_PROMPT}\n\n"
+                        f"Filename: {filename}\n"
+                        f"Content type: {content_type}\n"
+                        f"Extracted text:\n{content_text[:12000]}"
+                    ),
+                },
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1,
         }
         response = self.transport.post_json(
             url=f"{self.base_url}/chat/completions",

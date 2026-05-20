@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 from app.services.chat_service import StoredMessage, chat_service
 from app.storage.local import LocalObjectStorage
 from app.storage.protocols import ObjectStorage
+from app.ai.router import FileInsightRouter
 
 
 SUPPORTED_FILE_CONTENT_TYPES = {
@@ -65,10 +66,12 @@ class FileService:
         store: InMemoryFileUploadStore | None = None,
         chat_service_dependency: Any | None = None,
         storage: ObjectStorage | None = None,
+        file_insight_router: FileInsightRouter | None = None,
     ) -> None:
         self.store = store or InMemoryFileUploadStore()
         self.chat_service = chat_service_dependency or chat_service
         self.storage = storage or LocalObjectStorage()
+        self.file_insight_router = file_insight_router
 
     def upload_file(
         self,
@@ -85,7 +88,12 @@ class FileService:
         object_key = self._object_key(user_id, filename)
         stored = self.storage.put(key=object_key, content=content, content_type=content_type)
         summary = self._summary(filename=filename, content=content, content_type=content_type)
-        file_insights = build_file_insights(filename=filename, content=content, content_type=content_type)
+        file_insights = self._file_insights(
+            user_id=user_id,
+            filename=filename,
+            content=content,
+            content_type=content_type,
+        )
         file_message = self.chat_service.store.add_message(
             StoredMessage(
                 id=str(uuid.uuid4()),
@@ -156,7 +164,22 @@ class FileService:
             data["insights"] = file_insights["insights"]
             data["recommendations"] = file_insights["recommendations"]
             data["insight_schema_version"] = file_insights["schema_version"]
+            data["model_provider"] = file_insights.get("model_provider")
+            data["model_name"] = file_insights.get("model_name")
         return data
+
+    def _file_insights(self, user_id: str, filename: str, content: bytes, content_type: str) -> dict:
+        text = extract_file_text(filename=filename, content=content, content_type=content_type)
+        if self.file_insight_router is not None and text:
+            ai_insights = self.file_insight_router.analyze_file_text(
+                filename=filename,
+                content_text=text,
+                content_type=content_type,
+                user_id=user_id,
+            )
+            if ai_insights is not None:
+                return ai_insights
+        return build_file_insights(filename=filename, content=content, content_type=content_type)
 
     def _object_key(self, user_id: str, filename: str) -> str:
         safe_filename = filename or "fitmate-file"

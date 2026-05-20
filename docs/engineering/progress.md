@@ -300,9 +300,11 @@
 - Failure review recorded the core lesson: user-facing upload flows need device-level UX verification, real backend error preservation, and tests for fallback-state IDs, not just happy-path backend smoke.
 - Chat file selection now uses a GPT-style pending attachment preview before upload; the backend upload and insight generation start when the user taps send.
 - Product direction is now explicit: deterministic templates are for smoke tests, while real nutrition/body/training parameters should come from validated AI extraction.
+- Backend now has a first-pass AI file insight router for uploaded text/file content, using Xiaomi first and Qwen fallback behind `FILE_AI_EXTRACTION_ENABLED=true`.
+- AI file extraction validates output into the existing mobile card contract and falls back to deterministic heuristics when disabled, unavailable, or invalid.
 
 ## What's Next
-- Verify the pending attachment composer in Expo Go, then build the AI structured-extraction pipeline for food photos, uploaded files/images, and workout notes.
+- Verify the pending attachment composer in Expo Go, then enable/provider-test AI file extraction with real keys and extend the same structured extraction approach to workout notes.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

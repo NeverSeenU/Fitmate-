@@ -1,4 +1,4 @@
-from app.ai.router import FoodVisionRouter
+from app.ai.router import FileInsightRouter, FoodVisionRouter
 from app.repositories.sqlalchemy.model_calls import StoredAiModelCall
 
 
@@ -26,6 +26,13 @@ class FakeProvider:
         self.calls = 0
 
     def analyze_food_photo(self, image_bytes: bytes, user_note: str | None = None) -> object:
+        self.calls += 1
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    def analyze_file_text(self, filename: str, content_text: str, content_type: str) -> object:
         self.calls += 1
         response = self.responses.pop(0)
         if isinstance(response, Exception):
@@ -132,3 +139,57 @@ def test_low_confidence_xiaomi_result_uses_qwen_fallback_and_logs_both() -> None
     assert result["confidence"] == 0.81
     assert result["model_provider"] == "qwen"
     assert [call.purpose for call in model_calls.calls] == ["food_photo", "fallback"]
+
+
+def test_file_insight_router_uses_ai_structured_output_and_logs_usage() -> None:
+    xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [
+        {
+            "document_type": "menu",
+            "insights": [
+                {"label": "calories_kcal", "value": "550 kcal", "source": "ai"},
+                {"label": "protein_g", "value": "35g", "source": "ai"},
+            ],
+            "recommendations": ["Use this meal as a moderate lunch."],
+        }
+    ])
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [])
+    model_calls = InMemoryModelCallRepository()
+    router = FileInsightRouter(
+        primary_provider=xiaomi,
+        fallback_provider=qwen,
+        model_call_repository=model_calls,
+    )
+
+    result = router.analyze_file_text("menu.txt", "lunch calories 550 protein 35g", "text/plain")
+
+    assert result is not None
+    assert result["document_type"] == "menu"
+    assert result["model_provider"] == "xiaomi"
+    assert {item["label"] for item in result["insights"]}.issuperset({"document_type", "calories_kcal", "protein_g"})
+    assert qwen.calls == 0
+    assert model_calls.calls[0].purpose == "file_insight"
+    assert model_calls.calls[0].status == "success"
+
+
+def test_file_insight_router_falls_back_when_primary_schema_is_invalid() -> None:
+    xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [{"document_type": "unknown", "insights": [], "recommendations": []}])
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [
+        {
+            "document_type": "workout_plan",
+            "insights": [{"label": "training_frequency", "value": "4 days/week", "source": "ai"}],
+            "recommendations": ["Keep recovery days visible."],
+        }
+    ])
+    model_calls = InMemoryModelCallRepository()
+    router = FileInsightRouter(
+        primary_provider=xiaomi,
+        fallback_provider=qwen,
+        model_call_repository=model_calls,
+    )
+
+    result = router.analyze_file_text("workout.txt", "strength 4 days/week", "text/plain")
+
+    assert result is not None
+    assert result["document_type"] == "workout_plan"
+    assert result["model_provider"] == "qwen"
+    assert [call.status for call in model_calls.calls] == ["error", "success"]

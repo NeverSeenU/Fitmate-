@@ -72,6 +72,27 @@ def test_xiaomi_provider_sends_openai_compatible_multimodal_request(monkeypatch)
     assert user_content[1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
 
 
+def test_xiaomi_provider_sends_openai_compatible_file_extraction_request(monkeypatch) -> None:
+    monkeypatch.setenv("XIAOMI_API_KEY", "xiaomi-key")
+    monkeypatch.setenv("XIAOMI_BASE_URL", "https://mimo.example/v1")
+    transport = FakeTransport(response_payload=chat_response({
+        "document_type": "body_report",
+        "insights": [{"label": "weight_kg", "value": "70 kg", "source": "ai"}],
+        "recommendations": ["Sync weight after user confirmation."],
+    }))
+    provider = XiaomiVisionProvider(transport=transport)
+
+    result = provider.analyze_file_text("body-report.txt", "weight 70 kg", "text/plain")
+
+    request = transport.requests[0]
+    assert result["document_type"] == "body_report"
+    assert request["url"] == "https://mimo.example/v1/chat/completions"
+    assert request["payload"]["response_format"] == {"type": "json_object"}
+    assert request["payload"]["messages"][0]["role"] == "system"
+    assert request["payload"]["messages"][1]["role"] == "user"
+    assert "Filename: body-report.txt" in request["payload"]["messages"][1]["content"]
+
+
 def test_qwen_provider_reads_dashscope_env_and_parses_json_content(monkeypatch) -> None:
     monkeypatch.setenv("DASHSCOPE_API_KEY", "qwen-key")
     monkeypatch.setenv("DASHSCOPE_BASE_URL", "https://dashscope.example/compatible-mode/v1")

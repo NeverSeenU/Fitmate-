@@ -19,6 +19,7 @@ class Settings:
     object_storage_key_prefix: str = "food-photos"
     xiaomi_model_name: str = "mimo-v2-omni"
     qwen_model_name: str = "qwen3-vl-plus"
+    file_ai_extraction_enabled: bool = False
     auth_secret_key: str = "fitmate-local-dev-secret"
     admin_secret: str = "fitmate-local-admin-secret"
     access_token_minutes: int = 60 * 24 * 7
@@ -49,6 +50,7 @@ def get_settings() -> Settings:
         object_storage_key_prefix=os.getenv("OBJECT_STORAGE_KEY_PREFIX", Settings.object_storage_key_prefix),
         xiaomi_model_name=os.getenv("XIAOMI_MODEL_NAME", Settings.xiaomi_model_name),
         qwen_model_name=os.getenv("QWEN_MODEL_NAME", Settings.qwen_model_name),
+        file_ai_extraction_enabled=os.getenv("FILE_AI_EXTRACTION_ENABLED", "false").lower() == "true",
         auth_secret_key=os.getenv("AUTH_SECRET_KEY", Settings.auth_secret_key),
         admin_secret=os.getenv("ADMIN_SECRET", Settings.admin_secret),
         access_token_minutes=int(

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.config import get_settings, is_local_runtime
+from app.ai.router import FileInsightRouter
 from app.repositories.sqlalchemy.auth import SqlAlchemyAuthRepository
 from app.repositories.sqlalchemy.chat import SqlAlchemyChatRepository
 from app.repositories.sqlalchemy.files import SqlAlchemyFileUploadRepository
@@ -91,10 +92,16 @@ def get_food_service(db: DbSession) -> FoodService:
 
 
 def get_file_service(db: DbSession) -> FileService:
+    settings = get_settings()
     return FileService(
         store=SqlAlchemyFileUploadRepository(db),
         chat_service_dependency=get_chat_service(db),
-        storage=create_object_storage(get_settings()),
+        storage=create_object_storage(settings),
+        file_insight_router=(
+            FileInsightRouter(model_call_repository=SqlAlchemyModelCallRepository(db))
+            if settings.file_ai_extraction_enabled
+            else None
+        ),
     )
 
 

@@ -106,6 +106,7 @@ EXPO_PUBLIC_USE_MOCK_API=true
 ```
 
 For real provider smoke tests, inject Xiaomi/Qwen keys into the backend process environment only.
+Set `FILE_AI_EXTRACTION_ENABLED=true` when you explicitly want uploaded files to use the AI structured-extraction router; leave it unset for deterministic fixture/smoke testing.
 
 Production runtime rules:
 

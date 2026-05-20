@@ -22,9 +22,23 @@ RANGE_FIELDS = [
     "carbs_g_range",
     "fat_g_range",
 ]
+FILE_DOCUMENT_TYPES = {"body_report", "menu", "workout_plan", "general"}
+FILE_INSIGHT_LABELS = {
+    "document_type",
+    "weight_kg",
+    "bmi",
+    "body_fat_percent",
+    "protein_g",
+    "calories_kcal",
+    "training_frequency",
+}
 
 
 class FoodVisionSchemaError(ValueError):
+    pass
+
+
+class FileInsightSchemaError(ValueError):
     pass
 
 
@@ -63,3 +77,40 @@ def validate_food_analysis(raw: object) -> dict[str, Any]:
         raise FoodVisionSchemaError("safety_flags_must_be_list")
 
     return dict(raw)
+
+
+def validate_file_insights(raw: object) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise FileInsightSchemaError("file_insights_must_be_object")
+    document_type = raw.get("document_type")
+    if document_type not in FILE_DOCUMENT_TYPES:
+        raise FileInsightSchemaError("document_type_invalid")
+    insights = raw.get("insights")
+    if not isinstance(insights, list):
+        raise FileInsightSchemaError("insights_must_be_list")
+    normalized_insights: list[dict[str, str]] = []
+    for item in insights[:8]:
+        if not isinstance(item, dict):
+            raise FileInsightSchemaError("insight_must_be_object")
+        label = item.get("label")
+        value = item.get("value")
+        source = item.get("source", "ai")
+        if label not in FILE_INSIGHT_LABELS:
+            continue
+        if not isinstance(value, str) or not value.strip():
+            continue
+        normalized_insights.append({"label": label, "value": value.strip(), "source": str(source or "ai")})
+    if not any(item["label"] == "document_type" for item in normalized_insights):
+        normalized_insights.insert(0, {"label": "document_type", "value": document_type, "source": "ai"})
+
+    recommendations = raw.get("recommendations", [])
+    if not isinstance(recommendations, list):
+        raise FileInsightSchemaError("recommendations_must_be_list")
+    normalized_recommendations = [str(item).strip() for item in recommendations if str(item).strip()][:4]
+
+    return {
+        "schema_version": 1,
+        "document_type": document_type,
+        "insights": normalized_insights,
+        "recommendations": normalized_recommendations,
+    }
