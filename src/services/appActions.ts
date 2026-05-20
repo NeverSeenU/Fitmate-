@@ -36,7 +36,7 @@ type AppActionsApi = {
     deleteLog(foodLogId: string): Promise<unknown>;
   };
   files: {
-    upload(input: { threadId: string; fileUri: string; filename: string; mimeType: string }): Promise<FileUploadResponse>;
+    upload(input: { threadId: string; fileUri: string; filename: string; mimeType: string; userPrompt?: string | null }): Promise<FileUploadResponse>;
   };
   subscription: {
     restore(payload: { provider: string; productId: string; receipt: string }): Promise<{
@@ -253,7 +253,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       });
     },
 
-    async attachFile(file: PickedFile) {
+    async attachFile(file: PickedFile, userPrompt?: string) {
       if (!api) {
         throw new Error('File insight requires the backend API. Current app runtime has no backend API, so no insight card can be generated. Restart Expo and make sure it is not Local preview mode.');
       }
@@ -264,13 +264,16 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         fileUri: file.uri,
         filename: file.name,
         mimeType: file.mimeType,
+        userPrompt: userPrompt?.trim() || null,
       });
       const fileInsight = toFileInsight(response);
       addMessages(getState, setState, [
         {
           id: `file-user-${Date.now()}`,
           role: 'user',
-          text: `Uploading file: ${file.name}`,
+          text: userPrompt?.trim()
+            ? `${userPrompt.trim()}\n\nAttached file: ${file.name}`
+            : `Uploading file: ${file.name}`,
         },
         {
           id: response.assistant_message?.id ?? `file-assistant-${Date.now()}`,

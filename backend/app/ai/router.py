@@ -29,7 +29,7 @@ class FileInsightProvider(VisionProvider, Protocol):
     def analyze_food_text(self, text: str) -> object:
         ...
 
-    def analyze_file_text(self, filename: str, content_text: str, content_type: str) -> object:
+    def analyze_file_text(self, filename: str, content_text: str, content_type: str, user_prompt: str | None = None) -> object:
         ...
 
     def analyze_workout_text(self, text: str) -> object:
@@ -263,6 +263,7 @@ class FileInsightRouter:
         filename: str,
         content_text: str,
         content_type: str,
+        user_prompt: str | None = None,
         user_id: str | None = None,
     ) -> dict | None:
         for provider in (self.primary_provider, self.fallback_provider):
@@ -271,6 +272,7 @@ class FileInsightRouter:
                 filename=filename,
                 content_text=content_text,
                 content_type=content_type,
+                user_prompt=user_prompt,
                 user_id=user_id,
             )
             if result is not None:
@@ -283,11 +285,12 @@ class FileInsightRouter:
         filename: str,
         content_text: str,
         content_type: str,
+        user_prompt: str | None,
         user_id: str | None,
     ) -> dict | None:
         started = time.perf_counter()
         try:
-            raw = provider.analyze_file_text(filename=filename, content_text=content_text, content_type=content_type)
+            raw = provider.analyze_file_text(filename=filename, content_text=content_text, content_type=content_type, user_prompt=user_prompt)
             result = validate_file_insights(raw)
         except FileInsightSchemaError:
             self._record_model_call(provider, user_id, "file_insight", "error", self._latency_ms(started), "schema_error")

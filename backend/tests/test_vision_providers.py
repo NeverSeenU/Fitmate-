@@ -82,7 +82,7 @@ def test_xiaomi_provider_sends_openai_compatible_file_extraction_request(monkeyp
     }))
     provider = XiaomiVisionProvider(transport=transport)
 
-    result = provider.analyze_file_text("body-report.txt", "weight 70 kg", "text/plain")
+    result = provider.analyze_file_text("body-report.txt", "weight 70 kg", "text/plain", user_prompt="What changed?")
 
     request = transport.requests[0]
     assert result["document_type"] == "body_report"
@@ -91,6 +91,7 @@ def test_xiaomi_provider_sends_openai_compatible_file_extraction_request(monkeyp
     assert request["payload"]["messages"][0]["role"] == "system"
     assert request["payload"]["messages"][1]["role"] == "user"
     assert "Filename: body-report.txt" in request["payload"]["messages"][1]["content"]
+    assert "User question: What changed?" in request["payload"]["messages"][1]["content"]
 
 
 def test_xiaomi_provider_sends_openai_compatible_text_food_request(monkeypatch) -> None:

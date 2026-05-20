@@ -15,6 +15,7 @@ async def upload_file(
     user: CurrentUser,
     service: FileServiceDependency,
     thread_id: str = Form(...),
+    user_prompt: str | None = Form(default=None),
     file: UploadFile = File(...),
 ) -> dict:
     if file.content_type not in SUPPORTED_FILE_CONTENT_TYPES:
@@ -40,6 +41,7 @@ async def upload_file(
         content=content,
         filename=file.filename or "fitmate-file",
         content_type=file.content_type or "application/octet-stream",
+        user_prompt=user_prompt,
     )
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="thread_not_found")

@@ -39,7 +39,7 @@ class FakeProvider:
             raise response
         return response
 
-    def analyze_file_text(self, filename: str, content_text: str, content_type: str) -> object:
+    def analyze_file_text(self, filename: str, content_text: str, content_type: str, user_prompt: str | None = None) -> object:
         self.calls += 1
         response = self.responses.pop(0)
         if isinstance(response, Exception):

@@ -80,6 +80,7 @@ class FileService:
         content: bytes,
         filename: str,
         content_type: str,
+        user_prompt: str | None = None,
     ) -> dict | None:
         thread = self.chat_service.store.get_thread(user_id, thread_id)
         if thread is None:
@@ -93,7 +94,9 @@ class FileService:
             filename=filename,
             content=content,
             content_type=content_type,
+            user_prompt=user_prompt,
         )
+        prompt = (user_prompt or "").strip()
         file_message = self.chat_service.store.add_message(
             StoredMessage(
                 id=str(uuid.uuid4()),
@@ -101,13 +104,14 @@ class FileService:
                 user_id=user_id,
                 role="user",
                 message_type="file",
-                content_text=f"上传文件：{filename}",
+                content_text=f"{prompt}\n\nUploaded file: {filename}" if prompt else f"Uploaded file: {filename}",
                 image_object_key=stored.object_key,
                 structured_json={
                     "file_object_key": stored.object_key,
                     "filename": filename,
                     "content_type": content_type,
                     "size_bytes": stored.size_bytes,
+                    "user_prompt": prompt or None,
                 },
             )
         )
@@ -133,7 +137,7 @@ class FileService:
                 role="assistant",
                 message_type="file_summary",
                 content_text=summary,
-                structured_json={"file_upload": upload_response, "file_insights": file_insights},
+                structured_json={"file_upload": upload_response, "file_insights": file_insights, "user_prompt": prompt or None},
             )
         )
         return {
@@ -168,13 +172,14 @@ class FileService:
             data["model_name"] = file_insights.get("model_name")
         return data
 
-    def _file_insights(self, user_id: str, filename: str, content: bytes, content_type: str) -> dict:
+    def _file_insights(self, user_id: str, filename: str, content: bytes, content_type: str, user_prompt: str | None = None) -> dict:
         text = extract_file_text(filename=filename, content=content, content_type=content_type)
         if self.file_insight_router is not None and text:
             ai_insights = self.file_insight_router.analyze_file_text(
                 filename=filename,
                 content_text=text,
                 content_type=content_type,
+                user_prompt=user_prompt,
                 user_id=user_id,
             )
             if ai_insights is not None:

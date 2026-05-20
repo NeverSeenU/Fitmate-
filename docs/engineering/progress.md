@@ -306,6 +306,8 @@
 - AI workout analysis validates output into the existing workout card contract and falls back to the deterministic parser when disabled, unavailable, or invalid.
 - Backend now has a first-pass AI food text router for chat food descriptions, using Xiaomi first and Qwen fallback behind `TEXT_FOOD_AI_ANALYSIS_ENABLED=true`.
 - AI food text analysis reuses the food-photo nutrition schema, adapts into the existing editable food-card contract, and falls back to the deterministic text parser when disabled, unavailable, or invalid.
+- File uploads now support a user question sent in the same multipart request as the attachment, so the composer can send "question + file" as one AI analysis action instead of separate chat and upload actions.
+- `.env.example` now documents the AI extraction feature flags for file, workout, and food-text provider testing.
 
 ## What's Next
 - Verify the pending attachment composer in Expo Go, then enable/provider-test AI extraction with real keys across food text, food photo, files, and workout notes.

@@ -48,7 +48,7 @@ def test_file_upload_stores_file_and_returns_text_summary() -> None:
     response = client.post(
         "/v1/files/upload",
         headers=headers,
-        data={"thread_id": thread_id},
+        data={"thread_id": thread_id, "user_prompt": "What should I sync?"},
         files={"file": ("report.txt", b"protein 120g\nweight 70kg", "text/plain")},
     )
 
@@ -64,9 +64,12 @@ def test_file_upload_stores_file_and_returns_text_summary() -> None:
     assert body["file_upload"]["recommendations"]
     assert body["assistant_message"]["message_type"] == "file_summary"
     assert body["assistant_message"]["structured_json"]["file_upload"]["document_type"] == "body_report"
+    assert body["assistant_message"]["structured_json"]["user_prompt"] == "What should I sync?"
 
     messages = client.get(f"/v1/chat/threads/{thread_id}/messages", headers=headers).json()["messages"]
     assert [message["message_type"] for message in messages] == ["file", "file_summary"]
+    assert "What should I sync?" in messages[0]["content_text"]
+    assert messages[0]["structured_json"]["user_prompt"] == "What should I sync?"
 
 
 def test_file_upload_parses_csv_docx_xlsx_and_pdf_previews() -> None:

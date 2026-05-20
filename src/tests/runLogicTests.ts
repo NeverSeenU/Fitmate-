@@ -510,8 +510,8 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
         },
       },
       files: {
-        async upload(input: { threadId: string; fileUri: string; filename: string; mimeType: string }) {
-          calls.push(`file:${input.threadId}:${input.filename}:${input.mimeType}`);
+        async upload(input: { threadId: string; fileUri: string; filename: string; mimeType: string; userPrompt?: string | null }) {
+          calls.push(`file:${input.threadId}:${input.filename}:${input.mimeType}:${input.userPrompt ?? ''}`);
           return {
             assistant_message: { id: 'assistant-file', content_text: 'file summary reply' },
             file_upload: {
@@ -575,7 +575,7 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
     name: 'report.txt',
     mimeType: 'text/plain',
     sizeBytes: 128,
-  });
+  }, 'Summarize this report');
   await actions.restoreSubscription('fitmate.pro.monthly', 'receipt');
   await actions.updateProfile({ weightKg: 70.8, goalLabel: 'Lean wedding cut' });
   await actions.deletePhotos();
@@ -590,7 +590,7 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
   assert(calls.includes('checkin:71.2:6'), 'checkin action must map payload');
   assert(calls.includes('workout:力量训练 45 分钟'), 'workout action must call backend');
   assert(calls.includes('createThread:File insight:files'), 'file upload must create a backend file thread when only a local fallback thread exists');
-  assert(calls.includes('file:thread-new:report.txt:text/plain'), 'file upload action must use the backend-created thread id');
+  assert(calls.includes('file:thread-new:report.txt:text/plain:Summarize this report'), 'file upload action must use the backend-created thread id and user prompt');
   assert(calls.includes('restore:fitmate.pro.monthly'), 'restore action must call backend');
   assert(calls.includes('profile:70.8:Lean wedding cut'), 'profile action must map backend payload');
   assert(calls.includes('deletePhotos'), 'deletePhotos action must call backend');

@@ -164,7 +164,7 @@ class OpenAICompatibleVisionProvider:
         )
         return self._extract_json_content(response)
 
-    def analyze_file_text(self, filename: str, content_text: str, content_type: str) -> object:
+    def analyze_file_text(self, filename: str, content_text: str, content_type: str, user_prompt: str | None = None) -> object:
         if not self.api_key:
             raise RuntimeError(self.not_configured_error)
 
@@ -178,6 +178,7 @@ class OpenAICompatibleVisionProvider:
                         f"{FILE_USER_PROMPT}\n\n"
                         f"Filename: {filename}\n"
                         f"Content type: {content_type}\n"
+                        f"User question: {(user_prompt or '').strip() or 'None'}\n"
                         f"Extracted text:\n{content_text[:12000]}"
                     ),
                 },

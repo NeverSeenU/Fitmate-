@@ -46,6 +46,7 @@ export type FileUploadInput = {
   fileUri: string;
   filename: string;
   mimeType: string;
+  userPrompt?: string | null;
 };
 
 export type FileUploadResponse = {
@@ -369,6 +370,9 @@ class FileUploadBody {
   toFormData() {
     const data = new FormData();
     data.append('thread_id', this.input.threadId);
+    if (this.input.userPrompt) {
+      data.append('user_prompt', this.input.userPrompt);
+    }
     data.append('file', {
       uri: this.input.fileUri,
       name: this.input.filename,
@@ -378,7 +382,14 @@ class FileUploadBody {
   }
 
   toString() {
-    return `thread_id=${this.input.threadId}&file=${this.input.filename}`;
+    const params = [
+      `thread_id=${this.input.threadId}`,
+      `file=${this.input.filename}`,
+    ];
+    if (this.input.userPrompt) {
+      params.push(`user_prompt=${this.input.userPrompt}`);
+    }
+    return params.join('&');
   }
 }
 

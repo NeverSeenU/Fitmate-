@@ -105,12 +105,11 @@ export function ChatScreen({
       return;
     }
     void runAction(file ? '正在上传并分析文件...' : '正在发送...', file ? '文件已上传并生成识别卡片' : '消息已发送', async () => {
-      if (text) {
-        await actions.sendText(appState.threads[0]?.id ?? 'food-today', text);
-      }
       if (file) {
-        await actions.attachFile(file);
+        await actions.attachFile(file, text);
         setPendingFile(null);
+      } else if (text) {
+        await actions.sendText(appState.threads[0]?.id ?? 'food-today', text);
       }
       setComposerText('');
     });

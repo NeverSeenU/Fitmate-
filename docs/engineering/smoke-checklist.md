@@ -7,6 +7,7 @@ Run this checklist in Expo Go after meaningful mobile or backend changes.
 - Project root: `C:\Users\jiang\Projects\fitmate-ai`
 - Backend: `http://127.0.0.1:8000`
 - Expo: `exp://192.168.1.71:8081`
+- For physical phones, start the backend with `python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000` from `backend/`, then verify `http://192.168.1.71:8000/v1/healthz` works.
 - Start Expo with cache clear when UI looks stale: `npx.cmd expo start --lan --port 8081 --clear`
 - Before opening Expo Go, run `npm.cmd run smoke:file-insight-live` with the backend running to verify body-report, menu, and workout-plan uploads, file insight extraction, explicit sync actions, profile persistence, food-log persistence, workout-log persistence, and Records persistence.
 - Manual file fixtures live in `docs/engineering/smoke-fixtures/`. Copy `body-report-smoke.txt`, `menu-smoke.txt`, and `workout-plan-smoke.txt` to a phone-accessible Files/iCloud/Drive location before the Expo Go pass.
@@ -47,6 +48,9 @@ Run this checklist in Expo Go after meaningful mobile or backend changes.
 
 - Tap `+` then `文件`.
 - Select `docs/engineering/smoke-fixtures/body-report-smoke.txt` or another TXT, CSV, PDF, Word, or Excel file that contains a body metric such as `weight 70kg`.
+- Verify the selected file appears above the composer before upload, with filename/type/size and a removable `X`.
+- Type a question in the composer, such as `What should I sync from this report?`, then tap send.
+- Verify the user chat bubble includes both the question and the attached filename, and that only one file-analysis request is created.
 - Verify the chat shows a file insight card with document type, filename, extracted metrics, and a recommendation.
 - If the card shows `同步体重到记录`, tap it.
 - Verify the app navigates to Records and a weight card appears with the source filename.
@@ -54,6 +58,15 @@ Run this checklist in Expo Go after meaningful mobile or backend changes.
 - Confirm that selecting or uploading a file does not change profile or records until the sync button is tapped.
 - Repeat with `docs/engineering/smoke-fixtures/menu-smoke.txt`; verify `同步菜单营养到记录` creates a nutrition record and updates today's intake summary.
 - Repeat with `docs/engineering/smoke-fixtures/workout-plan-smoke.txt`; verify `同步训练计划到记录` creates a workout record with the source filename.
+
+## Live AI Provider Smoke
+
+- Keep these flags `false` for deterministic local smoke unless you are explicitly testing real AI providers:
+  - `FILE_AI_EXTRACTION_ENABLED`
+  - `WORKOUT_AI_ANALYSIS_ENABLED`
+  - `TEXT_FOOD_AI_ANALYSIS_ENABLED`
+- For a real provider pass, inject Xiaomi or Qwen keys into the backend process environment, set one flag to `true`, restart the backend, run the matching manual flow, then set the flag back to `false` before ordinary smoke testing.
+- Do not run destructive pytest cleanup at the same time as live provider smoke; run live smoke and backend tests sequentially to avoid local PostgreSQL table-lock deadlocks.
 
 ## Settings And Profile
 
