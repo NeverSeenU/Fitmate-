@@ -26,7 +26,6 @@ export default function App() {
     }),
     [],
   );
-  const runtimeInfo = runtimeConfig.useMockApi ? 'Local preview mode' : `Backend: ${runtimeConfig.apiBaseUrl}`;
   const actions = useMemo(
     () => createAppActions({
       api: services.api,
@@ -110,7 +109,6 @@ export default function App() {
         <LoginScreen
           go={goAuthenticated}
           onLogin={handleLogin}
-          runtimeInfo={runtimeInfo}
         />
       );
     }
@@ -128,7 +126,6 @@ export default function App() {
         clearReturnPanel={() => setReturnPanel(null)}
         appState={appState}
         actions={actions}
-        runtimeInfo={runtimeInfo}
       />
     );
   }, [screen, returnPanel, appState, actions, authenticated]);

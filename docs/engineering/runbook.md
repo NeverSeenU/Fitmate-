@@ -92,6 +92,13 @@ cd backend
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
+For Expo Go on a physical phone, bind the backend to all local interfaces so the phone can reach the machine LAN IP:
+
+```powershell
+cd backend
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
 ## Backend Environment
 
 Use `.env.example` as the template. Do not commit real `.env` files.
@@ -182,6 +189,7 @@ Do not bypass this guard for staging or production databases.
 ### Expo Cannot Reach Backend On Device
 
 Use the machine LAN IP in `EXPO_PUBLIC_API_BASE_URL`, not `localhost`, when testing from a physical phone.
+Also make sure the backend was started with `--host 0.0.0.0`; binding only to `127.0.0.1` will make the phone login fail with a network timeout.
 
 ### Provider Keys Missing
 
