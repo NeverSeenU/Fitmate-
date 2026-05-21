@@ -150,6 +150,21 @@ def test_photo_rejects_unsupported_upload_type() -> None:
     assert response.json()["detail"]["code"] == "unsupported_image_type"
 
 
+def test_photo_rejects_heic_with_specific_error() -> None:
+    headers = auth_headers("unsupported-heic@example.com")
+    thread_id = create_thread(headers)
+
+    response = client.post(
+        "/v1/chat/photo",
+        headers=headers,
+        data={"thread_id": thread_id},
+        files={"image": ("photo.heic", b"heic-image", "image/heic")},
+    )
+
+    assert response.status_code == 415
+    assert response.json()["detail"]["code"] == "unsupported_heic_image"
+
+
 def test_photo_rejects_uploads_larger_than_limit() -> None:
     headers = auth_headers("large-photo@example.com")
     thread_id = create_thread(headers)

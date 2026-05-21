@@ -136,6 +136,32 @@ async function testApiClientDoesNotMaskErrorDetailsWithAlreadyRead() {
   assert(message === 'thread_not_found', 'API errors must preserve backend text instead of masking with Already read');
 }
 
+async function testApiClientMapsUnsupportedHeicPhotoErrors() {
+  const api = createBackendApi({
+    baseUrl: 'https://api.example.test',
+    fetchImpl: async () => jsonResponse({
+      detail: {
+        code: 'unsupported_heic_image',
+        message: 'HEIC/HEIF photos are not supported yet.',
+      },
+    }, 415),
+  });
+
+  let message = '';
+  try {
+    await api.food.analyzePhoto({
+      threadId: 'thread-1',
+      imageUri: 'file:///photo.heic',
+      filename: 'photo.heic',
+      mimeType: 'image/heic',
+    });
+  } catch (error) {
+    message = error instanceof Error ? error.message : String(error);
+  }
+
+  assert(message.includes('HEIC/HEIF'), 'HEIC upload errors must show a readable format message');
+}
+
 async function testApiClientMultipartPhotoUpload() {
   const requests: ApiRequestRecord[] = [];
   const api = createBackendApi({
@@ -919,6 +945,7 @@ async function run() {
   await testApiClientAuthHeadersAndJsonBody();
   await testApiClientHandlesEmptyDeleteResponses();
   await testApiClientDoesNotMaskErrorDetailsWithAlreadyRead();
+  await testApiClientMapsUnsupportedHeicPhotoErrors();
   await testApiClientMultipartPhotoUpload();
   await testMockFallbackServicesStayAvailable();
   await testRuntimeConfigUsesBackendWhenApiBaseUrlIsProvided();
@@ -937,10 +964,10 @@ async function run() {
 
 void run();
 
-function jsonResponse(payload: unknown) {
+function jsonResponse(payload: unknown, status = 200) {
   return {
-    ok: true,
-    status: 200,
+    ok: status >= 200 && status < 300,
+    status,
     async json() {
       return payload;
     },

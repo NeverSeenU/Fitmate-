@@ -15,6 +15,7 @@ router = APIRouter(tags=["food"])
 FoodServiceDependency = Annotated[FoodService, Depends(get_food_service)]
 MAX_PHOTO_UPLOAD_BYTES = 8 * 1024 * 1024
 SUPPORTED_PHOTO_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+UNSUPPORTED_HEIC_CONTENT_TYPES = {"image/heic", "image/heif"}
 
 
 def get_food_vision_router(db: DbSession) -> FoodVisionRouter:
@@ -56,6 +57,14 @@ async def analyze_chat_photo(
     user_note: str | None = Form(default=None),
     vision_router: FoodVisionRouter = Depends(get_food_vision_router),
 ) -> dict:
+    if image.content_type in UNSUPPORTED_HEIC_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail={
+                "code": "unsupported_heic_image",
+                "message": "HEIC/HEIF photos are not supported yet. Please upload a JPEG, PNG, or WebP image.",
+            },
+        )
     if image.content_type not in SUPPORTED_PHOTO_CONTENT_TYPES:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
