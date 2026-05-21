@@ -760,6 +760,74 @@ async function testFoodActionStateLifecycle() {
   assert(fileError.includes('backend API'), 'file insight must fail loudly when backend API is not connected');
 }
 
+async function testAnalysisOnlyFoodCardCanBeManaged() {
+  let state: AppDataState = {
+    ...initialAppState,
+    activeFoodAnalysis: {
+      id: 'analysis-qwen-photo',
+      title: 'Qwen photo meal',
+      status: 'analysis_only',
+      confidence: 0.86,
+      modelProvider: 'qwen',
+      modelName: 'qwen3-vl-plus',
+      calories: '500-620',
+      protein: '28-36g',
+      carbs: '52-64g',
+      fat: '14-20g',
+      caloriesKcal: 560,
+      proteinG: 32,
+      carbsG: 58,
+      fatG: 17,
+      detail: 'AI image analysis only',
+      advice: 'Confirm before writing to records.',
+    },
+    records: [],
+    chatMessages: [],
+  };
+  const actions = createAppActions({
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  assert(state.records.length === 0, 'analysis-only food card must not auto-create a record');
+  await actions.confirmFoodLog('analysis-qwen-photo');
+  assert(state.activeFoodAnalysis?.status === 'confirmed', 'analysis-only food card must be confirmable');
+  assert(state.records.length === 1 && state.records[0].id === 'analysis-qwen-photo', 'confirming analysis-only food must write a record');
+  assert(state.records[0].done === true && state.records[0].caloriesKcal === 560, 'confirmed analysis-only record must preserve nutrition values');
+
+  state = {
+    ...state,
+    activeFoodAnalysis: {
+      id: 'analysis-qwen-edit',
+      title: 'Qwen editable meal',
+      status: 'analysis_only',
+      confidence: 0.76,
+      calories: '300-420',
+      protein: '18-24g',
+      carbs: '34-42g',
+      detail: 'Before edit',
+      advice: 'Editable analysis.',
+    },
+    records: [],
+  };
+  await actions.saveFoodLogDetails('analysis-qwen-edit', {
+    title: 'Edited Qwen meal',
+    caloriesKcal: 410,
+    proteinG: 26,
+    carbsG: 44,
+    fatG: 12,
+    detail: 'User corrected the AI estimate',
+  });
+  assert(state.activeFoodAnalysis?.status === 'edited', 'editing analysis-only food must move it to editable pending state');
+  assert(state.records.length === 1 && state.records[0].title === 'Edited Qwen meal', 'editing analysis-only food must create an editable record draft');
+
+  await actions.discardFoodLog('analysis-qwen-edit');
+  assert(state.activeFoodAnalysis === null, 'discarding analysis-only food must remove the active card');
+  assert(!state.records.some((record) => record.id === 'analysis-qwen-edit'), 'discarding analysis-only food must remove its record draft');
+}
+
 async function testBackendFileUploadCreatesStructuredInsightMessage() {
   let state: AppDataState = {
     ...initialAppState,
@@ -1010,6 +1078,7 @@ async function run() {
   await testBackendAppDataHydratesLiveRecordsShape();
   await testAppActionsCallBackendMutationsAndUpdateState();
   await testFoodActionStateLifecycle();
+  await testAnalysisOnlyFoodCardCanBeManaged();
   await testBackendFileUploadCreatesStructuredInsightMessage();
   await testFileInsightSyncRequiresUserActionAndCreatesWeightCheckin();
   await testExpandedFileInsightSyncCreatesMenuAndWorkoutRecords();

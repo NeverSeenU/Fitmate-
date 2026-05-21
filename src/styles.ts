@@ -398,10 +398,11 @@ export const styles = StyleSheet.create({
   actionGrid: {
     flexDirection: 'row',
     gap: 8,
-    flexWrap: 'nowrap',
+    flexWrap: 'wrap',
   },
   actionButton: {
     flex: 1,
+    minWidth: narrowPhone ? '46%' : 0,
   },
   portionEditor: {
     gap: 8,

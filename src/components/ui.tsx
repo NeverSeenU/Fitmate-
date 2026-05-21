@@ -39,7 +39,7 @@ export function FoodAnalysisCard({
   onDiscard?: () => void;
   busy?: boolean;
 }) {
-  const canManage = analysis.status === 'pending' || analysis.status === 'edited';
+  const canManage = analysis.status === 'pending' || analysis.status === 'edited' || analysis.status === 'analysis_only';
   return (
     <View style={styles.card}>
       <View style={styles.rowBetween}>
