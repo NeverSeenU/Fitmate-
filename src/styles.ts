@@ -223,6 +223,12 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 8,
   },
+  warningText: {
+    color: '#f5c542',
+    fontSize: size(12),
+    lineHeight: size(18),
+    fontWeight: '800',
+  },
   runtimeInfo: {
     color: colors.muted,
     fontSize: size(11),

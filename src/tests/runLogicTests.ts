@@ -222,20 +222,22 @@ async function testApiClientMultipartPhotoUpload() {
     fetchImpl: async (url, init) => {
       requests.push({ url, init });
       return jsonResponse({
-        food_analysis: {
-          food_log_id: 'food-1',
-          meal_name: 'bibimbap',
-          calories_range_kcal: [600, 900],
-          protein_g_range: [25, 40],
-          carbs_g_range: [70, 100],
-          fat_g_range: [18, 35],
-          confidence: 0.72,
-          status: 'pending',
-          needs_follow_up: false,
-          follow_up_question: null,
-          model_provider: 'xiaomi',
-          model_name: 'mimo-v2-omni',
-        },
+          food_analysis: {
+            food_log_id: 'food-1',
+            meal_name: 'bibimbap',
+            detected_items: ['rice', 'egg', 'vegetables'],
+            calories_range_kcal: [600, 900],
+            protein_g_range: [25, 40],
+            carbs_g_range: [70, 100],
+            fat_g_range: [18, 35],
+            confidence: 0.72,
+            status: 'pending',
+            needs_follow_up: false,
+            follow_up_question: null,
+            fat_loss_advice: 'Keep sauce light.',
+            model_provider: 'xiaomi',
+            model_name: 'mimo-v2-omni',
+          },
         assistant_message: { id: 'msg-1' },
       });
     },
@@ -256,6 +258,7 @@ async function testApiClientMultipartPhotoUpload() {
   assert(!('Content-Type' in requests[0].init.headers), 'multipart requests must not force JSON content type');
   assert(String(requests[0].init.body).includes('thread_id=thread-1'), 'photo upload body must include thread id');
   assert(String(requests[0].init.body).includes('food.jpg'), 'photo upload body must include image file metadata');
+  assert(String(requests[0].init.body).includes('user_note=dinner'), 'photo upload body must include the user question as image context');
 }
 
 async function testMockFallbackServicesStayAvailable() {
@@ -828,6 +831,91 @@ async function testAnalysisOnlyFoodCardCanBeManaged() {
   assert(!state.records.some((record) => record.id === 'analysis-qwen-edit'), 'discarding analysis-only food must remove its record draft');
 }
 
+async function testFoodAnalysisUsesDetectedItemsForDetailAndFollowUpForAdvice() {
+  let state: AppDataState = {
+    ...initialAppState,
+    activeFoodAnalysis: null,
+    records: [],
+    chatMessages: [],
+  };
+  const actions = createAppActions({
+    api: {
+      chat: {
+        async createThread() {
+          return { id: '11111111-1111-4111-8111-111111111111', title: 'Food photo', kind: 'food' };
+        },
+        async sendTextMessage() {
+          return {};
+        },
+      },
+      food: {
+        async analyzePhoto(input: { userNote?: string | null }) {
+          assert(input.userNote === '少饭，酱料不确定', 'photo analysis must receive the user note typed with the image');
+          return {
+            food_analysis: {
+              food_log_id: null,
+              meal_name: 'Mixed plate',
+              detected_items: ['rice', 'chicken', 'dark sauce'],
+              calories_range_kcal: [520, 760],
+              protein_g_range: [30, 45],
+              carbs_g_range: [55, 80],
+              fat_g_range: [12, 28],
+              confidence: 0.48,
+              status: 'analysis_only',
+              needs_follow_up: true,
+              follow_up_question: '这份是一个人吃完的吗？酱料大概用了多少？',
+              fat_loss_advice: '补充份量后再计算更稳。',
+              model_provider: 'qwen',
+              model_name: 'qwen3-vl-plus',
+            },
+            assistant_message: { id: 'assistant-photo' },
+          };
+        },
+        async createLog() { return {}; },
+        async confirmLog() { return {}; },
+        async patchLog() { return {}; },
+        async discardLog() { return {}; },
+        async deleteLog() { return {}; },
+      },
+      profile: { async patchProfile() { return {}; } },
+      records: { async createCheckin() { return {}; }, async patchCheckin() { return {}; }, async deleteCheckin() { return {}; } },
+      workouts: { async analyze() { return {}; }, async createLog() { return {}; }, async confirmLog() { return {}; }, async patchLog() { return {}; } },
+      files: { async upload() { return {} as never; } },
+      subscription: { async restore() { return { entitlements: initialAppState.entitlements }; } },
+      privacy: { async deletePhotos() { return {}; }, async deleteAccount() { return {}; } },
+    },
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  await actions.analyzeFoodPhoto({
+    threadId: 'food-today',
+    imageUri: 'file:///meal.jpg',
+    filename: 'meal.jpg',
+    mimeType: 'image/jpeg',
+    userNote: '少饭，酱料不确定',
+  });
+
+  assert(state.activeFoodAnalysis?.detail === 'rice, chicken, dark sauce', 'food detail must list detected food items, not the follow-up question');
+  assert(state.activeFoodAnalysis?.needsFollowUp === true, 'food card must preserve that AI needs more user input');
+  assert(state.activeFoodAnalysis?.followUpQuestion?.includes('酱料') === true, 'food card must keep the follow-up question separately');
+  assert(state.activeFoodAnalysis?.advice.includes('酱料') === true, 'food card advice should ask the follow-up question when AI is uncertain');
+
+  await actions.saveFoodLogDetails(state.activeFoodAnalysis?.id ?? '', {
+    title: 'Corrected mixed plate',
+    caloriesKcal: 620,
+    proteinG: 38,
+    carbsG: 62,
+    fatG: 18,
+    detail: '一个人吃完，酱料约一汤匙',
+  });
+
+  assert(state.activeFoodAnalysis?.needsFollowUp === false, 'saving user corrections must clear follow-up blocking state');
+  assert(state.activeFoodAnalysis?.followUpQuestion === undefined, 'saving user corrections must remove the follow-up question from the active card');
+}
+
 async function testBackendFileUploadCreatesStructuredInsightMessage() {
   let state: AppDataState = {
     ...initialAppState,
@@ -1079,6 +1167,7 @@ async function run() {
   await testAppActionsCallBackendMutationsAndUpdateState();
   await testFoodActionStateLifecycle();
   await testAnalysisOnlyFoodCardCanBeManaged();
+  await testFoodAnalysisUsesDetectedItemsForDetailAndFollowUpForAdvice();
   await testBackendFileUploadCreatesStructuredInsightMessage();
   await testFileInsightSyncRequiresUserActionAndCreatesWeightCheckin();
   await testExpandedFileInsightSyncCreatesMenuAndWorkoutRecords();

@@ -68,6 +68,8 @@ def test_xiaomi_provider_sends_openai_compatible_multimodal_request(monkeypatch)
     user_content = request["payload"]["messages"][1]["content"]
     assert user_content[0]["type"] == "text"
     assert "less rice" in user_content[0]["text"]
+    assert "detected_items must describe only visible food items" in user_content[0]["text"]
+    assert "Do not put follow-up questions into detected_items or fat_loss_advice" in user_content[0]["text"]
     assert user_content[1]["type"] == "image_url"
     assert user_content[1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
 

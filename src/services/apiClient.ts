@@ -30,6 +30,7 @@ export type ApiClientOptions = {
   baseUrl?: string;
   config?: RuntimeConfig;
   getAccessToken?: () => string | null | undefined;
+  initialAccessToken?: string | null;
   onAuthInvalid?: () => void;
   fetchImpl?: FetchLike;
 };
@@ -73,6 +74,7 @@ export type FoodPhotoAnalysisResponse = {
   food_analysis: {
     food_log_id: string | null;
     meal_name: string;
+    detected_items?: string[];
     calories_range_kcal: number[];
     protein_g_range: number[];
     carbs_g_range: number[];
@@ -81,6 +83,7 @@ export type FoodPhotoAnalysisResponse = {
     status: string;
     needs_follow_up: boolean;
     follow_up_question: string | null;
+    fat_loss_advice?: string;
     model_provider?: string;
     model_name?: string;
   };
@@ -226,7 +229,7 @@ export function createFitMateServices(options: FitMateServicesOptions = {}): Fit
     };
   }
 
-  let accessToken = options.getAccessToken?.() ?? null;
+  let accessToken = options.initialAccessToken ?? options.getAccessToken?.() ?? null;
   const api = createBackendApi({
     ...options,
     getAccessToken: () => accessToken ?? options.getAccessToken?.(),

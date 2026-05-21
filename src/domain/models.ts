@@ -90,6 +90,9 @@ export type FoodAnalysis = {
   confidence: number;
   modelProvider?: string;
   modelName?: string;
+  needsFollowUp?: boolean;
+  followUpQuestion?: string;
+  detectedItems?: string[];
   calories: string;
   protein: string;
   carbs: string;

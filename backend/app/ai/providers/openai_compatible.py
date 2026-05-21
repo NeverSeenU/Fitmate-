@@ -18,7 +18,12 @@ USER_PROMPT = (
     "Analyze this food photo for a fat-loss coaching app. Required JSON fields: "
     "meal_name, detected_items, calories_range_kcal, protein_g_range, carbs_g_range, "
     "fat_g_range, confidence, needs_follow_up, follow_up_question, fat_loss_advice, "
-    "supportive_reply, safety_flags."
+    "supportive_reply, safety_flags. detected_items must describe only visible food items "
+    "and observable portion clues, not questions. If portion size, oil, sauce, or shared "
+    "servings are unclear, set needs_follow_up=true and put exactly one concise question "
+    "in follow_up_question. Do not put follow-up questions into detected_items or "
+    "fat_loss_advice. fat_loss_advice should be coaching guidance only after the visible "
+    "food estimate; if the estimate is too uncertain, say that user input is needed first."
 )
 TEXT_FOOD_SYSTEM_PROMPT = (
     "You are FitMate AI's text food-log nutrition analyst. Return valid JSON only. "

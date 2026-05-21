@@ -159,6 +159,13 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         chatMessages: [
           ...state.chatMessages,
           {
+            id: `user-photo-${Date.now()}`,
+            role: 'user',
+            text: input.userNote?.trim()
+              ? `照片：${input.filename}\n\n${input.userNote.trim()}`
+              : `照片：${input.filename}`,
+          },
+          {
             id: `assistant-photo-${Date.now()}`,
             role: 'assistant',
             text: `${mapped.title} 已完成估算：${mapped.calories} kcal，蛋白 ${mapped.protein}。请确认、编辑份量或丢弃。`,
@@ -368,6 +375,10 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
     },
 
     async confirmFoodLog(foodLogId: string) {
+      const active = getState().activeFoodAnalysis;
+      if (active?.id === foodLogId && active.needsFollowUp) {
+        throw new Error(active.followUpQuestion || '请先补充份量信息，再确认写入记录。');
+      }
       if (!isLocalOnlyFoodLog(foodLogId)) {
         await api?.food.confirmLog(foodLogId);
       }
@@ -617,6 +628,8 @@ function updateFoodLogDetails(
       fatG: input.fatG,
       detail: input.detail,
       advice: input.detail || '营养信息已编辑，请确认后写入今日记录。',
+      needsFollowUp: false,
+      followUpQuestion: undefined,
     }
     : null;
   setState({
@@ -800,6 +813,12 @@ function foodStatusLabel(status: FoodAnalysis['status']) {
 
 function toFoodAnalysis(response: FoodPhotoAnalysisResponse): FoodAnalysis {
   const analysis = response.food_analysis;
+  const detectedItems = Array.isArray(analysis.detected_items)
+    ? analysis.detected_items.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : [];
+  const followUpQuestion = analysis.needs_follow_up && analysis.follow_up_question
+    ? analysis.follow_up_question
+    : undefined;
   return {
     id: analysis.food_log_id ?? `analysis-${Date.now()}`,
     title: analysis.meal_name,
@@ -807,6 +826,9 @@ function toFoodAnalysis(response: FoodPhotoAnalysisResponse): FoodAnalysis {
     confidence: analysis.confidence,
     modelProvider: analysis.model_provider,
     modelName: analysis.model_name,
+    needsFollowUp: analysis.needs_follow_up,
+    followUpQuestion,
+    detectedItems,
     calories: rangeLabel(analysis.calories_range_kcal),
     protein: `${rangeLabel(analysis.protein_g_range)}g`,
     carbs: `${rangeLabel(analysis.carbs_g_range)}g`,
@@ -815,10 +837,10 @@ function toFoodAnalysis(response: FoodPhotoAnalysisResponse): FoodAnalysis {
     proteinG: rangeMidpoint(analysis.protein_g_range),
     carbsG: rangeMidpoint(analysis.carbs_g_range),
     fatG: rangeMidpoint(analysis.fat_g_range),
-    detail: analysis.needs_follow_up && analysis.follow_up_question ? analysis.follow_up_question : '',
-    advice: analysis.needs_follow_up && analysis.follow_up_question
-      ? analysis.follow_up_question
-      : '已按图片估算营养区间，请确认份量后记录。',
+    detail: detectedItems.join(', '),
+    advice: followUpQuestion
+      ? followUpQuestion
+      : analysis.fat_loss_advice || '已按图片估算营养区间，请确认份量后记录。',
   };
 }
 

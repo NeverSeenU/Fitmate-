@@ -131,6 +131,8 @@ def test_free_user_receives_analysis_without_auto_created_food_log() -> None:
     assert body["food_analysis"]["food_log_id"] is None
     assert body["food_analysis"]["status"] == "analysis_only"
     assert body["food_analysis"]["meal_name"] == "韩式石锅拌饭"
+    assert body["food_analysis"]["detected_items"] == ["rice", "egg", "vegetables", "sauce"]
+    assert body["food_analysis"]["fat_loss_advice"] == "下一餐压低油和主食，蛋白补足。"
     assert body["assistant_message"]["message_type"] == "food_analysis"
     assert "焦虑" in body["assistant_message"]["content_text"]
     assert usage_for_email(email).food_photo_count == 1

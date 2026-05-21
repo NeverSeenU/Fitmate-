@@ -1,5 +1,5 @@
 ﻿import { StatusBar } from 'expo-status-bar';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native';
 import { LoginScreen, RegisterScreen, ForgotScreen, OnboardingScreen, type AuthCredentials } from './screens/AuthScreens';
 import { ChatScreen } from './screens/ChatScreen';
@@ -9,6 +9,8 @@ import { initialAppState } from './state/appState';
 import { createFitMateServices } from './services/apiClient';
 import { createAppActions } from './services/appActions';
 import { loadAppDataFromBackend } from './services/appBackend';
+import { loadFitMateState } from './state/persistence';
+import { createAsyncStorageStore } from './storage/localStore';
 import { runtimeConfig } from './config/env';
 import { styles } from './styles';
 import type { AuthSession } from './domain/models';
@@ -21,11 +23,16 @@ export default function App() {
   const [appState, setAppState] = useState(initialAppState);
   const [authenticated, setAuthenticated] = useState(false);
   const [authNotice, setAuthNotice] = useState('');
+  const [persistedSession, setPersistedSession] = useState<AuthSession | null>(null);
+  const store = useMemo(() => createAsyncStorageStore(), []);
   const services = useMemo(
     () => createFitMateServices({
       baseUrl: runtimeConfig.apiBaseUrl,
       useMockApi: runtimeConfig.useMockApi,
+      initialAccessToken: persistedSession?.accessToken ?? null,
       onAuthInvalid: () => {
+        void store.remove('fitmate.session');
+        setPersistedSession(null);
         setAuthenticated(false);
         setAppState(initialAppState);
         setSheet(null);
@@ -34,7 +41,7 @@ export default function App() {
         setScreen('login');
       },
     }),
-    [],
+    [persistedSession?.accessToken, store],
   );
   const actions = useMemo(
     () => createAppActions({
@@ -44,6 +51,45 @@ export default function App() {
     }),
     [services, appState],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const saved = await loadFitMateState(store);
+      if (cancelled) return;
+      setAppState({
+        ...initialAppState,
+        ...(saved.profile ? { profile: saved.profile } : {}),
+        ...(saved.records ? { records: saved.records } : {}),
+        ...(saved.conversations ? { threads: saved.conversations } : {}),
+      });
+      if (saved.session && isSessionFresh(saved.session)) {
+        setPersistedSession(saved.session);
+        setAuthenticated(true);
+        setAuthNotice('');
+        setScreen('chat');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [store]);
+
+  useEffect(() => {
+    if (!authenticated || !persistedSession || !services.api) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const nextState = await loadAppDataFromBackend(services.api!, initialAppState);
+      if (!cancelled) {
+        setAppState(nextState);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated, persistedSession, services]);
 
   const enterApp = async (displayName?: string, email?: string) => {
     if (services.api) {
@@ -76,7 +122,9 @@ export default function App() {
       });
     }
     setAuthenticated(true);
+    setPersistedSession(session);
     setAuthNotice('');
+    await store.set('fitmate.session', session);
     await enterApp(session.user.displayName, session.user.email);
   };
 
@@ -87,7 +135,9 @@ export default function App() {
       displayName: displayName || identifier.split('@')[0] || 'FitMate User',
     });
     setAuthenticated(true);
+    setPersistedSession(session);
     setAuthNotice('');
+    await store.set('fitmate.session', session);
     await enterApp(session.user.displayName, session.user.email);
   };
 
@@ -154,4 +204,9 @@ export default function App() {
       {sheet === 'profile' && <ProfileSheet close={backFromSheet} appState={appState} actions={actions} />}
     </SafeAreaView>
   );
+}
+
+function isSessionFresh(session: AuthSession) {
+  const expiresAt = Date.parse(session.expiresAt);
+  return Number.isFinite(expiresAt) && expiresAt > Date.now() + 1000 * 60;
 }

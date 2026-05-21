@@ -5,7 +5,7 @@ import type { AppDataState } from '../domain/models';
 import { AttachmentPanel, NewChatPanel, ThreadDrawer } from '../overlays/ChatOverlays';
 import type { createAppActions, FoodLogEditInput } from '../services/appActions';
 import { formatFileSize, pickFitMateFile, type PickedFile } from '../services/filePicker';
-import { pickFoodPhoto, type PhotoPickerSource } from '../services/photoPicker';
+import { pickFoodPhoto, type PickedPhoto, type PhotoPickerSource } from '../services/photoPicker';
 import { styles } from '../styles';
 import type { ChatPanel, Screen, Sheet } from '../types';
 import { deviceWidth } from '../theme';
@@ -31,13 +31,14 @@ export function ChatScreen({
   const [utilityPanel, setUtilityPanel] = useState<'weight' | 'workout' | null>(null);
   const [panelBack, setPanelBack] = useState<ChatPanel>(null);
   const [composerText, setComposerText] = useState('');
-  const [pendingFile, setPendingFile] = useState<PickedFile | null>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [foodEditorOpen, setFoodEditorOpen] = useState(false);
   const [foodForm, setFoodForm] = useState(foodAnalysisToForm(appState.activeFoodAnalysis));
   const [weightForm, setWeightForm] = useState({ weightKg: appState.profile.weightKg.toFixed(1), notes: '' });
   const [workoutForm, setWorkoutForm] = useState({ detail: '' });
+  const scrollRef = useRef<ScrollView | null>(null);
   const swipeResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) =>
@@ -57,6 +58,15 @@ export function ChatScreen({
       clearReturnPanel();
     }
   }, [returnPanel, clearReturnPanel]);
+
+  useEffect(() => {
+    const scrollLatest = () => {
+      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+    };
+    scrollLatest();
+    const showSub = Keyboard.addListener('keyboardDidShow', scrollLatest);
+    return () => showSub.remove();
+  }, [appState.chatMessages.length, appState.activeFoodAnalysis?.id, status]);
 
   const closePanel = () => {
     if (panelBack) {
@@ -87,27 +97,42 @@ export function ChatScreen({
       setStatus('已取消选择照片');
       return;
     }
-    await runAction('正在上传并分析照片...', '照片分析完成，请确认是否写入记录', async () => {
-      await actions.analyzeFoodPhoto({
-        threadId: appState.threads[0]?.id ?? 'food-today',
-        ...photo,
-      });
-      setFoodEditorOpen(false);
-      setPanel(null);
-    });
+    setPendingAttachment({ kind: 'photo', ...photo });
+    setPanel(null);
+    setStatus('照片已添加，可以输入问题后一起发送给 AI');
   };
 
   const sendComposerText = () => {
     const text = composerText.trim();
-    const file = pendingFile;
-    if (!text && !file) {
+    const attachment = pendingAttachment;
+    if (!text && !attachment) {
       setStatus('请输入要发送的内容');
       return;
     }
-    void runAction(file ? '正在上传并分析文件...' : '正在发送...', file ? '文件已上传并生成识别卡片' : '消息已发送', async () => {
-      if (file) {
-        await actions.attachFile(file, text);
-        setPendingFile(null);
+    const busyText = attachment?.kind === 'file'
+      ? '正在上传并分析文件...'
+      : attachment?.kind === 'photo'
+        ? '正在上传并分析照片...'
+        : '正在发送...';
+    const successText = attachment?.kind === 'file'
+      ? '文件已上传并生成识别卡片'
+      : attachment?.kind === 'photo'
+        ? '照片分析完成，请确认、编辑或丢弃'
+        : '消息已发送';
+    void runAction(busyText, successText, async () => {
+      if (attachment?.kind === 'file') {
+        await actions.attachFile(attachment, text);
+        setPendingAttachment(null);
+      } else if (attachment?.kind === 'photo') {
+        await actions.analyzeFoodPhoto({
+          threadId: appState.threads[0]?.id ?? 'food-today',
+          imageUri: attachment.imageUri,
+          filename: attachment.filename,
+          mimeType: attachment.mimeType,
+          userNote: text,
+        });
+        setPendingAttachment(null);
+        setFoodEditorOpen(false);
       } else if (text) {
         await actions.sendText(appState.threads[0]?.id ?? 'food-today', text);
       }
@@ -199,7 +224,7 @@ export function ChatScreen({
           setStatus('已取消选择文件');
           return;
         }
-        setPendingFile(file);
+        setPendingAttachment({ kind: 'file', ...file });
         setStatus('文件已添加，点发送后开始识别');
       } catch (error) {
         setStatus(error instanceof Error ? error.message : '文件选择失败');
@@ -228,7 +253,12 @@ export function ChatScreen({
         openThreads={() => setPanel('threads')}
       />
       {runtimeInfo ? <Text style={styles.runtimeBanner}>{runtimeInfo}</Text> : null}
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+      >
         {appState.chatMessages.map((message) => (
           <ChatBubble
             key={message.id}
@@ -265,16 +295,16 @@ export function ChatScreen({
       </ScrollView>
       {!foodEditorOpen ? (
         <View style={styles.composer}>
-          {pendingFile ? (
+          {pendingAttachment ? (
             <View style={styles.pendingAttachment}>
               <View style={styles.pendingAttachmentBadge}>
-                <Text style={styles.pendingAttachmentType}>{fileTypeLabel(pendingFile)}</Text>
+                <Text style={styles.pendingAttachmentType}>{attachmentTypeLabel(pendingAttachment)}</Text>
               </View>
               <View style={styles.pendingAttachmentMeta}>
-                <Text style={styles.pendingAttachmentName} numberOfLines={2}>{pendingFile.name}</Text>
-                <Text style={styles.pendingAttachmentSize}>{formatFileSize(pendingFile.sizeBytes)}</Text>
+                <Text style={styles.pendingAttachmentName} numberOfLines={2}>{attachmentName(pendingAttachment)}</Text>
+                <Text style={styles.pendingAttachmentSize}>{attachmentSubtitle(pendingAttachment)}</Text>
               </View>
-              <Pressable style={styles.pendingAttachmentRemove} onPress={() => setPendingFile(null)} disabled={busy}>
+              <Pressable style={styles.pendingAttachmentRemove} onPress={() => setPendingAttachment(null)} disabled={busy}>
                 <Text style={styles.iconText}>X</Text>
               </Pressable>
             </View>
@@ -374,6 +404,10 @@ type FoodEditorForm = {
   fatG: string;
   detail: string;
 };
+
+type PendingAttachment =
+  | ({ kind: 'file' } & PickedFile)
+  | ({ kind: 'photo' } & PickedPhoto);
 
 function FoodEditorPage({
   form,
@@ -549,12 +583,23 @@ function parseLeadingNumber(value?: string) {
   return match ? Number(match[0]) : undefined;
 }
 
-function fileTypeLabel(file: PickedFile) {
-  const extension = file.name.split('.').pop()?.toUpperCase();
+function attachmentName(attachment: PendingAttachment) {
+  return attachment.kind === 'file' ? attachment.name : attachment.filename;
+}
+
+function attachmentSubtitle(attachment: PendingAttachment) {
+  return attachment.kind === 'file' ? formatFileSize(attachment.sizeBytes) : attachment.mimeType;
+}
+
+function attachmentTypeLabel(attachment: PendingAttachment) {
+  if (attachment.kind === 'photo') {
+    return 'IMG';
+  }
+  const extension = attachment.name.split('.').pop()?.toUpperCase();
   if (extension && extension.length <= 5) {
     return extension;
   }
-  if (file.mimeType.startsWith('image/')) {
+  if (attachment.mimeType.startsWith('image/')) {
     return 'IMG';
   }
   return 'FILE';

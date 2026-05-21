@@ -40,6 +40,7 @@ export function FoodAnalysisCard({
   busy?: boolean;
 }) {
   const canManage = analysis.status === 'pending' || analysis.status === 'edited' || analysis.status === 'analysis_only';
+  const needsFollowUp = Boolean(analysis.needsFollowUp && analysis.followUpQuestion);
   return (
     <View style={styles.card}>
       <View style={styles.rowBetween}>
@@ -58,10 +59,11 @@ export function FoodAnalysisCard({
         <Metric value={analysis.carbs} label="碳水" />
       </View>
       <Text style={styles.muted}>{analysis.advice}</Text>
+      {needsFollowUp ? <Text style={styles.warningText}>需要先补充：{analysis.followUpQuestion}</Text> : null}
       {canManage ? (
         <>
           <View style={styles.actionGrid}>
-            <Button label={busy ? '处理中...' : '确认并写入'} onPress={onConfirm} disabled={busy} style={styles.actionButton} />
+            <Button label={needsFollowUp ? '先编辑补充后确认' : busy ? '处理中...' : '确认并写入'} onPress={onConfirm} disabled={busy || needsFollowUp} style={styles.actionButton} />
             <Button label="编辑内容" variant="secondary" onPress={onEdit} disabled={busy} style={styles.actionButton} />
             <Button label="丢弃" variant="secondary" onPress={onDiscard} disabled={busy} style={styles.actionButton} />
           </View>

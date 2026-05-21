@@ -241,6 +241,7 @@ class FoodService:
         return {
             "food_log_id": food_log.id if food_log else None,
             "meal_name": analysis["meal_name"],
+            "detected_items": analysis.get("detected_items", []),
             "calories_range_kcal": analysis["calories_range_kcal"],
             "protein_g_range": analysis["protein_g_range"],
             "carbs_g_range": analysis["carbs_g_range"],
@@ -249,6 +250,7 @@ class FoodService:
             "status": food_log.status if food_log else "analysis_only",
             "needs_follow_up": analysis["needs_follow_up"],
             "follow_up_question": analysis["follow_up_question"],
+            "fat_loss_advice": analysis.get("fat_loss_advice"),
             "model_provider": analysis.get("model_provider"),
             "model_name": analysis.get("model_name"),
         }
