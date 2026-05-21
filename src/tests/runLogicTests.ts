@@ -3,6 +3,7 @@ import { createAppActions } from '../services/appActions';
 import { loadAppDataFromBackend } from '../services/appBackend';
 import { createRuntimeConfig } from '../config/env';
 import { createAiVisionService, type FoodVisionInput, type VisionProvider } from '../services/aiVision';
+import { normalizeFileMimeType, normalizeImageMimeType } from '../services/mimeTypes';
 import { evaluateEntitlement, entitlementsForTier } from '../services/subscription';
 import { initialAppState } from '../state/appState';
 import type { AppDataState } from '../domain/models';
@@ -50,6 +51,15 @@ async function testVisionFallback() {
   const estimate = await service.estimateFood(input);
   assert(estimate.provider === 'qwen', 'vision service must fallback to Qwen');
   assert(estimate.requiresUserConfirmation, 'food estimates must require user confirmation');
+}
+
+async function testPickerMimeNormalizationPreservesExplicitHeic() {
+  assert(normalizeImageMimeType('image/heic', 'food-photo.jpg') === 'image/heic', 'photo picker must not disguise explicit HEIC as JPEG');
+  assert(normalizeImageMimeType(undefined, 'meal.jpeg') === 'image/jpeg', 'photo picker may infer JPEG when MIME is missing');
+  assert(normalizeImageMimeType('image/jpg', 'meal') === 'image/jpeg', 'photo picker must normalize image/jpg');
+  const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  assert(normalizeFileMimeType('application/octet-stream', 'menu.png', supportedTypes) === 'image/png', 'file picker must normalize octet-stream by supported extension');
+  assert(normalizeFileMimeType('image/jpg', 'food', supportedTypes) === 'image/jpeg', 'file picker must normalize image/jpg');
 }
 
 async function testPersistenceRoundTrip() {
@@ -478,7 +488,7 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
       chat: {
         async createThread(payload: { title: string; kind?: string }) {
           calls.push(`createThread:${payload.title}:${payload.kind}`);
-          return { id: 'thread-new', title: payload.title, kind: payload.kind ?? 'general' };
+          return { id: '11111111-1111-4111-8111-111111111111', title: payload.title, kind: payload.kind ?? 'general' };
         },
         async sendTextMessage(payload: { threadId: string; text: string }) {
           calls.push(`sendText:${payload.threadId}:${payload.text}`);
@@ -625,7 +635,7 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
     },
     getState: () => initialAppState,
     setState: (next: AppDataState) => {
-      assert(next.threads[0].id === 'thread-new' || next.chatMessages.length > 0, 'actions must update state');
+      assert(next.threads[0].id === '11111111-1111-4111-8111-111111111111' || next.chatMessages.length > 0, 'actions must update state');
       snapshots.push(next);
     },
   });
@@ -657,8 +667,8 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
   await actions.deleteAccount();
 
   assert(calls.includes('createThread:Live food:food'), 'createThread action must call backend');
-  assert(calls.includes('sendText:food-today:hello'), 'sendText action must call backend');
-  assert(calls.includes('photo:food-today:meal.jpg:image/jpeg'), 'photo action must call backend');
+  assert(calls.includes('sendText:11111111-1111-4111-8111-111111111111:hello'), 'sendText action must use a backend-created thread when current thread is local fallback');
+  assert(calls.includes('photo:11111111-1111-4111-8111-111111111111:meal.jpg:image/jpeg'), 'photo action must use a backend-created thread when current thread is local fallback');
   assert(calls.includes('confirmFood:food-live'), 'confirm food action must call backend');
   assert(calls.includes('patchFood:food-live:米饭吃了一半'), 'edit food action must call backend');
   assert(calls.includes('discardFood:food-live'), 'discard food action must call backend');
@@ -666,7 +676,7 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
   assert(calls.includes('workout:力量训练 45 分钟'), 'workout action must call backend');
   assert(snapshots.some((snapshot) => snapshot.records.some((record) => record.kind === 'workout' && record.detail?.includes('xiaomi/mimo-v2-omni') && record.detail.includes('confidence 0.78'))), 'workout record must preserve AI provider metadata');
   assert(calls.includes('createThread:File insight:files'), 'file upload must create a backend file thread when only a local fallback thread exists');
-  assert(calls.includes('file:thread-new:report.txt:text/plain:Summarize this report'), 'file upload action must use the backend-created thread id and user prompt');
+  assert(calls.includes('file:11111111-1111-4111-8111-111111111111:report.txt:text/plain:Summarize this report'), 'file upload action must use the backend-created thread id and user prompt');
   assert(calls.includes('restore:fitmate.pro.monthly'), 'restore action must call backend');
   assert(calls.includes('profile:70.8:Lean wedding cut'), 'profile action must map backend payload');
   assert(calls.includes('deletePhotos'), 'deletePhotos action must call backend');
@@ -983,6 +993,7 @@ async function testSendTextShowsUserMessageBeforeBackendReply() {
 async function run() {
   await testSubscriptionEntitlements();
   await testVisionFallback();
+  await testPickerMimeNormalizationPreservesExplicitHeic();
   await testPersistenceRoundTrip();
   await testApiClientAuthHeadersAndJsonBody();
   await testApiClientHandlesEmptyDeleteResponses();

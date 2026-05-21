@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import { isSupportedImageMimeType, normalizeImageMimeType } from './mimeTypes';
 
 export type PhotoPickerSource = 'camera' | 'library';
 
@@ -26,14 +27,14 @@ export async function pickFoodPhoto(source: PhotoPickerSource): Promise<PickedPh
   }
 
   const asset = result.assets[0];
-  const filename = asset.fileName ?? filenameFromUri(asset.uri);
-  const mimeType = normalizeImageMimeType(asset.mimeType ?? mimeTypeFromUri(asset.uri), filename);
+  const pickedName = asset.fileName ?? filenameFromUri(asset.uri);
+  const mimeType = normalizeImageMimeType(asset.mimeType, pickedName, asset.uri);
   if (!isSupportedImageMimeType(mimeType)) {
     throw new Error('当前照片格式暂不支持，请在 iPhone 相机设置中选择“兼容性最佳”，或先选择 JPEG/PNG 图片。');
   }
   return {
     imageUri: asset.uri,
-    filename,
+    filename: withImageExtension(pickedName, mimeType),
     mimeType,
   };
 }
@@ -46,35 +47,13 @@ const pickerOptions: ImagePicker.ImagePickerOptions = {
 
 function filenameFromUri(uri: string) {
   const lastSegment = uri.split('/').pop();
-  return lastSegment?.includes('.') ? lastSegment : `food-photo-${Date.now()}.jpg`;
+  return lastSegment || `food-photo-${Date.now()}`;
 }
 
-function mimeTypeFromUri(uri: string) {
-  const lower = uri.toLowerCase();
-  if (lower.endsWith('.png')) {
-    return 'image/png';
+function withImageExtension(filename: string, mimeType: string) {
+  if (/\.(jpe?g|png|webp)$/i.test(filename)) {
+    return filename;
   }
-  if (lower.endsWith('.webp')) {
-    return 'image/webp';
-  }
-  return 'image/jpeg';
-}
-
-function normalizeImageMimeType(mimeType: string, filename: string) {
-  const lowerName = filename.toLowerCase();
-  const lowerType = mimeType.toLowerCase();
-  if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) {
-    return 'image/jpeg';
-  }
-  if (lowerName.endsWith('.png')) {
-    return 'image/png';
-  }
-  if (lowerName.endsWith('.webp')) {
-    return 'image/webp';
-  }
-  return lowerType;
-}
-
-function isSupportedImageMimeType(mimeType: string) {
-  return mimeType === 'image/jpeg' || mimeType === 'image/png' || mimeType === 'image/webp';
+  const extension = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+  return `${filename}.${extension}`;
 }

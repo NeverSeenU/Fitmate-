@@ -1,4 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
+import { hasKnownMimeExtension, normalizeFileMimeType } from './mimeTypes';
 
 export type PickedFile = {
   uri: string;
@@ -20,20 +21,6 @@ const SUPPORTED_FILE_TYPES = [
   'image/webp',
 ];
 
-const EXTENSION_MIME_TYPES: Record<string, string> = {
-  csv: 'text/csv',
-  doc: 'application/msword',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  jpeg: 'image/jpeg',
-  jpg: 'image/jpeg',
-  pdf: 'application/pdf',
-  png: 'image/png',
-  txt: 'text/plain',
-  webp: 'image/webp',
-  xls: 'application/vnd.ms-excel',
-  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-};
-
 export class UnsupportedFileTypeError extends Error {
   constructor(filename: string) {
     super(`暂不支持 ${filename}。请先选择 PDF、Word、Excel、CSV、TXT 或常见图片文件。`);
@@ -54,7 +41,7 @@ export async function pickFitMateFile(): Promise<PickedFile | null> {
 
   const asset = result.assets[0];
   const name = asset.name || filenameFromUri(asset.uri);
-  const mimeType = asset.mimeType || mimeTypeFromName(name);
+  const mimeType = normalizeFileMimeType(asset.mimeType, name, SUPPORTED_FILE_TYPES);
 
   if (!isSupportedFile(name, mimeType)) {
     throw new UnsupportedFileTypeError(name);
@@ -82,15 +69,7 @@ export function formatFileSize(sizeBytes?: number) {
 }
 
 function isSupportedFile(name: string, mimeType: string) {
-  return SUPPORTED_FILE_TYPES.includes(mimeType) || Boolean(EXTENSION_MIME_TYPES[fileExtension(name)]);
-}
-
-function mimeTypeFromName(name: string) {
-  return EXTENSION_MIME_TYPES[fileExtension(name)] ?? 'application/octet-stream';
-}
-
-function fileExtension(name: string) {
-  return name.split('.').pop()?.toLowerCase() ?? '';
+  return SUPPORTED_FILE_TYPES.includes(mimeType) || hasKnownMimeExtension(name);
 }
 
 function filenameFromUri(uri: string) {

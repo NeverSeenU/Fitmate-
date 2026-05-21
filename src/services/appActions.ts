@@ -104,7 +104,11 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         return;
       }
       addMessages(getState, setState, [userMessage]);
-      const response = await api.chat.sendTextMessage({ threadId, text }) as {
+      const backendThreadId = await ensureBackendThread(api, getState, setState, threadId, {
+        title: 'FitMate chat',
+        kind: 'general',
+      });
+      const response = await api.chat.sendTextMessage({ threadId: backendThreadId, text }) as {
         message?: { id?: string; content_text?: string };
         user_message?: { id?: string; content_text?: string };
         assistant_message?: { id?: string; content_text?: string };
@@ -132,9 +136,18 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
     },
 
     async analyzeFoodPhoto(input: PhotoUploadInput) {
+      const backendInput = api
+        ? {
+          ...input,
+          threadId: await ensureBackendThread(api, getState, setState, input.threadId, {
+            title: 'Food photo',
+            kind: 'food',
+          }),
+        }
+        : input;
       const analysis = api
-        ? await api.food.analyzePhoto(input)
-        : mockFoodPhotoResponse(input.filename);
+        ? await api.food.analyzePhoto(backendInput)
+        : mockFoodPhotoResponse(backendInput.filename);
       const mapped = toFoodAnalysis(analysis);
       const state = getState();
       setState({
@@ -262,7 +275,10 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         throw new Error('File insight requires the backend API. Current app runtime has no backend API, so no insight card can be generated. Restart Expo and make sure it is not Local preview mode.');
       }
       const state = getState();
-      const threadId = await ensureBackendFileThread(api, getState, setState, state.threads[0]?.id);
+      const threadId = await ensureBackendThread(api, getState, setState, state.threads[0]?.id, {
+        title: 'File insight',
+        kind: 'files',
+      });
       const response = await api.files.upload({
         threadId,
         fileUri: file.uri,
@@ -1049,27 +1065,28 @@ function addMessages(
   });
 }
 
-async function ensureBackendFileThread(
+async function ensureBackendThread(
   api: AppActionsApi,
   getState: () => AppDataState,
   setState: (state: AppDataState) => void,
   currentThreadId: string | undefined,
+  fallback: { title: string; kind: string },
 ) {
-  if (currentThreadId && !isLocalFallbackThreadId(currentThreadId)) {
+  if (currentThreadId && isBackendThreadId(currentThreadId)) {
     return currentThreadId;
   }
-  const created = await api.chat.createThread({ title: 'File insight', kind: 'files' }) as { id?: string; title?: string; kind?: string };
+  const created = await api.chat.createThread({ title: fallback.title, kind: fallback.kind }) as { id?: string; title?: string; kind?: string };
   const threadId = created.id ?? `thread-${Date.now()}`;
   addThread(getState, setState, {
     id: threadId,
-    title: created.title ?? 'File insight',
-    subtitle: created.kind ?? 'files',
+    title: created.title ?? fallback.title,
+    subtitle: created.kind ?? fallback.kind,
   });
   return threadId;
 }
 
-function isLocalFallbackThreadId(threadId: string) {
-  return threadId === 'food-today' || threadId.startsWith('mock-');
+function isBackendThreadId(threadId: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(threadId);
 }
 
 function formatAttachmentFileSize(sizeBytes?: number) {

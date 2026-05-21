@@ -31,7 +31,11 @@ class SqlAlchemyChatRepository:
         return [self._stored_thread(thread) for thread in threads]
 
     def get_thread(self, user_id: str, thread_id: str) -> StoredThread | None:
-        thread = self.session.get(models.ChatThread, uuid.UUID(thread_id))
+        try:
+            thread_uuid = uuid.UUID(thread_id)
+        except ValueError:
+            return None
+        thread = self.session.get(models.ChatThread, thread_uuid)
         if thread is None or str(thread.user_id) != user_id or thread.archived_at is not None:
             return None
         return self._stored_thread(thread)

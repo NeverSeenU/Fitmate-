@@ -180,6 +180,20 @@ def test_photo_rejects_uploads_larger_than_limit() -> None:
     assert response.json()["detail"]["code"] == "image_too_large"
 
 
+def test_photo_with_local_fallback_thread_id_returns_not_found_not_500() -> None:
+    headers = auth_headers("fallback-thread-photo@example.com")
+
+    response = client.post(
+        "/v1/chat/photo",
+        headers=headers,
+        data={"thread_id": "food-today"},
+        files={"image": ("food.jpg", b"fake-image", "image/jpeg")},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "thread_not_found"
+
+
 def test_photo_fair_use_limit_returns_429_before_analysis() -> None:
     from datetime import date
 
