@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsc -p tsconfig.test.json && node .test-build/tests/runLogicTests.js",
     "smoke:mobile": "tsc -p tsconfig.test.json && node .test-build/tests/runMobileSmoke.js",
-    "smoke:file-insight-live": "tsc -p tsconfig.test.json && node .test-build/tests/runLiveFileInsightSmoke.js"
+    "smoke:file-insight-live": "tsc -p tsconfig.test.json && node .test-build/tests/runLiveFileInsightSmoke.js",
+    "smoke:file-insight-ai": "tsc -p tsconfig.test.json && node .test-build/tests/runLiveFileInsightSmoke.js --require-ai-metadata"
   },
   "dependencies": {
     "expo": "~54.0.33",

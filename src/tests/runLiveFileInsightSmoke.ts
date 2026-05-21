@@ -5,9 +5,12 @@ import type { FileUploadResponse } from '../services/apiClient';
 
 declare const process: {
   env?: Record<string, string | undefined>;
+  argv?: string[];
 };
 
 const baseUrl = trimTrailingSlash(process.env?.FITMATE_LIVE_API_BASE_URL ?? 'http://127.0.0.1:8000');
+const requireAiMetadata = process.env?.FITMATE_REQUIRE_AI_FILE_METADATA === 'true'
+  || process.argv?.includes('--require-ai-metadata') === true;
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -110,7 +113,6 @@ async function run() {
   });
 
   const uploads: Array<{ fixture: LiveFileFixture; response: FileUploadResponse; labels: Set<string> }> = [];
-  const requireAiMetadata = process.env?.FITMATE_REQUIRE_AI_FILE_METADATA === 'true';
   for (const fixture of fileFixtures) {
     const response = await uploadFile(thread.id, session.access_token, fixture);
     const labels = new Set((response.file_upload.insights ?? []).map((item) => item.label));

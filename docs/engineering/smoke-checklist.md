@@ -66,7 +66,7 @@ Run this checklist in Expo Go after meaningful mobile or backend changes.
   - `WORKOUT_AI_ANALYSIS_ENABLED`
   - `TEXT_FOOD_AI_ANALYSIS_ENABLED`
 - For a real provider pass, inject Xiaomi or Qwen keys into the backend process environment, set one flag to `true`, restart the backend, run the matching manual flow, then set the flag back to `false` before ordinary smoke testing.
-- For file extraction, run `FITMATE_REQUIRE_AI_FILE_METADATA=true npm.cmd run smoke:file-insight-live` with `FILE_AI_EXTRACTION_ENABLED=true`; this requires Xiaomi/Qwen provider metadata, top-level confidence, per-field confidence, and per-field `source_text` for body-report, menu, and workout-plan fixtures.
+- For file extraction, run `npm.cmd run smoke:file-insight-ai` with `FILE_AI_EXTRACTION_ENABLED=true`; this requires Xiaomi/Qwen provider metadata, top-level confidence, per-field confidence, and per-field `source_text` for body-report, menu, and workout-plan fixtures.
 - Do not run destructive pytest cleanup at the same time as live provider smoke; run live smoke and backend tests sequentially to avoid local PostgreSQL table-lock deadlocks.
 
 ## Settings And Profile
