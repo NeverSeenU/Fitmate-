@@ -30,6 +30,7 @@ export type ApiClientOptions = {
   baseUrl?: string;
   config?: RuntimeConfig;
   getAccessToken?: () => string | null | undefined;
+  onAuthInvalid?: () => void;
   fetchImpl?: FetchLike;
 };
 
@@ -229,6 +230,10 @@ export function createFitMateServices(options: FitMateServicesOptions = {}): Fit
   const api = createBackendApi({
     ...options,
     getAccessToken: () => accessToken ?? options.getAccessToken?.(),
+    onAuthInvalid: () => {
+      accessToken = null;
+      options.onAuthInvalid?.();
+    },
   });
   return {
     api,
@@ -261,12 +266,14 @@ export function createFitMateServices(options: FitMateServicesOptions = {}): Fit
 class ApiClient {
   private readonly baseUrl: string;
   private readonly getAccessToken?: () => string | null | undefined;
+  private readonly onAuthInvalid?: () => void;
   private readonly fetchImpl: FetchLike;
 
   constructor(options: ApiClientOptions) {
     const config = options.config ?? runtimeConfig;
     this.baseUrl = trimTrailingSlash(options.baseUrl ?? config.apiBaseUrl);
     this.getAccessToken = options.getAccessToken;
+    this.onAuthInvalid = options.onAuthInvalid;
     this.fetchImpl = options.fetchImpl ?? defaultFetch;
   }
 
@@ -321,7 +328,11 @@ class ApiClient {
 
     const response = await this.fetchImpl(this.url(path), init);
     if (!response.ok) {
-      throw new ApiError(response.status, await readErrorDetail(response));
+      const detail = await readErrorDetail(response);
+      if (response.status === 401 && isAuthInvalidDetail(detail)) {
+        this.onAuthInvalid?.();
+      }
+      throw new ApiError(response.status, detail);
     }
     if (response.status === 204) {
       return {};
@@ -421,6 +432,9 @@ async function readErrorDetail(response: ApiResponseLike) {
 }
 
 function apiErrorMessage(status: number, detail: unknown) {
+  if (status === 401 && isAuthInvalidDetail(detail)) {
+    return '登录已过期，请重新登录。';
+  }
   if (typeof detail === 'string' && detail.trim().length > 0) {
     return detail;
   }
@@ -448,6 +462,26 @@ function apiErrorMessage(status: number, detail: unknown) {
     return nested;
   }
   return `FitMate API request failed with status ${status}`;
+}
+
+function isAuthInvalidDetail(detail: unknown) {
+  if (detail === 'invalid_token' || detail === 'not_authenticated') {
+    return true;
+  }
+  if (!detail || typeof detail !== 'object') {
+    return false;
+  }
+  const body = detail as { detail?: unknown; code?: unknown };
+  if (body.detail === 'invalid_token' || body.detail === 'not_authenticated') {
+    return true;
+  }
+  if (body.code === 'invalid_token' || body.code === 'not_authenticated') {
+    return true;
+  }
+  const nested = body.detail as { code?: unknown; message?: unknown } | undefined;
+  return typeof nested === 'object' && (
+    nested.code === 'invalid_token' || nested.code === 'not_authenticated'
+  );
 }
 
 function toAuthSession(payload: unknown): AuthSession {

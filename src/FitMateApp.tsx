@@ -11,6 +11,7 @@ import { createAppActions } from './services/appActions';
 import { loadAppDataFromBackend } from './services/appBackend';
 import { runtimeConfig } from './config/env';
 import { styles } from './styles';
+import type { AuthSession } from './domain/models';
 import type { ChatPanel, Screen, Sheet } from './types';
 
 export default function App() {
@@ -19,10 +20,19 @@ export default function App() {
   const [returnPanel, setReturnPanel] = useState<ChatPanel>(null);
   const [appState, setAppState] = useState(initialAppState);
   const [authenticated, setAuthenticated] = useState(false);
+  const [authNotice, setAuthNotice] = useState('');
   const services = useMemo(
     () => createFitMateServices({
       baseUrl: runtimeConfig.apiBaseUrl,
       useMockApi: runtimeConfig.useMockApi,
+      onAuthInvalid: () => {
+        setAuthenticated(false);
+        setAppState(initialAppState);
+        setSheet(null);
+        setReturnPanel(null);
+        setAuthNotice('登录已过期，请重新登录。');
+        setScreen('login');
+      },
     }),
     [],
   );
@@ -52,19 +62,22 @@ export default function App() {
   };
 
   const handleLogin = async ({ identifier, password }: AuthCredentials) => {
+    let session: AuthSession;
     try {
-      const session = await services.auth.login({ identifier, password });
-      setAuthenticated(true);
-      await enterApp(session.user.displayName, session.user.email);
+      session = await services.auth.login({ identifier, password });
     } catch (error) {
-      const session = await services.auth.register({
+      if (!(error instanceof Error) || error.message !== 'invalid_credentials') {
+        throw error;
+      }
+      session = await services.auth.register({
         identifier,
         password,
         displayName: identifier.split('@')[0] || 'FitMate User',
       });
-      setAuthenticated(true);
-      await enterApp(session.user.displayName, session.user.email);
     }
+    setAuthenticated(true);
+    setAuthNotice('');
+    await enterApp(session.user.displayName, session.user.email);
   };
 
   const handleRegister = async ({ identifier, password, displayName }: AuthCredentials) => {
@@ -74,6 +87,7 @@ export default function App() {
       displayName: displayName || identifier.split('@')[0] || 'FitMate User',
     });
     setAuthenticated(true);
+    setAuthNotice('');
     await enterApp(session.user.displayName, session.user.email);
   };
 
@@ -109,6 +123,7 @@ export default function App() {
         <LoginScreen
           go={goAuthenticated}
           onLogin={handleLogin}
+          runtimeInfo={authNotice}
         />
       );
     }

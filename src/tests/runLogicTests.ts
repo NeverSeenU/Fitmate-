@@ -136,6 +136,48 @@ async function testApiClientDoesNotMaskErrorDetailsWithAlreadyRead() {
   assert(message === 'thread_not_found', 'API errors must preserve backend text instead of masking with Already read');
 }
 
+async function testBackendServiceClearsInvalidToken() {
+  const requests: ApiRequestRecord[] = [];
+  let invalidated = 0;
+  const services = createFitMateServices({
+    baseUrl: 'https://api.example.test',
+    onAuthInvalid: () => {
+      invalidated += 1;
+    },
+    fetchImpl: async (url, init) => {
+      requests.push({ url, init });
+      if (url.endsWith('/v1/auth/login')) {
+        return jsonResponse({
+          access_token: 'stale-token',
+          user: {
+            id: 'user-1',
+            email: 'jason@example.com',
+            display_name: 'Jason',
+          },
+        });
+      }
+      if (url.endsWith('/v1/chat/messages')) {
+        return jsonResponse({ detail: 'invalid_token' }, 401);
+      }
+      return jsonResponse({ id: 'thread-1', title: 'FitMate', kind: 'general' });
+    },
+  });
+
+  await services.auth.login({ identifier: 'jason@example.com', password: 'StrongPass123' });
+  let message = '';
+  try {
+    await services.api?.chat.sendTextMessage({ threadId: 'thread-1', text: 'hello' });
+  } catch (error) {
+    message = error instanceof Error ? error.message : String(error);
+  }
+  await services.api?.chat.createThread({ title: 'FitMate' });
+
+  assert(invalidated === 1, 'invalid token responses must notify the app once');
+  assert(message === '登录已过期，请重新登录。', 'invalid token must show a re-login message');
+  assert(requests[1].init.headers.Authorization === 'Bearer stale-token', 'first authenticated call must use the login token');
+  assert(!requests[2].init.headers.Authorization, 'invalid token must be cleared before the next authenticated call');
+}
+
 async function testApiClientMapsUnsupportedHeicPhotoErrors() {
   const api = createBackendApi({
     baseUrl: 'https://api.example.test',
@@ -945,6 +987,7 @@ async function run() {
   await testApiClientAuthHeadersAndJsonBody();
   await testApiClientHandlesEmptyDeleteResponses();
   await testApiClientDoesNotMaskErrorDetailsWithAlreadyRead();
+  await testBackendServiceClearsInvalidToken();
   await testApiClientMapsUnsupportedHeicPhotoErrors();
   await testApiClientMultipartPhotoUpload();
   await testMockFallbackServicesStayAvailable();
