@@ -129,7 +129,7 @@ class FoodVisionRouter:
                 purpose=purpose,
                 status="error",
                 latency_ms=self._latency_ms(started),
-                error_code=exc.__class__.__name__,
+                error_code=str(exc) or exc.__class__.__name__,
             )
             return None
 

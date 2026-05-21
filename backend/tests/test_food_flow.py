@@ -154,7 +154,7 @@ def test_photo_rejects_unsupported_upload_type() -> None:
 def test_photo_converts_heic_before_analysis(monkeypatch) -> None:
     headers = auth_headers("unsupported-heic@example.com")
     thread_id = create_thread(headers)
-    monkeypatch.setattr(food_api, "convert_heic_to_jpeg", lambda image_bytes: b"converted-jpeg")
+    monkeypatch.setattr(food_api, "normalize_for_ai_provider", lambda image_bytes: b"converted-jpeg")
 
     response = client.post(
         "/v1/chat/photo",
@@ -171,7 +171,7 @@ def test_photo_converts_heic_bytes_even_when_labeled_jpeg(monkeypatch) -> None:
     headers = auth_headers("unsupported-heic-bytes@example.com")
     thread_id = create_thread(headers)
     heic_bytes = b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00"
-    monkeypatch.setattr(food_api, "convert_heic_to_jpeg", lambda image_bytes: b"converted-jpeg")
+    monkeypatch.setattr(food_api, "normalize_for_ai_provider", lambda image_bytes: b"converted-jpeg")
 
     response = client.post(
         "/v1/chat/photo",

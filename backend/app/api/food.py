@@ -10,9 +10,10 @@ from app.repositories.sqlalchemy.model_calls import SqlAlchemyModelCallRepositor
 from app.services.image_conversion import (
     ImageConversionError,
     ImageConversionUnavailableError,
-    convert_heic_to_jpeg,
     is_heic_image_bytes,
     jpeg_filename,
+    normalize_for_ai_provider,
+    should_normalize_image_bytes,
 )
 from app.services.food_service import FoodService
 from app.services.usage_service import UsageLimitExceededError
@@ -76,9 +77,10 @@ async def analyze_chat_photo(
 
     image_content_type = image.content_type or "application/octet-stream"
     image_filename = image.filename or "food-photo.jpg"
-    if image_content_type in HEIC_CONTENT_TYPES or is_heic_image_bytes(image_bytes):
+    should_store_as_jpeg = image_content_type in HEIC_CONTENT_TYPES or should_normalize_image_bytes(image_bytes)
+    if should_store_as_jpeg:
         try:
-            image_bytes = convert_heic_to_jpeg(image_bytes)
+            image_bytes = normalize_for_ai_provider(image_bytes)
         except ImageConversionUnavailableError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

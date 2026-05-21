@@ -441,13 +441,16 @@ function apiErrorMessage(status: number, detail: unknown) {
   const body = detail as { detail?: unknown; message?: unknown };
   const nested = body?.detail as { code?: unknown; message?: unknown } | string | undefined;
   if (typeof nested === 'object' && nested?.code === 'vision_unavailable') {
-    return '图片识别暂时不可用：AI 识别服务还没有接入或当前不可用。你可以先用文字记录食物。';
+    return 'Image recognition is temporarily unavailable. FitMate could not process this photo right now; please try again.';
   }
-  if (typeof nested === 'object' && nested?.code === 'unsupported_heic_image') {
-    return '当前照片格式是 HEIC/HEIF，FitMate 暂时只支持 JPEG、PNG、WebP。请换一张 JPEG/PNG 图片，或在 iPhone 相机设置里选择“兼容性最佳”。';
+  if (typeof nested === 'object' && nested?.code === 'image_conversion_unavailable') {
+    return 'Photo conversion is temporarily unavailable. Please try again later.';
+  }
+  if (typeof nested === 'object' && nested?.code === 'image_conversion_failed') {
+    return 'This photo could not be decoded. Please upload the original photo again.';
   }
   if (typeof nested === 'object' && nested?.code === 'unsupported_image_type') {
-    return '当前图片格式暂不支持，请上传 JPEG、PNG 或 WebP 图片。';
+    return 'This photo format is not supported yet. Please upload the original system camera or photo library image.';
   }
   if (typeof nested === 'object' && nested?.code === 'fair_use_limit_reached') {
     return '今天的使用次数已达到当前订阅的公平使用上限。你可以明天再试，或升级订阅后继续使用。';
