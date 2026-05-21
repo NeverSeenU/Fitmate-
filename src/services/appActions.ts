@@ -798,6 +798,9 @@ function toFileInsight(response: FileUploadResponse): FileInsight | undefined {
   return {
     documentType: upload.document_type,
     filename: upload.filename,
+    confidence: upload.confidence,
+    modelProvider: upload.model_provider,
+    modelName: upload.model_name,
     syncStatus: hasSyncableFileInsight(upload.document_type, upload.insights)
       ? 'available'
       : 'unavailable',
@@ -805,6 +808,8 @@ function toFileInsight(response: FileUploadResponse): FileInsight | undefined {
       label: item.label,
       value: item.value,
       source: item.source,
+      sourceText: item.source_text,
+      confidence: item.confidence,
     })),
     recommendations: upload.recommendations ?? [],
   };

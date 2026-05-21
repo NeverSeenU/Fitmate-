@@ -116,6 +116,7 @@ For real provider smoke tests, inject Xiaomi/Qwen keys into the backend process 
 Set `FILE_AI_EXTRACTION_ENABLED=true` when you explicitly want uploaded files to use the AI structured-extraction router; leave it unset for deterministic fixture/smoke testing.
 Set `WORKOUT_AI_ANALYSIS_ENABLED=true` when you explicitly want workout text logs to use the AI structured-analysis router; leave it unset for deterministic fixture/smoke testing.
 Set `TEXT_FOOD_AI_ANALYSIS_ENABLED=true` when you explicitly want text food chat messages to use the AI structured-analysis router; leave it unset for deterministic fixture/smoke testing.
+For the strict file-provider pass, also set `FITMATE_REQUIRE_AI_FILE_METADATA=true` before `npm.cmd run smoke:file-insight-live`; the smoke will fail unless body-report, menu, and workout-plan uploads include provider/model metadata, top-level confidence, per-field confidence, and per-field source text.
 
 Production runtime rules:
 

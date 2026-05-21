@@ -701,9 +701,12 @@ async function testBackendFileUploadCreatesStructuredInsightMessage() {
               status: 'parsed',
               summary_text: 'parsed body report',
               document_type: 'body_report',
+              confidence: 0.82,
+              model_provider: 'xiaomi',
+              model_name: 'mimo-v2-omni',
               insights: [
-                { label: 'weight_kg', value: '70 kg', source: 'file_text' },
-                { label: 'body_fat_percent', value: '21%', source: 'file_text' },
+                { label: 'weight_kg', value: '70 kg', source: 'ai', source_text: 'weight 70 kg', confidence: 0.84 },
+                { label: 'body_fat_percent', value: '21%', source: 'ai', source_text: 'body fat 21%', confidence: 0.79 },
               ],
               recommendations: ['Sync the weight value to the profile or check-in record before comparing trends.'],
               insight_schema_version: 1,
@@ -730,6 +733,10 @@ async function testBackendFileUploadCreatesStructuredInsightMessage() {
   assert(Boolean(insightMessage), 'backend file upload must append an assistant message');
   assert(insightMessage?.fileInsight?.documentType === 'body_report', 'backend file upload must preserve document type for UI cards');
   assert(insightMessage?.fileInsight?.insights.some((item) => item.label === 'weight_kg' && item.value === '70 kg') === true, 'file insight card must preserve typed insight values');
+  assert(insightMessage?.fileInsight?.confidence === 0.82, 'file insight card must preserve top-level confidence');
+  assert(insightMessage?.fileInsight?.modelProvider === 'xiaomi', 'file insight card must preserve model provider');
+  assert(insightMessage?.fileInsight?.modelName === 'mimo-v2-omni', 'file insight card must preserve model name');
+  assert(insightMessage?.fileInsight?.insights.some((item) => item.sourceText === 'weight 70 kg' && item.confidence === 0.84) === true, 'file insight card must preserve per-field source text and confidence');
   assert(insightMessage?.fileInsight?.recommendations.length === 1, 'file insight card must preserve recommendations');
 }
 

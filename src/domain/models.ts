@@ -69,11 +69,16 @@ export type ChatMessage = {
 export type FileInsight = {
   documentType: string;
   filename: string;
+  confidence?: number;
+  modelProvider?: string;
+  modelName?: string;
   syncStatus?: 'available' | 'synced' | 'unavailable';
   insights: Array<{
     label: string;
     value: string;
     source?: string;
+    sourceText?: string;
+    confidence?: number;
   }>;
   recommendations: string[];
 };

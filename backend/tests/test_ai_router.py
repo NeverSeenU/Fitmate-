@@ -159,14 +159,15 @@ def test_file_insight_router_uses_ai_structured_output_and_logs_usage() -> None:
     xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [
         {
             "document_type": "menu",
+            "confidence": 0.83,
             "insights": [
-                {"label": "calories_kcal", "value": "550 kcal", "source": "ai"},
-                {"label": "protein_g", "value": "35g", "source": "ai"},
+                {"label": "calories_kcal", "value": "550 kcal", "source": "ai", "source_text": "calories 550", "confidence": 0.86},
+                {"label": "protein_g", "value": "35g", "source": "ai", "source_text": "protein 35g", "confidence": 0.8},
             ],
             "recommendations": ["Use this meal as a moderate lunch."],
         }
     ])
-    qwen = FakeProvider("qwen", "qwen3-vl-plus", [])
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [RuntimeError("not_configured")])
     model_calls = InMemoryModelCallRepository()
     router = FileInsightRouter(
         primary_provider=xiaomi,
@@ -178,19 +179,24 @@ def test_file_insight_router_uses_ai_structured_output_and_logs_usage() -> None:
 
     assert result is not None
     assert result["document_type"] == "menu"
+    assert result["confidence"] == 0.83
     assert result["model_provider"] == "xiaomi"
     assert {item["label"] for item in result["insights"]}.issuperset({"document_type", "calories_kcal", "protein_g"})
+    protein = next(item for item in result["insights"] if item["label"] == "protein_g")
+    assert protein["source_text"] == "protein 35g"
+    assert protein["confidence"] == 0.8
     assert qwen.calls == 0
     assert model_calls.calls[0].purpose == "file_insight"
     assert model_calls.calls[0].status == "success"
 
 
 def test_file_insight_router_falls_back_when_primary_schema_is_invalid() -> None:
-    xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [{"document_type": "unknown", "insights": [], "recommendations": []}])
+    xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [{"document_type": "unknown", "confidence": 0.8, "insights": [], "recommendations": []}])
     qwen = FakeProvider("qwen", "qwen3-vl-plus", [
         {
             "document_type": "workout_plan",
-            "insights": [{"label": "training_frequency", "value": "4 days/week", "source": "ai"}],
+            "confidence": 0.75,
+            "insights": [{"label": "training_frequency", "value": "4 days/week", "source": "ai", "source_text": "4 days/week", "confidence": 0.75}],
             "recommendations": ["Keep recovery days visible."],
         }
     ])
@@ -207,6 +213,26 @@ def test_file_insight_router_falls_back_when_primary_schema_is_invalid() -> None
     assert result["document_type"] == "workout_plan"
     assert result["model_provider"] == "qwen"
     assert [call.status for call in model_calls.calls] == ["error", "success"]
+
+
+def test_file_insight_router_rejects_invalid_confidence() -> None:
+    xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [
+        {
+            "document_type": "menu",
+            "confidence": 1.4,
+            "insights": [{"label": "protein_g", "value": "35g", "source": "ai"}],
+            "recommendations": [],
+        }
+    ])
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [RuntimeError("not_configured")])
+    model_calls = InMemoryModelCallRepository()
+    router = FileInsightRouter(primary_provider=xiaomi, fallback_provider=qwen, model_call_repository=model_calls)
+
+    result = router.analyze_file_text("menu.txt", "protein 35g", "text/plain")
+
+    assert result is None
+    assert [call.status for call in model_calls.calls] == ["error", "error"]
+    assert model_calls.calls[0].error_code == "schema_error"
 
 
 def test_workout_analysis_router_uses_ai_structured_output_and_logs_usage() -> None:

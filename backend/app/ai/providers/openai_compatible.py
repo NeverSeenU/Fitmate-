@@ -36,8 +36,10 @@ FILE_SYSTEM_PROMPT = (
 )
 FILE_USER_PROMPT = (
     "Classify the uploaded content as one of: body_report, menu, workout_plan, general. "
-    "Return JSON fields: document_type, insights, recommendations. insights must be a list "
-    "of objects with label, value, source. Supported labels: document_type, weight_kg, bmi, "
+    "Return JSON fields: document_type, confidence, insights, recommendations. insights must be a list "
+    "of objects with label, value, source, source_text, confidence. source_text must be a short exact "
+    "excerpt from the uploaded content that supports the value, or empty when unavailable. "
+    "confidence must be 0 to 1. Supported labels: document_type, weight_kg, bmi, "
     "body_fat_percent, protein_g, calories_kcal, training_frequency."
 )
 WORKOUT_SYSTEM_PROMPT = (

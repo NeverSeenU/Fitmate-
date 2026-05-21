@@ -77,7 +77,8 @@ def test_xiaomi_provider_sends_openai_compatible_file_extraction_request(monkeyp
     monkeypatch.setenv("XIAOMI_BASE_URL", "https://mimo.example/v1")
     transport = FakeTransport(response_payload=chat_response({
         "document_type": "body_report",
-        "insights": [{"label": "weight_kg", "value": "70 kg", "source": "ai"}],
+        "confidence": 0.84,
+        "insights": [{"label": "weight_kg", "value": "70 kg", "source": "ai", "source_text": "weight 70 kg", "confidence": 0.84}],
         "recommendations": ["Sync weight after user confirmation."],
     }))
     provider = XiaomiVisionProvider(transport=transport)
@@ -90,6 +91,8 @@ def test_xiaomi_provider_sends_openai_compatible_file_extraction_request(monkeyp
     assert request["payload"]["response_format"] == {"type": "json_object"}
     assert request["payload"]["messages"][0]["role"] == "system"
     assert request["payload"]["messages"][1]["role"] == "user"
+    assert "document_type, confidence, insights, recommendations" in request["payload"]["messages"][1]["content"]
+    assert "source_text" in request["payload"]["messages"][1]["content"]
     assert "Filename: body-report.txt" in request["payload"]["messages"][1]["content"]
     assert "User question: What changed?" in request["payload"]["messages"][1]["content"]
 

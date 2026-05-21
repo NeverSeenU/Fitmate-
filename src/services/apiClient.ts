@@ -58,9 +58,12 @@ export type FileUploadResponse = {
     status: string;
     summary_text: string;
     document_type?: string;
-    insights?: Array<{ label: string; value: string; source?: string }>;
+    confidence?: number;
+    insights?: Array<{ label: string; value: string; source?: string; source_text?: string; confidence?: number }>;
     recommendations?: string[];
     insight_schema_version?: number;
+    model_provider?: string;
+    model_name?: string;
   };
   assistant_message?: { id?: string; content_text?: string; message_type?: string; structured_json?: unknown };
 };

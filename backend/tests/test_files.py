@@ -59,11 +59,17 @@ def test_file_upload_stores_file_and_returns_text_summary() -> None:
     assert body["file_upload"]["status"] == "parsed"
     assert "protein 120g" in body["file_upload"]["summary_text"]
     assert body["file_upload"]["document_type"] == "body_report"
+    assert body["file_upload"]["confidence"] == 0.7
     insight_labels = {item["label"] for item in body["file_upload"]["insights"]}
     assert {"document_type", "protein_g", "weight_kg"}.issubset(insight_labels)
+    weight_insight = next(item for item in body["file_upload"]["insights"] if item["label"] == "weight_kg")
+    assert weight_insight["source"] == "file_text"
+    assert weight_insight["source_text"]
+    assert weight_insight["confidence"] == 0.65
     assert body["file_upload"]["recommendations"]
     assert body["assistant_message"]["message_type"] == "file_summary"
     assert body["assistant_message"]["structured_json"]["file_upload"]["document_type"] == "body_report"
+    assert body["assistant_message"]["structured_json"]["file_upload"]["confidence"] == 0.7
     assert body["assistant_message"]["structured_json"]["user_prompt"] == "What should I sync?"
 
     messages = client.get(f"/v1/chat/threads/{thread_id}/messages", headers=headers).json()["messages"]

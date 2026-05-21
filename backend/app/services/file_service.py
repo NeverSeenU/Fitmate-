@@ -165,6 +165,7 @@ class FileService:
         data["updated_at"] = upload.updated_at.isoformat()
         if file_insights is not None:
             data["document_type"] = file_insights["document_type"]
+            data["confidence"] = file_insights.get("confidence")
             data["insights"] = file_insights["insights"]
             data["recommendations"] = file_insights["recommendations"]
             data["insight_schema_version"] = file_insights["schema_version"]
@@ -243,10 +244,17 @@ def build_file_insights(filename: str, content: bytes, content_type: str) -> dic
     searchable = f"{filename} {text}".lower()
     document_type = _document_type(searchable)
     insights = _extract_insights(searchable)
-    insights.insert(0, {"label": "document_type", "value": document_type, "source": "heuristic"})
+    insights.insert(0, {
+        "label": "document_type",
+        "value": document_type,
+        "source": "heuristic",
+        "source_text": "",
+        "confidence": 0.6,
+    })
     return {
         "schema_version": FILE_INSIGHT_SCHEMA_VERSION,
         "document_type": document_type,
+        "confidence": 0.6 if document_type == "general" else 0.7,
         "insights": insights[:8],
         "recommendations": _recommendations(document_type, insights),
     }
@@ -333,7 +341,13 @@ def _extract_insights(text: str) -> list[dict[str, str]]:
             value = f"{value} kcal"
         elif label == "training_frequency":
             value = f"{value} days/week"
-        insights.append({"label": label, "value": value, "source": "file_text"})
+        insights.append({
+            "label": label,
+            "value": value,
+            "source": "file_text",
+            "source_text": match.group(0).strip()[:240],
+            "confidence": 0.65,
+        })
     return insights
 
 

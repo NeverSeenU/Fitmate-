@@ -110,6 +110,7 @@ async function run() {
   });
 
   const uploads: Array<{ fixture: LiveFileFixture; response: FileUploadResponse; labels: Set<string> }> = [];
+  const requireAiMetadata = process.env?.FITMATE_REQUIRE_AI_FILE_METADATA === 'true';
   for (const fixture of fileFixtures) {
     const response = await uploadFile(thread.id, session.access_token, fixture);
     const labels = new Set((response.file_upload.insights ?? []).map((item) => item.label));
@@ -119,6 +120,16 @@ async function run() {
     );
     for (const label of fixture.requiredLabels) {
       assert(labels.has(label), `live upload must extract ${label} from ${fixture.filename}`);
+    }
+    if (requireAiMetadata) {
+      assert(response.file_upload.model_provider === 'xiaomi' || response.file_upload.model_provider === 'qwen', `${fixture.filename} must use a real AI provider`);
+      assert(Boolean(response.file_upload.model_name), `${fixture.filename} must include model name`);
+      assert(typeof response.file_upload.confidence === 'number', `${fixture.filename} must include top-level confidence`);
+      for (const label of fixture.requiredLabels) {
+        const insight = response.file_upload.insights?.find((item) => item.label === label);
+        assert(typeof insight?.confidence === 'number', `${fixture.filename} ${label} must include field confidence`);
+        assert(Boolean(insight?.source_text), `${fixture.filename} ${label} must include source_text`);
+      }
     }
     uploads.push({ fixture, response, labels });
   }
@@ -209,7 +220,11 @@ async function run() {
     uploads: uploads.map(({ fixture, response, labels }) => ({
       filename: fixture.filename,
       documentType: response.file_upload.document_type,
+      confidence: response.file_upload.confidence,
+      modelProvider: response.file_upload.model_provider,
+      modelName: response.file_upload.model_name,
       labels: [...labels].sort(),
+      metadataMode: requireAiMetadata ? 'required' : 'optional',
     })),
     syncedRecordKinds: state.records.map((record) => record.kind),
     syncedWeightKg: state.profile.weightKg,
@@ -220,8 +235,17 @@ function toFileInsight(response: FileUploadResponse): FileInsight {
   return {
     documentType: response.file_upload.document_type ?? 'general',
     filename: response.file_upload.filename,
+    confidence: response.file_upload.confidence,
+    modelProvider: response.file_upload.model_provider,
+    modelName: response.file_upload.model_name,
     syncStatus: 'available',
-    insights: response.file_upload.insights ?? [],
+    insights: (response.file_upload.insights ?? []).map((item) => ({
+      label: item.label,
+      value: item.value,
+      source: item.source,
+      sourceText: item.source_text,
+      confidence: item.confidence,
+    })),
     recommendations: response.file_upload.recommendations ?? [],
   };
 }

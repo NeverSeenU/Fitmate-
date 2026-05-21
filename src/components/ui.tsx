@@ -295,6 +295,7 @@ function FileInsightCard({ insight, onSync }: { insight: FileInsight; onSync?: (
         <View style={styles.fileInsightTitleWrap}>
           <Text style={styles.bodyStrong}>{documentTypeLabel(insight.documentType)}</Text>
           <Text style={styles.muted}>{insight.filename}</Text>
+          {fileInsightMetadata(insight) ? <Text style={styles.muted}>{fileInsightMetadata(insight)}</Text> : null}
         </View>
         <View style={styles.pill}>
           <Text style={styles.pillText}>{insight.documentType}</Text>
@@ -306,6 +307,8 @@ function FileInsightCard({ insight, onSync }: { insight: FileInsight; onSync?: (
             <View key={`${item.label}-${item.value}`} style={styles.fileInsightMetric}>
               <Text style={styles.metricValue}>{item.value}</Text>
               <Text style={styles.metricLabel}>{insightLabel(item.label)}</Text>
+              {insightMetricMetadata(item) ? <Text style={styles.metricLabel}>{insightMetricMetadata(item)}</Text> : null}
+              {item.sourceText ? <Text style={styles.metricLabel} numberOfLines={2}>{item.sourceText}</Text> : null}
             </View>
           ))}
         </View>
@@ -315,6 +318,29 @@ function FileInsightCard({ insight, onSync }: { insight: FileInsight; onSync?: (
       {insight.syncStatus === 'synced' ? <Text style={styles.doneStatus}>已同步到档案和今日记录</Text> : null}
     </View>
   );
+}
+
+function fileInsightMetadata(insight: FileInsight) {
+  const parts = [
+    insight.confidence === undefined ? null : `confidence ${insight.confidence.toFixed(2)}`,
+    insight.modelProvider && insight.modelName ? `${insight.modelProvider}/${insight.modelName}` : insight.modelName ?? insight.modelProvider ?? null,
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
+function insightMetricMetadata(item: FileInsight['insights'][number]) {
+  const parts = [
+    item.confidence === undefined ? null : `confidence ${item.confidence.toFixed(2)}`,
+    item.source ? sourceLabel(item.source) : null,
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
+function sourceLabel(source: string) {
+  if (source === 'ai') return 'AI';
+  if (source === 'file_text') return 'file text';
+  if (source === 'heuristic') return 'fallback';
+  return source.replace(/_/g, ' ');
 }
 
 function hasSyncableInsight(insight: FileInsight) {

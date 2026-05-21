@@ -310,9 +310,12 @@
 - `.env.example` now documents the AI extraction feature flags for file, workout, and food-text provider testing.
 - Expo Go on-device verification passed for the GPT-style pending attachment composer, including file preview before send, remove affordance, question-plus-file send, file insight card generation, sync buttons, Records navigation, and reload persistence.
 - Expo Go on-device verification passed for body-report, menu, and workout-plan file insight flows against the local backend, so the remaining open product work moves to real AI-generated extraction quality.
+- P3-12 file extraction metadata pass now validates and returns top-level confidence, provider/model metadata, and per-insight confidence/source text for uploaded-file cards.
+- Mobile file insight cards now display extraction confidence, model/provider metadata, per-field source, and source excerpts without changing the existing explicit sync behavior.
+- `npm.cmd run smoke:file-insight-live` now has strict provider metadata mode via `FITMATE_REQUIRE_AI_FILE_METADATA=true`; ordinary fallback smoke remains deterministic when AI keys are not configured.
 
 ## What's Next
-- Enable/provider-test AI extraction with real keys across food text, food photo, files, and workout notes, then add confidence/source metadata to user-facing cards.
+- Run strict file-provider smoke with real Xiaomi/Qwen keys, then extend the same confidence/source metadata pattern to food text, food photos, and workout notes.
 
 ## Blockers
 - None for local PostgreSQL migration verification.

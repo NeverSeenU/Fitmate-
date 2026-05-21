@@ -94,20 +94,40 @@ def validate_file_insights(raw: object) -> dict[str, Any]:
     insights = raw.get("insights")
     if not isinstance(insights, list):
         raise FileInsightSchemaError("insights_must_be_list")
-    normalized_insights: list[dict[str, str]] = []
+    overall_confidence = raw.get("confidence", 0.7)
+    if not isinstance(overall_confidence, int | float) or overall_confidence < 0 or overall_confidence > 1:
+        raise FileInsightSchemaError("confidence_invalid")
+
+    normalized_insights: list[dict[str, Any]] = []
     for item in insights[:8]:
         if not isinstance(item, dict):
             raise FileInsightSchemaError("insight_must_be_object")
         label = item.get("label")
         value = item.get("value")
         source = item.get("source", "ai")
+        source_text = item.get("source_text") or item.get("sourceText") or ""
+        confidence = item.get("confidence", overall_confidence)
+        if not isinstance(confidence, int | float) or confidence < 0 or confidence > 1:
+            raise FileInsightSchemaError("insight_confidence_invalid")
         if label not in FILE_INSIGHT_LABELS:
             continue
         if not isinstance(value, str) or not value.strip():
             continue
-        normalized_insights.append({"label": label, "value": value.strip(), "source": str(source or "ai")})
+        normalized_insights.append({
+            "label": label,
+            "value": value.strip(),
+            "source": str(source or "ai"),
+            "source_text": str(source_text).strip()[:240],
+            "confidence": round(float(confidence), 2),
+        })
     if not any(item["label"] == "document_type" for item in normalized_insights):
-        normalized_insights.insert(0, {"label": "document_type", "value": document_type, "source": "ai"})
+        normalized_insights.insert(0, {
+            "label": "document_type",
+            "value": document_type,
+            "source": "ai",
+            "source_text": "",
+            "confidence": round(float(overall_confidence), 2),
+        })
 
     recommendations = raw.get("recommendations", [])
     if not isinstance(recommendations, list):
@@ -117,6 +137,7 @@ def validate_file_insights(raw: object) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "document_type": document_type,
+        "confidence": round(float(overall_confidence), 2),
         "insights": normalized_insights,
         "recommendations": normalized_recommendations,
     }
