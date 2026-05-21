@@ -308,9 +308,11 @@
 - AI food text analysis reuses the food-photo nutrition schema, adapts into the existing editable food-card contract, and falls back to the deterministic text parser when disabled, unavailable, or invalid.
 - File uploads now support a user question sent in the same multipart request as the attachment, so the composer can send "question + file" as one AI analysis action instead of separate chat and upload actions.
 - `.env.example` now documents the AI extraction feature flags for file, workout, and food-text provider testing.
+- Expo Go on-device verification passed for the GPT-style pending attachment composer, including file preview before send, remove affordance, question-plus-file send, file insight card generation, sync buttons, Records navigation, and reload persistence.
+- Expo Go on-device verification passed for body-report, menu, and workout-plan file insight flows against the local backend, so the remaining open product work moves to real AI-generated extraction quality.
 
 ## What's Next
-- Verify the pending attachment composer in Expo Go, then enable/provider-test AI extraction with real keys across food text, food photo, files, and workout notes.
+- Enable/provider-test AI extraction with real keys across food text, food photo, files, and workout notes, then add confidence/source metadata to user-facing cards.
 
 ## Blockers
 - None for local PostgreSQL migration verification.
