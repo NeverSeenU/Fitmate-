@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.ai.router import FoodVisionUnavailableError
+from app.api import food as food_api
 from app.db.session import SessionLocal
 from app.main import app
 from app.repositories.sqlalchemy.auth import SqlAlchemyAuthRepository
@@ -35,7 +36,7 @@ class FakeVisionRouter:
         user_note: str | None = None,
         user_id: str | None = None,
     ) -> dict:
-        assert image_bytes == b"fake-image"
+        assert image_bytes in {b"fake-image", b"converted-jpeg"}
         return dict(VISION_ANALYSIS)
 
 
@@ -150,9 +151,10 @@ def test_photo_rejects_unsupported_upload_type() -> None:
     assert response.json()["detail"]["code"] == "unsupported_image_type"
 
 
-def test_photo_rejects_heic_with_specific_error() -> None:
+def test_photo_converts_heic_before_analysis(monkeypatch) -> None:
     headers = auth_headers("unsupported-heic@example.com")
     thread_id = create_thread(headers)
+    monkeypatch.setattr(food_api, "convert_heic_to_jpeg", lambda image_bytes: b"converted-jpeg")
 
     response = client.post(
         "/v1/chat/photo",
@@ -161,14 +163,15 @@ def test_photo_rejects_heic_with_specific_error() -> None:
         files={"image": ("photo.heic", b"heic-image", "image/heic")},
     )
 
-    assert response.status_code == 415
-    assert response.json()["detail"]["code"] == "unsupported_heic_image"
+    assert response.status_code == 200
+    assert response.json()["food_analysis"]["meal_name"] == VISION_ANALYSIS["meal_name"]
 
 
-def test_photo_rejects_heic_bytes_even_when_labeled_jpeg() -> None:
+def test_photo_converts_heic_bytes_even_when_labeled_jpeg(monkeypatch) -> None:
     headers = auth_headers("unsupported-heic-bytes@example.com")
     thread_id = create_thread(headers)
     heic_bytes = b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00"
+    monkeypatch.setattr(food_api, "convert_heic_to_jpeg", lambda image_bytes: b"converted-jpeg")
 
     response = client.post(
         "/v1/chat/photo",
@@ -177,8 +180,8 @@ def test_photo_rejects_heic_bytes_even_when_labeled_jpeg() -> None:
         files={"image": ("photo.jpg", heic_bytes, "image/jpeg")},
     )
 
-    assert response.status_code == 415
-    assert response.json()["detail"]["code"] == "unsupported_heic_image"
+    assert response.status_code == 200
+    assert response.json()["food_analysis"]["meal_name"] == VISION_ANALYSIS["meal_name"]
 
 
 def test_photo_rejects_uploads_larger_than_limit() -> None:

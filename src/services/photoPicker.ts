@@ -30,7 +30,7 @@ export async function pickFoodPhoto(source: PhotoPickerSource): Promise<PickedPh
   const pickedName = asset.fileName ?? filenameFromUri(asset.uri);
   const mimeType = normalizeImageMimeType(asset.mimeType, pickedName, asset.uri);
   if (!isSupportedImageMimeType(mimeType)) {
-    throw new Error('当前照片格式暂不支持，请在 iPhone 相机设置中选择“兼容性最佳”，或先选择 JPEG/PNG 图片。');
+    throw new Error('Unsupported photo format. Please try the original photo from the system camera or photo library.');
   }
   return {
     imageUri: asset.uri,
@@ -51,9 +51,17 @@ function filenameFromUri(uri: string) {
 }
 
 function withImageExtension(filename: string, mimeType: string) {
-  if (/\.(jpe?g|png|webp)$/i.test(filename)) {
+  if (/\.(jpe?g|png|webp|heic|heif)$/i.test(filename)) {
     return filename;
   }
-  const extension = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+  const extension = mimeType === 'image/png'
+    ? 'png'
+    : mimeType === 'image/webp'
+      ? 'webp'
+      : mimeType === 'image/heic'
+        ? 'heic'
+        : mimeType === 'image/heif'
+          ? 'heif'
+          : 'jpg';
   return `${filename}.${extension}`;
 }

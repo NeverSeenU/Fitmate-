@@ -7,6 +7,13 @@ from pydantic import BaseModel, ConfigDict
 from app.ai.router import FoodVisionRouter, FoodVisionUnavailableError
 from app.api.deps import CurrentUser, DbSession, get_food_service
 from app.repositories.sqlalchemy.model_calls import SqlAlchemyModelCallRepository
+from app.services.image_conversion import (
+    ImageConversionError,
+    ImageConversionUnavailableError,
+    convert_heic_to_jpeg,
+    is_heic_image_bytes,
+    jpeg_filename,
+)
 from app.services.food_service import FoodService
 from app.services.usage_service import UsageLimitExceededError
 
@@ -15,7 +22,7 @@ router = APIRouter(tags=["food"])
 FoodServiceDependency = Annotated[FoodService, Depends(get_food_service)]
 MAX_PHOTO_UPLOAD_BYTES = 8 * 1024 * 1024
 SUPPORTED_PHOTO_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
-UNSUPPORTED_HEIC_CONTENT_TYPES = {"image/heic", "image/heif"}
+HEIC_CONTENT_TYPES = {"image/heic", "image/heif"}
 
 
 def get_food_vision_router(db: DbSession) -> FoodVisionRouter:
@@ -57,19 +64,7 @@ async def analyze_chat_photo(
     user_note: str | None = Form(default=None),
     vision_router: FoodVisionRouter = Depends(get_food_vision_router),
 ) -> dict:
-    if image.content_type in UNSUPPORTED_HEIC_CONTENT_TYPES:
-        raise_unsupported_heic_image()
-    if image.content_type not in SUPPORTED_PHOTO_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail={
-                "code": "unsupported_image_type",
-                "message": "Food photo uploads must be JPEG, PNG, or WebP images.",
-            },
-        )
     image_bytes = await image.read()
-    if is_heic_image_bytes(image_bytes):
-        raise_unsupported_heic_image()
     if len(image_bytes) > MAX_PHOTO_UPLOAD_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
@@ -78,13 +73,46 @@ async def analyze_chat_photo(
                 "message": "Food photo uploads must be 8 MB or smaller.",
             },
         )
+
+    image_content_type = image.content_type or "application/octet-stream"
+    image_filename = image.filename or "food-photo.jpg"
+    if image_content_type in HEIC_CONTENT_TYPES or is_heic_image_bytes(image_bytes):
+        try:
+            image_bytes = convert_heic_to_jpeg(image_bytes)
+        except ImageConversionUnavailableError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "code": "image_conversion_unavailable",
+                    "message": "Photo conversion is temporarily unavailable. Please try again later.",
+                },
+            ) from exc
+        except ImageConversionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail={
+                    "code": "image_conversion_failed",
+                    "message": "This photo could not be decoded. Please try uploading the original image again.",
+                },
+            ) from exc
+        image_content_type = "image/jpeg"
+        image_filename = jpeg_filename(image_filename)
+
+    if image_content_type not in SUPPORTED_PHOTO_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail={
+                "code": "unsupported_image_type",
+                "message": "Food photo uploads must be JPEG, PNG, WebP, HEIC, or HEIF images.",
+            },
+        )
     try:
         result = service.analyze_photo(
             user_id=user["id"],
             thread_id=thread_id,
             image_bytes=image_bytes,
-            image_filename=image.filename or "food-photo.jpg",
-            image_content_type=image.content_type or "image/jpeg",
+            image_filename=image_filename,
+            image_content_type=image_content_type,
             user_note=user_note,
             vision_router=vision_router,
         )
@@ -108,28 +136,6 @@ async def analyze_chat_photo(
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="thread_not_found")
     return result
-
-
-def is_heic_image_bytes(image_bytes: bytes) -> bool:
-    # ISO BMFF files such as HEIC/HEIF usually declare a major brand near byte 8.
-    return len(image_bytes) >= 12 and image_bytes[4:8] == b"ftyp" and image_bytes[8:12] in {
-        b"heic",
-        b"heix",
-        b"hevc",
-        b"hevx",
-        b"mif1",
-        b"msf1",
-    }
-
-
-def raise_unsupported_heic_image() -> None:
-    raise HTTPException(
-        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-        detail={
-            "code": "unsupported_heic_image",
-            "message": "HEIC/HEIF photos are not supported yet. Please upload a JPEG, PNG, or WebP image.",
-        },
-    )
 
 
 @router.get("/food/logs")

@@ -1,10 +1,12 @@
-const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 
 const EXTENSION_MIME_TYPES: Record<string, string> = {
   csv: 'text/csv',
   doc: 'application/msword',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   jpeg: 'image/jpeg',
+  heic: 'image/heic',
+  heif: 'image/heif',
   jpg: 'image/jpeg',
   pdf: 'application/pdf',
   png: 'image/png',
@@ -31,6 +33,12 @@ export function normalizeImageMimeType(mimeType: string | null | undefined, file
   }
   if (lowerName.endsWith('.webp')) {
     return 'image/webp';
+  }
+  if (lowerName.endsWith('.heic')) {
+    return 'image/heic';
+  }
+  if (lowerName.endsWith('.heif')) {
+    return 'image/heif';
   }
   return imageMimeTypeFromUri(uri);
 }

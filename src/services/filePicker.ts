@@ -19,6 +19,8 @@ const SUPPORTED_FILE_TYPES = [
   'image/jpeg',
   'image/png',
   'image/webp',
+  'image/heic',
+  'image/heif',
 ];
 
 export class UnsupportedFileTypeError extends Error {
