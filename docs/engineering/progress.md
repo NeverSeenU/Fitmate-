@@ -314,6 +314,7 @@
 - Mobile file insight cards now display extraction confidence, model/provider metadata, per-field source, and source excerpts without changing the existing explicit sync behavior.
 - `npm.cmd run smoke:file-insight-live` now has strict provider metadata mode via `FITMATE_REQUIRE_AI_FILE_METADATA=true`; ordinary fallback smoke remains deterministic when AI keys are not configured.
 - Food analysis cards now preserve and display AI provider/model metadata, and workout analysis records preserve confidence, provider/model, and summary metadata in the record detail.
+- Strict real-provider file extraction smoke passed against Xiaomi on `body-report`, `menu`, and `workout-plan` fixtures after tightening the file extraction prompt to require explicit supported values, source text, confidence, and provider metadata.
 
 ## What's Next
 - Run strict file-provider smoke with real Xiaomi/Qwen keys, then extend the same confidence/source metadata pattern to food text, food photos, and workout notes.

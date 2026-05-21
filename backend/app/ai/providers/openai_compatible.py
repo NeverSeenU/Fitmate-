@@ -40,7 +40,13 @@ FILE_USER_PROMPT = (
     "of objects with label, value, source, source_text, confidence. source_text must be a short exact "
     "excerpt from the uploaded content that supports the value, or empty when unavailable. "
     "confidence must be 0 to 1. Supported labels: document_type, weight_kg, bmi, "
-    "body_fat_percent, protein_g, calories_kcal, training_frequency."
+    "body_fat_percent, protein_g, calories_kcal, training_frequency. "
+    "Do not return only document_type when the text contains supported values. "
+    "Extract every supported value that is explicitly present in the text. "
+    "Examples: text 'weight 70kg body fat 21% protein 120g' must include "
+    "weight_kg='70 kg', body_fat_percent='21%', protein_g='120g'. "
+    "Text 'protein 35g calories 550 kcal' must include protein_g='35g' and calories_kcal='550 kcal'. "
+    "Text '4 days/week' must include training_frequency='4 days/week'."
 )
 WORKOUT_SYSTEM_PROMPT = (
     "You are FitMate AI's workout log analyst. Return valid JSON only. "

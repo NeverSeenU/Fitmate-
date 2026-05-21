@@ -93,6 +93,8 @@ def test_xiaomi_provider_sends_openai_compatible_file_extraction_request(monkeyp
     assert request["payload"]["messages"][1]["role"] == "user"
     assert "document_type, confidence, insights, recommendations" in request["payload"]["messages"][1]["content"]
     assert "source_text" in request["payload"]["messages"][1]["content"]
+    assert "Do not return only document_type" in request["payload"]["messages"][1]["content"]
+    assert "weight_kg='70 kg'" in request["payload"]["messages"][1]["content"]
     assert "Filename: body-report.txt" in request["payload"]["messages"][1]["content"]
     assert "User question: What changed?" in request["payload"]["messages"][1]["content"]
 
