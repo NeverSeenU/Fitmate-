@@ -48,6 +48,7 @@ export function FoodAnalysisCard({
           <Text style={styles.muted}>
             置信度 {analysis.confidence.toFixed(2)} · {canManage ? '待你确认，确认后才写入记录' : foodAnalysisStatusCopy(analysis.status)}
           </Text>
+          {foodAnalysisMetadata(analysis) ? <Text style={styles.muted}>{foodAnalysisMetadata(analysis)}</Text> : null}
         </View>
         <Text style={styles.status}>{foodAnalysisStatusLabel(analysis.status)}</Text>
       </View>
@@ -68,6 +69,13 @@ export function FoodAnalysisCard({
       ) : null}
     </View>
   );
+}
+
+function foodAnalysisMetadata(analysis: FoodAnalysis) {
+  if (analysis.modelProvider && analysis.modelName) {
+    return `${analysis.modelProvider}/${analysis.modelName}`;
+  }
+  return analysis.modelName ?? analysis.modelProvider ?? '';
 }
 
 function foodAnalysisStatusLabel(status: FoodAnalysis['status']) {

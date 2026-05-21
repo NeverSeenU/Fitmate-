@@ -67,6 +67,8 @@ function mapActiveFoodAnalysis(
     title: stringValue(pending.meal_name) ?? '食物记录',
     status: stringValue(pending.status) === 'edited' ? 'edited' : 'pending',
     confidence: numberValue(pending.confidence) ?? 0.7,
+    modelProvider: stringValue(pending.model_provider),
+    modelName: stringValue(pending.model_name),
     calories: formatPlainRange(pending.calories_range_kcal) ?? '待估算',
     protein: `${formatPlainRange(pending.protein_g_range) ?? '待估算'}g`,
     carbs: `${formatPlainRange(pending.carbs_g_range) ?? '待估算'}g`,

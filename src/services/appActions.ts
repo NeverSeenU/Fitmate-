@@ -233,6 +233,10 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           duration_minutes?: number;
           intensity?: string;
           calories_burned_range_kcal?: number[];
+          confidence?: number | null;
+          model_provider?: string | null;
+          model_name?: string | null;
+          summary?: string | null;
           status?: string;
         };
       } : null;
@@ -704,6 +708,10 @@ function toWorkoutRecord(
     duration_minutes?: number;
     intensity?: string;
     calories_burned_range_kcal?: number[];
+    confidence?: number | null;
+    model_provider?: string | null;
+    model_name?: string | null;
+    summary?: string | null;
     status?: string;
   } | undefined,
   fallbackText: string,
@@ -718,6 +726,11 @@ function toWorkoutRecord(
         ? '已编辑'
         : '已记录';
   const title = workoutTitle(analysis?.workout_type, fallbackText);
+  const metadata = [
+    analysis?.confidence === undefined || analysis.confidence === null ? null : `confidence ${analysis.confidence.toFixed(2)}`,
+    analysis?.model_provider && analysis?.model_name ? `${analysis.model_provider}/${analysis.model_name}` : analysis?.model_name ?? analysis?.model_provider ?? null,
+    analysis?.summary,
+  ].filter(Boolean).join(' · ');
   return {
     id: analysis?.workout_log_id ?? `workout-${Date.now()}`,
     kind: 'workout' as const,
@@ -727,10 +740,11 @@ function toWorkoutRecord(
       duration !== undefined ? `${duration} 分钟` : fallbackText,
       analysis?.intensity ? `强度 ${workoutIntensityLabel(analysis.intensity)}` : null,
       analysis?.calories_burned_range_kcal?.length ? `消耗 ${calories} kcal` : null,
+      metadata || null,
       fallbackText,
     ].filter(Boolean).join(' · '),
     done: analysis?.status !== 'pending',
-    detail: fallbackText,
+    detail: metadata ? `${metadata} · ${fallbackText}` : fallbackText,
   };
 }
 
@@ -775,6 +789,8 @@ function toFoodAnalysis(response: FoodPhotoAnalysisResponse): FoodAnalysis {
     title: analysis.meal_name,
     status: toFoodStatus(analysis.status),
     confidence: analysis.confidence,
+    modelProvider: analysis.model_provider,
+    modelName: analysis.model_name,
     calories: rangeLabel(analysis.calories_range_kcal),
     protein: `${rangeLabel(analysis.protein_g_range)}g`,
     carbs: `${rangeLabel(analysis.carbs_g_range)}g`,

@@ -88,6 +88,8 @@ export type FoodAnalysis = {
   title: string;
   status: 'pending' | 'confirmed' | 'edited' | 'discarded' | 'analysis_only';
   confidence: number;
+  modelProvider?: string;
+  modelName?: string;
   calories: string;
   protein: string;
   carbs: string;

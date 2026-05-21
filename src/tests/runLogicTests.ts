@@ -398,6 +398,7 @@ async function testBackendAppDataHydratesLiveRecordsShape() {
 
 async function testAppActionsCallBackendMutationsAndUpdateState() {
   const calls: string[] = [];
+  const snapshots: AppDataState[] = [];
   const actions = createAppActions({
     api: {
       profile: {
@@ -444,6 +445,10 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
               duration_minutes: 45,
               intensity: 'medium',
               calories_burned_range_kcal: [180, 270],
+              confidence: 0.78,
+              model_provider: 'xiaomi',
+              model_name: 'mimo-v2-omni',
+              summary: 'Strength training session.',
               status: 'pending',
             },
           };
@@ -553,6 +558,7 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
     getState: () => initialAppState,
     setState: (next: AppDataState) => {
       assert(next.threads[0].id === 'thread-new' || next.chatMessages.length > 0, 'actions must update state');
+      snapshots.push(next);
     },
   });
 
@@ -565,6 +571,7 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
     mimeType: 'image/jpeg',
     userNote: 'lunch',
   });
+  assert(snapshots.some((snapshot) => snapshot.activeFoodAnalysis?.modelProvider === 'xiaomi' && snapshot.activeFoodAnalysis.modelName === 'mimo-v2-omni'), 'food card must preserve AI provider metadata');
   await actions.confirmFoodLog('food-live');
   await actions.editFoodLogPortion('food-live', '米饭吃了一半');
   await actions.discardFoodLog('food-live');
@@ -589,6 +596,7 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
   assert(calls.includes('discardFood:food-live'), 'discard food action must call backend');
   assert(calls.includes('checkin:71.2:6'), 'checkin action must map payload');
   assert(calls.includes('workout:力量训练 45 分钟'), 'workout action must call backend');
+  assert(snapshots.some((snapshot) => snapshot.records.some((record) => record.kind === 'workout' && record.detail?.includes('xiaomi/mimo-v2-omni') && record.detail.includes('confidence 0.78'))), 'workout record must preserve AI provider metadata');
   assert(calls.includes('createThread:File insight:files'), 'file upload must create a backend file thread when only a local fallback thread exists');
   assert(calls.includes('file:thread-new:report.txt:text/plain:Summarize this report'), 'file upload action must use the backend-created thread id and user prompt');
   assert(calls.includes('restore:fitmate.pro.monthly'), 'restore action must call backend');
