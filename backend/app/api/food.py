@@ -58,13 +58,7 @@ async def analyze_chat_photo(
     vision_router: FoodVisionRouter = Depends(get_food_vision_router),
 ) -> dict:
     if image.content_type in UNSUPPORTED_HEIC_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail={
-                "code": "unsupported_heic_image",
-                "message": "HEIC/HEIF photos are not supported yet. Please upload a JPEG, PNG, or WebP image.",
-            },
-        )
+        raise_unsupported_heic_image()
     if image.content_type not in SUPPORTED_PHOTO_CONTENT_TYPES:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -74,6 +68,8 @@ async def analyze_chat_photo(
             },
         )
     image_bytes = await image.read()
+    if is_heic_image_bytes(image_bytes):
+        raise_unsupported_heic_image()
     if len(image_bytes) > MAX_PHOTO_UPLOAD_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
@@ -112,6 +108,28 @@ async def analyze_chat_photo(
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="thread_not_found")
     return result
+
+
+def is_heic_image_bytes(image_bytes: bytes) -> bool:
+    # ISO BMFF files such as HEIC/HEIF usually declare a major brand near byte 8.
+    return len(image_bytes) >= 12 and image_bytes[4:8] == b"ftyp" and image_bytes[8:12] in {
+        b"heic",
+        b"heix",
+        b"hevc",
+        b"hevx",
+        b"mif1",
+        b"msf1",
+    }
+
+
+def raise_unsupported_heic_image() -> None:
+    raise HTTPException(
+        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        detail={
+            "code": "unsupported_heic_image",
+            "message": "HEIC/HEIF photos are not supported yet. Please upload a JPEG, PNG, or WebP image.",
+        },
+    )
 
 
 @router.get("/food/logs")
