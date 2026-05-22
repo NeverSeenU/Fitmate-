@@ -1074,6 +1074,7 @@ async function testFoodFollowUpAnswerUpdatesExistingCard() {
 
   assert(!calls.includes('sendText'), 'follow-up answers should not become a disconnected generic chat reply');
   assert(calls.includes('analyzePhoto:pasta.jpg:has-answer'), 'follow-up answers must trigger AI photo reanalysis with the user answer');
+  assert(state.chatMessages.some((message) => message.role === 'user'), 'follow-up answers must keep the optimistic user bubble visible');
   assert(state.activeFoodAnalysis?.id === 'analysis-needs-context', 'follow-up answer must keep the same food card');
   assert(state.activeFoodAnalysis?.needsFollowUp === false, 'follow-up answer must clear the blocking question');
   assert(state.activeFoodAnalysis?.status === 'edited', 'follow-up answer must make the card confirmable as an edited estimate');

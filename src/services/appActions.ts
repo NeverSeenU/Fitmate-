@@ -105,7 +105,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       }
       addMessages(getState, setState, [userMessage]);
       await yieldToUi();
-      if (await applyFoodFollowUpAnswer(api, getState, setState, threadId, text)) {
+      if (await applyFoodFollowUpAnswer(api, getState, setState, threadId, text, userMessage)) {
         return;
       }
       const backendThreadId = await ensureBackendThread(api, getState, setState, threadId, {
@@ -676,6 +676,7 @@ async function applyFoodFollowUpAnswer(
   setState: (state: AppDataState) => void,
   threadId: string,
   answer: string,
+  userMessage: ChatMessage,
 ) {
   const state = getState();
   const active = state.activeFoodAnalysis;
@@ -683,22 +684,32 @@ async function applyFoodFollowUpAnswer(
     return false;
   }
   if (!api || !active.sourceImageUri || !active.sourceFilename || !active.sourceMimeType) {
-    addMessages(getState, setState, [
+    const nextState = getState();
+    setState({
+      ...nextState,
+      chatMessages: appendMissingMessages(nextState.chatMessages, [
+        userMessage,
       {
         id: `food-follow-up-missing-image-${Date.now()}`,
         role: 'assistant',
         text: '我收到了补充信息，但当前卡片没有保留原图，不能重新让 AI 计算。请重新发送图片，或点“编辑内容”手动修正。',
       },
-    ]);
+      ]),
+    });
     return true;
   }
-  addMessages(getState, setState, [
+  const thinkingState = getState();
+  setState({
+    ...thinkingState,
+    chatMessages: appendMissingMessages(thinkingState.chatMessages, [
+      userMessage,
     {
       id: `food-follow-up-thinking-${Date.now()}`,
       role: 'assistant',
       text: '收到，我会结合原图和你的补充重新分析这张食物卡片。',
     },
-  ]);
+    ]),
+  });
   const backendThreadId = await ensureBackendThread(api, getState, setState, threadId, {
     title: 'Food photo',
     kind: 'food',
@@ -746,9 +757,24 @@ async function applyFoodFollowUpAnswer(
     ...nextState,
     activeFoodAnalysis: nextAnalysis,
     records: upsertFoodRecord(nextState.records, nextAnalysis, nextAnalysis.status),
-    chatMessages: [...nextState.chatMessages, ...assistantMessages],
+    chatMessages: appendMissingMessages(nextState.chatMessages, [userMessage, ...assistantMessages]),
   });
   return true;
+}
+
+function appendMissingMessages(
+  messages: ChatMessage[],
+  candidates: ChatMessage[],
+) {
+  const existingIds = new Set(messages.map((message) => message.id));
+  const next = [...messages];
+  candidates.forEach((candidate) => {
+    if (!existingIds.has(candidate.id)) {
+      next.push(candidate);
+      existingIds.add(candidate.id);
+    }
+  });
+  return next;
 }
 
 function setActiveFoodAnalysis(

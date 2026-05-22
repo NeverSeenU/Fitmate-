@@ -258,40 +258,32 @@ export function ChatScreen({
         keyboardShouldPersistTaps="handled"
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
       >
-        {appState.chatMessages.map((message) => (
-          <ChatBubble
-            key={message.id}
-            id={message.id}
-            text={message.text}
-            user={message.role === 'user'}
-            imageUri={message.imageUri}
-            imageFilename={message.imageFilename}
-            fileInsight={message.fileInsight}
-            onSyncFileInsight={syncFileInsight}
-          />
-        ))}
-        {appState.activeFoodAnalysis ? (
-          <FoodAnalysisCard
-            analysis={appState.activeFoodAnalysis}
-            busy={busy}
-            onConfirm={() => void runAction('正在确认食物记录...', '确认成功：已写入今日记录', async () => {
-              const foodLogId = appState.activeFoodAnalysis?.id;
-              if (!foodLogId) return;
-              Keyboard.dismiss();
-              await actions.confirmFoodLog(foodLogId);
-              setFoodEditorOpen(false);
-              go('records');
-            })}
-            onEdit={openFoodEditor}
-            onDiscard={() => void runAction('正在丢弃记录...', '丢弃成功：已移除，不会计入今日记录', async () => {
-              const foodLogId = appState.activeFoodAnalysis?.id;
-              if (!foodLogId) return;
-              Keyboard.dismiss();
-              await actions.discardFoodLog(foodLogId);
-              setFoodEditorOpen(false);
-            })}
-          />
-        ) : null}
+        {renderChatTimeline({
+          messages: appState.chatMessages,
+          foodCard: appState.activeFoodAnalysis ? (
+            <FoodAnalysisCard
+              analysis={appState.activeFoodAnalysis}
+              busy={busy}
+              onConfirm={() => void runAction('正在确认食物记录...', '确认成功：已写入今日记录', async () => {
+                const foodLogId = appState.activeFoodAnalysis?.id;
+                if (!foodLogId) return;
+                Keyboard.dismiss();
+                await actions.confirmFoodLog(foodLogId);
+                setFoodEditorOpen(false);
+                go('records');
+              })}
+              onEdit={openFoodEditor}
+              onDiscard={() => void runAction('正在丢弃记录...', '丢弃成功：已移除，不会计入今日记录', async () => {
+                const foodLogId = appState.activeFoodAnalysis?.id;
+                if (!foodLogId) return;
+                Keyboard.dismiss();
+                await actions.discardFoodLog(foodLogId);
+                setFoodEditorOpen(false);
+              })}
+            />
+          ) : null,
+          syncFileInsight,
+        })}
         {status ? <Text style={styles.formStatus}>{status}</Text> : null}
       </ScrollView>
       {!foodEditorOpen ? (
@@ -395,6 +387,47 @@ export function ChatScreen({
       ) : null}
     </KeyboardAvoidingView>
   );
+}
+
+function renderChatTimeline({
+  messages,
+  foodCard,
+  syncFileInsight,
+}: {
+  messages: AppDataState['chatMessages'];
+  foodCard: ReactNode;
+  syncFileInsight: (messageId: string) => void;
+}) {
+  let foodCardInserted = false;
+  const items: ReactNode[] = [];
+  messages.forEach((message) => {
+    if (foodCard && !foodCardInserted && shouldInsertFoodCardBefore(message.id)) {
+      items.push(<View key="active-food-card">{foodCard}</View>);
+      foodCardInserted = true;
+    }
+    items.push(
+      <ChatBubble
+        key={message.id}
+        id={message.id}
+        text={message.text}
+        user={message.role === 'user'}
+        imageUri={message.imageUri}
+        imageFilename={message.imageFilename}
+        fileInsight={message.fileInsight}
+        onSyncFileInsight={syncFileInsight}
+      />,
+    );
+  });
+  if (foodCard && !foodCardInserted) {
+    items.push(<View key="active-food-card">{foodCard}</View>);
+  }
+  return items;
+}
+
+function shouldInsertFoodCardBefore(messageId: string) {
+  return messageId.startsWith('assistant-follow-up-')
+    || messageId.startsWith('food-follow-up-done-')
+    || messageId.startsWith('food-follow-up-again-');
 }
 
 type FoodEditorForm = {
