@@ -916,6 +916,63 @@ async function testFoodAnalysisUsesDetectedItemsForDetailAndFollowUpForAdvice() 
   assert(state.activeFoodAnalysis?.followUpQuestion === undefined, 'saving user corrections must remove the follow-up question from the active card');
 }
 
+async function testPhotoUploadShowsUserBubbleEvenWhenAnalysisFails() {
+  let state: AppDataState = {
+    ...initialAppState,
+    activeFoodAnalysis: null,
+    records: [],
+    chatMessages: [],
+  };
+  const actions = createAppActions({
+    api: {
+      chat: {
+        async createThread() {
+          return { id: '11111111-1111-4111-8111-111111111111', title: 'Food photo', kind: 'food' };
+        },
+        async sendTextMessage() {
+          return {};
+        },
+      },
+      food: {
+        async analyzePhoto() {
+          throw new Error('vision unavailable');
+        },
+        async createLog() { return {}; },
+        async confirmLog() { return {}; },
+        async patchLog() { return {}; },
+        async discardLog() { return {}; },
+        async deleteLog() { return {}; },
+      },
+      profile: { async patchProfile() { return {}; } },
+      records: { async createCheckin() { return {}; }, async patchCheckin() { return {}; }, async deleteCheckin() { return {}; } },
+      workouts: { async analyze() { return {}; }, async createLog() { return {}; }, async confirmLog() { return {}; }, async patchLog() { return {}; } },
+      files: { async upload() { return {} as never; } },
+      subscription: { async restore() { return { entitlements: initialAppState.entitlements }; } },
+      privacy: { async deletePhotos() { return {}; }, async deleteAccount() { return {}; } },
+    },
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  let failed = false;
+  try {
+    await actions.analyzeFoodPhoto({
+      threadId: 'food-today',
+      imageUri: 'file:///meal.jpg',
+      filename: 'meal.jpg',
+      mimeType: 'image/jpeg',
+      userNote: '这是一人份意大利面，帮我估热量',
+    });
+  } catch {
+    failed = true;
+  }
+
+  assert(failed, 'photo analysis failure must still surface to caller');
+  assert(state.chatMessages.some((message) => message.role === 'user' && message.text.includes('meal.jpg') && message.text.includes('意大利面')), 'failed photo uploads must still show the user photo bubble with typed context');
+}
+
 async function testBackendFileUploadCreatesStructuredInsightMessage() {
   let state: AppDataState = {
     ...initialAppState,
@@ -1168,6 +1225,7 @@ async function run() {
   await testFoodActionStateLifecycle();
   await testAnalysisOnlyFoodCardCanBeManaged();
   await testFoodAnalysisUsesDetectedItemsForDetailAndFollowUpForAdvice();
+  await testPhotoUploadShowsUserBubbleEvenWhenAnalysisFails();
   await testBackendFileUploadCreatesStructuredInsightMessage();
   await testFileInsightSyncRequiresUserActionAndCreatesWeightCheckin();
   await testExpandedFileInsightSyncCreatesMenuAndWorkoutRecords();

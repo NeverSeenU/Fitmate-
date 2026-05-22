@@ -136,6 +136,14 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
     },
 
     async analyzeFoodPhoto(input: PhotoUploadInput) {
+      const userPhotoMessage: ChatMessage = {
+        id: `user-photo-${Date.now()}`,
+        role: 'user',
+        text: input.userNote?.trim()
+          ? `照片：${input.filename}\n\n${input.userNote.trim()}`
+          : `照片：${input.filename}`,
+      };
+      addMessages(getState, setState, [userPhotoMessage]);
       const backendInput = api
         ? {
           ...input,
@@ -158,13 +166,6 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           : upsertFoodRecord(state.records, mapped, mapped.status),
         chatMessages: [
           ...state.chatMessages,
-          {
-            id: `user-photo-${Date.now()}`,
-            role: 'user',
-            text: input.userNote?.trim()
-              ? `照片：${input.filename}\n\n${input.userNote.trim()}`
-              : `照片：${input.filename}`,
-          },
           {
             id: `assistant-photo-${Date.now()}`,
             role: 'assistant',

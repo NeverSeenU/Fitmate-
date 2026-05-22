@@ -119,10 +119,11 @@ export function ChatScreen({
       : attachment?.kind === 'photo'
         ? '照片分析完成，请确认、编辑或丢弃'
         : '消息已发送';
+    setComposerText('');
+    setPendingAttachment(null);
     void runAction(busyText, successText, async () => {
       if (attachment?.kind === 'file') {
         await actions.attachFile(attachment, text);
-        setPendingAttachment(null);
       } else if (attachment?.kind === 'photo') {
         await actions.analyzeFoodPhoto({
           threadId: appState.threads[0]?.id ?? 'food-today',
@@ -131,12 +132,10 @@ export function ChatScreen({
           mimeType: attachment.mimeType,
           userNote: text,
         });
-        setPendingAttachment(null);
         setFoodEditorOpen(false);
       } else if (text) {
         await actions.sendText(appState.threads[0]?.id ?? 'food-today', text);
       }
-      setComposerText('');
     });
   };
 
