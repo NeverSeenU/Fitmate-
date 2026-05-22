@@ -28,6 +28,7 @@ export function RecordsScreen({
   const [foodForm, setFoodForm] = useState(recordToFoodForm(null));
   const [textForm, setTextForm] = useState({ title: '', detail: '' });
   const intake = useMemo(() => summarizeFoodIntake(appState.records), [appState.records]);
+  const energy = useMemo(() => estimateEnergyTarget(appState, intake.caloriesKcal), [appState, intake.caloriesKcal]);
 
   const runAction = async (label: string, action: () => Promise<void>) => {
     setBusy(true);
@@ -67,12 +68,19 @@ export function RecordsScreen({
       />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.summaryBand}>
-          <View style={styles.rowBetween}>
+          <View style={styles.energyHeader}>
             <View>
               <Text style={styles.h2}>今日摄入</Text>
-              <Text style={styles.muted}>读取已确认食物记录，随编辑实时变化</Text>
+              <Text style={styles.muted}>目标基于资料估算，2-3 周后结合记录动态校准</Text>
             </View>
-            <Text style={styles.score}>{intake.caloriesKcal} kcal</Text>
+            <EnergyRing progress={energy.progress} calories={intake.caloriesKcal} target={energy.targetCalories} />
+          </View>
+          <View style={styles.energyStatsRow}>
+            <Text style={styles.energyStat}>TDEE {energy.tdeeCalories} kcal</Text>
+            <Text style={styles.energyStat}>目标 {energy.targetCalories} kcal</Text>
+            <Text style={energy.remainingCalories >= 0 ? styles.energyStatAccent : styles.energyStatWarning}>
+              {energy.remainingCalories >= 0 ? `还可吃 ${energy.remainingCalories} kcal` : `超出 ${Math.abs(energy.remainingCalories)} kcal`}
+            </Text>
           </View>
           <View style={styles.metricGrid}>
             <Metric value={`${intake.proteinG}g`} label="蛋白" />
@@ -283,6 +291,56 @@ function TextArea({ label, value, onChangeText, placeholder }: { label: string; 
       />
     </View>
   );
+}
+
+function EnergyRing({ progress, calories, target }: { progress: number; calories: number; target: number }) {
+  const segmentCount = 24;
+  const activeSegments = Math.round(Math.min(1, progress) * segmentCount);
+  return (
+    <View style={styles.energyRing}>
+      {Array.from({ length: segmentCount }).map((_, index) => (
+        <View
+          key={index}
+          style={[
+            styles.energyRingSegment,
+            index < activeSegments && styles.energyRingSegmentActive,
+            { transform: [{ rotate: `${(360 / segmentCount) * index}deg` }, { translateY: -36 }] },
+          ]}
+        />
+      ))}
+      <View style={styles.energyRingCore}>
+        <Text style={styles.energyRingValue}>{calories}</Text>
+        <Text style={styles.energyRingLabel}>/ {target}</Text>
+      </View>
+    </View>
+  );
+}
+
+function estimateEnergyTarget(state: AppDataState, caloriesKcal: number) {
+  const { profile } = state;
+  const bmr = profile.gender === 'male'
+    ? (10 * profile.weightKg) + (6.25 * profile.heightCm) - (5 * profile.age) + 5
+    : (10 * profile.weightKg) + (6.25 * profile.heightCm) - (5 * profile.age) - 161;
+  const tdeeCalories = Math.round(bmr * activityMultiplier(profile.trainingFrequency));
+  const deficitRate = profile.goalLabel.includes('减脂') || profile.goalLabel.toLowerCase().includes('fat')
+    ? 0.82
+    : 0.92;
+  const targetCalories = Math.max(1100, Math.round(tdeeCalories * deficitRate));
+  return {
+    tdeeCalories,
+    targetCalories,
+    remainingCalories: targetCalories - caloriesKcal,
+    progress: targetCalories > 0 ? caloriesKcal / targetCalories : 0,
+  };
+}
+
+function activityMultiplier(trainingFrequency: string) {
+  const value = trainingFrequency.toLowerCase();
+  if (value.includes('每天') || value.includes('daily') || value.includes('6') || value.includes('7')) return 1.72;
+  if (value.includes('4') || value.includes('5')) return 1.55;
+  if (value.includes('2') || value.includes('3')) return 1.38;
+  if (value.includes('很少') || value.includes('sedentary')) return 1.2;
+  return 1.45;
 }
 
 function summarizeFoodIntake(records: DailyRecord[]) {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Keyboard, KeyboardAvoidingView, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { BottomTabs, Button, ChatBubble, ChatHeader, FoodAnalysisCard } from '../components/ui';
-import type { AppDataState } from '../domain/models';
+import type { AppDataState, ChatMessage, FoodAnalysis } from '../domain/models';
 import { AttachmentPanel, NewChatPanel, ThreadDrawer } from '../overlays/ChatOverlays';
 import type { createAppActions, FoodLogEditInput } from '../services/appActions';
 import { formatFileSize, pickFitMateFile, type PickedFile } from '../services/filePicker';
@@ -35,6 +35,7 @@ export function ChatScreen({
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [foodEditorOpen, setFoodEditorOpen] = useState(false);
+  const [editingFoodId, setEditingFoodId] = useState<string | null>(null);
   const [foodForm, setFoodForm] = useState(foodAnalysisToForm(appState.activeFoodAnalysis));
   const [weightForm, setWeightForm] = useState({ weightKg: appState.profile.weightKg.toFixed(1), notes: '' });
   const [workoutForm, setWorkoutForm] = useState({ detail: '' });
@@ -66,7 +67,7 @@ export function ChatScreen({
     scrollLatest();
     const showSub = Keyboard.addListener('keyboardDidShow', scrollLatest);
     return () => showSub.remove();
-  }, [appState.chatMessages.length, appState.activeFoodAnalysis?.id, status]);
+  }, [appState.chatMessages.length, status]);
 
   const closePanel = () => {
     if (panelBack) {
@@ -139,15 +140,20 @@ export function ChatScreen({
     });
   };
 
-  const openFoodEditor = () => {
+  const openFoodEditor = (analysis = appState.activeFoodAnalysis) => {
+    if (!analysis) {
+      setStatus('当前没有待编辑的食物记录');
+      return;
+    }
     Keyboard.dismiss();
-    setFoodForm(foodAnalysisToForm(appState.activeFoodAnalysis));
+    setEditingFoodId(analysis.id);
+    setFoodForm(foodAnalysisToForm(analysis));
     setFoodEditorOpen(true);
     setStatus('');
   };
 
   const submitFoodEditor = () => {
-    const foodLogId = appState.activeFoodAnalysis?.id;
+    const foodLogId = editingFoodId ?? appState.activeFoodAnalysis?.id;
     if (!foodLogId) {
       setStatus('当前没有待编辑的食物记录');
       return;
@@ -160,12 +166,14 @@ export function ChatScreen({
     void runAction('正在保存食物编辑...', '食物内容已保存，仍需确认写入', async () => {
       await actions.saveFoodLogDetails(foodLogId, next);
       setFoodEditorOpen(false);
+      setEditingFoodId(null);
     });
   };
 
   const openManualFoodRecord = () => {
     Keyboard.dismiss();
     void actions.createManualFoodLog();
+    setEditingFoodId(null);
     setFoodForm(foodAnalysisToForm(null));
     setFoodEditorOpen(true);
     setStatus('已打开食物记录，请输入食物和份量');
@@ -260,29 +268,19 @@ export function ChatScreen({
       >
         {renderChatTimeline({
           messages: appState.chatMessages,
-          foodCard: appState.activeFoodAnalysis ? (
-            <FoodAnalysisCard
-              analysis={appState.activeFoodAnalysis}
-              busy={busy}
-              onConfirm={() => void runAction('正在确认食物记录...', '确认成功：已写入今日记录', async () => {
-                const foodLogId = appState.activeFoodAnalysis?.id;
-                if (!foodLogId) return;
-                Keyboard.dismiss();
-                await actions.confirmFoodLog(foodLogId);
-                setFoodEditorOpen(false);
-                go('records');
-              })}
-              onEdit={openFoodEditor}
-              onDiscard={() => void runAction('正在丢弃记录...', '丢弃成功：已移除，不会计入今日记录', async () => {
-                const foodLogId = appState.activeFoodAnalysis?.id;
-                if (!foodLogId) return;
-                Keyboard.dismiss();
-                await actions.discardFoodLog(foodLogId);
-                setFoodEditorOpen(false);
-              })}
-            />
-          ) : null,
           syncFileInsight,
+          renderFoodCard: (analysis) => renderFoodCard({
+            analysis,
+            busy,
+            go,
+            runAction,
+            actions,
+            openFoodEditor,
+            closeFoodEditor: () => {
+              setFoodEditorOpen(false);
+              setEditingFoodId(null);
+            },
+          }),
         })}
         {status ? <Text style={styles.formStatus}>{status}</Text> : null}
       </ScrollView>
@@ -391,21 +389,18 @@ export function ChatScreen({
 
 function renderChatTimeline({
   messages,
-  foodCard,
   syncFileInsight,
+  renderFoodCard,
 }: {
-  messages: AppDataState['chatMessages'];
-  foodCard: ReactNode;
+  messages: ChatMessage[];
   syncFileInsight: (messageId: string) => void;
+  renderFoodCard: (analysis: FoodAnalysis) => ReactNode;
 }) {
-  let foodCardInserted = false;
-  const items: ReactNode[] = [];
-  messages.forEach((message) => {
-    if (foodCard && !foodCardInserted && shouldInsertFoodCardBefore(message.id)) {
-      items.push(<View key="active-food-card">{foodCard}</View>);
-      foodCardInserted = true;
+  return messages.map((message) => {
+    if (message.foodAnalysis) {
+      return <View key={message.id}>{renderFoodCard(message.foodAnalysis)}</View>;
     }
-    items.push(
+    return (
       <ChatBubble
         key={message.id}
         id={message.id}
@@ -415,19 +410,46 @@ function renderChatTimeline({
         imageFilename={message.imageFilename}
         fileInsight={message.fileInsight}
         onSyncFileInsight={syncFileInsight}
-      />,
+      />
     );
   });
-  if (foodCard && !foodCardInserted) {
-    items.push(<View key="active-food-card">{foodCard}</View>);
-  }
-  return items;
 }
 
-function shouldInsertFoodCardBefore(messageId: string) {
-  return messageId.startsWith('assistant-follow-up-')
-    || messageId.startsWith('food-follow-up-done-')
-    || messageId.startsWith('food-follow-up-again-');
+function renderFoodCard({
+  analysis,
+  busy,
+  go,
+  runAction,
+  actions,
+  openFoodEditor,
+  closeFoodEditor,
+}: {
+  analysis: FoodAnalysis;
+  busy: boolean;
+  go: (screen: Screen) => void;
+  runAction: (message: string, success: string, action: () => Promise<void>) => Promise<void>;
+  actions: ReturnType<typeof createAppActions>;
+  openFoodEditor: (analysis: FoodAnalysis) => void;
+  closeFoodEditor: () => void;
+}) {
+  return (
+    <FoodAnalysisCard
+      analysis={analysis}
+      busy={busy}
+      onConfirm={() => void runAction('正在确认食物记录...', '确认成功：已写入今日记录', async () => {
+        Keyboard.dismiss();
+        await actions.confirmFoodLog(analysis.id);
+        closeFoodEditor();
+        go('records');
+      })}
+      onEdit={() => openFoodEditor(analysis)}
+      onDiscard={() => void runAction('正在丢弃记录...', '丢弃成功：已移除，不会计入今日记录', async () => {
+        Keyboard.dismiss();
+        await actions.discardFoodLog(analysis.id);
+        closeFoodEditor();
+      })}
+    />
+  );
 }
 
 type FoodEditorForm = {

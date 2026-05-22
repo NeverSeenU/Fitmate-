@@ -924,6 +924,7 @@ async function testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse() {
     records: [],
     chatMessages: [],
   };
+  let photoCalls = 0;
   const actions = createAppActions({
     api: {
       chat: {
@@ -936,10 +937,12 @@ async function testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse() {
       },
       food: {
         async analyzePhoto() {
+          photoCalls += 1;
+          const title = photoCalls === 1 ? 'Pasta plate' : 'Second meal';
           return {
             food_analysis: {
               food_log_id: null,
-              meal_name: 'Pasta plate',
+              meal_name: title,
               detected_items: ['pasta', 'tomato sauce'],
               calories_range_kcal: [500, 700],
               protein_g_range: [15, 25],
@@ -986,6 +989,23 @@ async function testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse() {
   assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///pasta.jpg' && message.text.includes('这是一人份')), 'successful photo analysis must keep the user image bubble');
   assert(state.activeFoodAnalysis?.sourceImageUri === 'file:///pasta.jpg', 'food card must retain original image URI for follow-up AI reanalysis');
   assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('Pasta plate')), 'successful photo analysis must append assistant feedback');
+  const firstCardIndex = state.chatMessages.findIndex((message) => message.foodAnalysis?.title === 'Pasta plate');
+  const firstReplyIndex = state.chatMessages.findIndex((message) => message.text.includes('Pasta plate'));
+  assert(firstCardIndex >= 0, 'successful photo analysis must insert the food card into the chat timeline');
+  assert(firstCardIndex < firstReplyIndex, 'food card must appear before assistant follow-up text');
+
+  await actions.analyzeFoodPhoto({
+    threadId: 'food-today',
+    imageUri: 'file:///second.jpg',
+    filename: 'second.jpg',
+    mimeType: 'image/jpeg',
+    userNote: 'second',
+  });
+
+  const foodCards = state.chatMessages.filter((message) => message.foodAnalysis);
+  assert(foodCards.length === 2, 'multiple photo analyses must keep each food card in the chat timeline');
+  assert(foodCards[0]?.foodAnalysis?.title === 'Pasta plate', 'a later food photo must not replace the earlier card');
+  assert(foodCards[1]?.foodAnalysis?.title === 'Second meal', 'the latest food photo must append its own card');
 }
 
 async function testFoodFollowUpAnswerUpdatesExistingCard() {

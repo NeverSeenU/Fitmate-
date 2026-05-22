@@ -132,7 +132,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           ...state,
           activeFoodAnalysis: mapped,
           records: mapped.status === 'analysis_only' ? state.records : upsertFoodRecord(state.records, mapped, mapped.status),
-          chatMessages: [...state.chatMessages, ...messages],
+          chatMessages: [...state.chatMessages, toFoodAnalysisMessage(mapped), ...messages],
         });
         return;
       }
@@ -193,7 +193,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         records: mapped.status === 'analysis_only'
           ? state.records
           : upsertFoodRecord(state.records, mapped, mapped.status),
-        chatMessages: [...existingMessages, ...assistantMessages],
+        chatMessages: [...existingMessages, toFoodAnalysisMessage(mapped), ...assistantMessages],
       });
     },
 
@@ -596,11 +596,14 @@ function updateFoodLogState(
 ) {
   const state = getState();
   const statusLabel = foodStatusLabel(status);
-  const active = state.activeFoodAnalysis?.id === foodLogId ? state.activeFoodAnalysis : null;
+  const active = findFoodAnalysis(state, foodLogId);
+  const nextAnalysis = active
+    ? { ...active, status, advice: portionNote ? `份量备注：${portionNote}` : active.advice }
+    : null;
   const nextActive = status === 'discarded'
     ? null
-    : active
-      ? { ...active, status, advice: portionNote ? `份量备注：${portionNote}` : active.advice }
+    : nextAnalysis
+      ? nextAnalysis
       : state.activeFoodAnalysis;
   const nextRecords = status === 'discarded'
     ? state.records.filter((record) => record.id !== foodLogId)
@@ -613,16 +616,19 @@ function updateFoodLogState(
           done: status === 'confirmed',
         }
         : record)),
-      active,
+      nextAnalysis,
       status,
       portionNote,
     );
+  const nextChatMessages = nextAnalysis
+    ? updateFoodAnalysisInMessages(state.chatMessages, nextAnalysis)
+    : state.chatMessages;
   setState({
     ...state,
     activeFoodAnalysis: nextActive,
     records: nextRecords,
     chatMessages: [
-      ...state.chatMessages,
+      ...nextChatMessages,
       { id: `food-${status}-${Date.now()}`, role: 'assistant', text: message },
     ],
   });
@@ -635,7 +641,7 @@ function updateFoodLogDetails(
   input: FoodLogEditInput,
 ) {
   const state = getState();
-  const active = state.activeFoodAnalysis?.id === foodLogId ? state.activeFoodAnalysis : null;
+  const active = findFoodAnalysis(state, foodLogId);
   const nextAnalysis = active
     ? {
       ...active,
@@ -660,7 +666,7 @@ function updateFoodLogDetails(
     activeFoodAnalysis: nextAnalysis ?? state.activeFoodAnalysis,
     records: upsertFoodRecord(state.records, nextAnalysis, nextAnalysis?.status ?? 'edited'),
     chatMessages: [
-      ...state.chatMessages,
+      ...(nextAnalysis ? updateFoodAnalysisInMessages(state.chatMessages, nextAnalysis) : state.chatMessages),
       {
         id: `food-edit-${Date.now()}`,
         role: 'assistant',
@@ -757,7 +763,10 @@ async function applyFoodFollowUpAnswer(
     ...nextState,
     activeFoodAnalysis: nextAnalysis,
     records: upsertFoodRecord(nextState.records, nextAnalysis, nextAnalysis.status),
-    chatMessages: appendMissingMessages(nextState.chatMessages, [userMessage, ...assistantMessages]),
+    chatMessages: updateFoodAnalysisInMessages(
+      appendMissingMessages(nextState.chatMessages, [userMessage, ...assistantMessages]),
+      nextAnalysis,
+    ),
   });
   return true;
 }
@@ -777,6 +786,37 @@ function appendMissingMessages(
   return next;
 }
 
+function toFoodAnalysisMessage(analysis: FoodAnalysis): ChatMessage {
+  return {
+    id: `food-card-${analysis.id}-${Date.now()}`,
+    role: 'assistant',
+    text: '',
+    foodAnalysis: analysis,
+  };
+}
+
+function findFoodAnalysis(state: AppDataState, foodLogId: string) {
+  if (state.activeFoodAnalysis?.id === foodLogId) {
+    return state.activeFoodAnalysis;
+  }
+  return state.chatMessages.find((message) => message.foodAnalysis?.id === foodLogId)?.foodAnalysis ?? null;
+}
+
+function updateFoodAnalysisInMessages(messages: ChatMessage[], analysis: FoodAnalysis) {
+  return messages.map((message) => {
+    if (message.foodAnalysis?.id !== analysis.id) {
+      return message;
+    }
+    return {
+      ...message,
+      foodAnalysis: {
+        ...message.foodAnalysis,
+        ...analysis,
+      },
+    };
+  });
+}
+
 function setActiveFoodAnalysis(
   getState: () => AppDataState,
   setState: (state: AppDataState) => void,
@@ -789,8 +829,8 @@ function setActiveFoodAnalysis(
     activeFoodAnalysis: analysis,
     records: analysis.status === 'analysis_only' ? state.records : upsertFoodRecord(state.records, analysis, analysis.status),
     chatMessages: message
-      ? [...state.chatMessages, { id: `food-open-${Date.now()}`, role: 'assistant', text: message }]
-      : state.chatMessages,
+      ? [...state.chatMessages, toFoodAnalysisMessage(analysis), { id: `food-open-${Date.now()}`, role: 'assistant', text: message }]
+      : [...state.chatMessages, toFoodAnalysisMessage(analysis)],
   });
 }
 

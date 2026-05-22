@@ -595,6 +595,66 @@ export const styles = StyleSheet.create({
     padding: compactPhone ? 12 : 14,
     gap: compactPhone ? 10 : 12,
   },
+  energyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  energyStatsRow: {
+    flexDirection: 'row',
+    gap: 7,
+    flexWrap: 'wrap',
+  },
+  energyStat: {
+    color: colors.muted,
+    fontSize: size(11),
+    fontWeight: '800',
+  },
+  energyStatAccent: {
+    color: colors.lime,
+    fontSize: size(11),
+    fontWeight: '900',
+  },
+  energyStatWarning: {
+    color: '#f5c542',
+    fontSize: size(11),
+    fontWeight: '900',
+  },
+  energyRing: {
+    width: 92,
+    height: 92,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  energyRingSegment: {
+    position: 'absolute',
+    width: 5,
+    height: 12,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  energyRingSegmentActive: {
+    backgroundColor: colors.lime,
+  },
+  energyRingCore: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: '#151515',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  energyRingValue: {
+    color: colors.text,
+    fontSize: narrowPhone ? 14 : 15,
+    fontWeight: '900',
+  },
+  energyRingLabel: {
+    color: colors.muted,
+    fontSize: size(10),
+    fontWeight: '800',
+  },
   score: {
     color: colors.lime,
     fontSize: narrowPhone ? 20 : 22,
