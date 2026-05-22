@@ -19,6 +19,7 @@ class Settings:
     object_storage_key_prefix: str = "food-photos"
     xiaomi_model_name: str = "mimo-v2-omni"
     qwen_model_name: str = "qwen3-vl-plus"
+    food_vision_provider: str = "auto"
     file_ai_extraction_enabled: bool = False
     workout_ai_analysis_enabled: bool = False
     text_food_ai_analysis_enabled: bool = False
@@ -52,6 +53,7 @@ def get_settings() -> Settings:
         object_storage_key_prefix=os.getenv("OBJECT_STORAGE_KEY_PREFIX", Settings.object_storage_key_prefix),
         xiaomi_model_name=os.getenv("XIAOMI_MODEL_NAME", Settings.xiaomi_model_name),
         qwen_model_name=os.getenv("QWEN_MODEL_NAME", Settings.qwen_model_name),
+        food_vision_provider=os.getenv("FOOD_VISION_PROVIDER", Settings.food_vision_provider).lower(),
         file_ai_extraction_enabled=os.getenv("FILE_AI_EXTRACTION_ENABLED", "false").lower() == "true",
         workout_ai_analysis_enabled=os.getenv("WORKOUT_AI_ANALYSIS_ENABLED", "false").lower() == "true",
         text_food_ai_analysis_enabled=os.getenv("TEXT_FOOD_AI_ANALYSIS_ENABLED", "false").lower() == "true",

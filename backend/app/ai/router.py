@@ -14,6 +14,7 @@ from app.ai.schema import (
     validate_food_analysis,
     validate_workout_analysis,
 )
+from app.config import get_settings
 from app.repositories.sqlalchemy.model_calls import StoredAiModelCall
 
 
@@ -53,10 +54,24 @@ class FoodVisionRouter:
         low_confidence_threshold: float = 0.55,
         model_call_repository: ModelCallRepository | None = None,
     ) -> None:
-        self.primary_provider = primary_provider or XiaomiVisionProvider()
-        self.fallback_provider = fallback_provider or QwenVisionProvider()
-        self.low_confidence_threshold = low_confidence_threshold
+        settings = get_settings()
+        configured_primary, configured_fallback, configured_threshold = self._configured_providers(
+            settings.food_vision_provider,
+            low_confidence_threshold,
+        )
+        self.primary_provider = primary_provider or configured_primary
+        self.fallback_provider = fallback_provider or configured_fallback
+        self.low_confidence_threshold = configured_threshold if primary_provider is None and fallback_provider is None else low_confidence_threshold
         self.model_call_repository = model_call_repository
+
+    def _configured_providers(self, provider_name: str, default_threshold: float) -> tuple[VisionProvider, VisionProvider, float]:
+        if provider_name == "xiaomi":
+            provider = XiaomiVisionProvider()
+            return provider, provider, 0.0
+        if provider_name == "qwen":
+            provider = QwenVisionProvider()
+            return provider, provider, 0.0
+        return XiaomiVisionProvider(), QwenVisionProvider(), default_threshold
 
     def analyze_food_photo(
         self,

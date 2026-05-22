@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 
@@ -51,12 +52,14 @@ class WorkoutAnalysisSchemaError(ValueError):
 def validate_food_analysis(raw: object) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise FoodVisionSchemaError("analysis_must_be_object")
+    raw = dict(raw)
     missing = REQUIRED_FIELDS - set(raw)
     if missing:
         raise FoodVisionSchemaError(f"missing_fields:{','.join(sorted(missing))}")
 
     for field in RANGE_FIELDS:
-        value = raw[field]
+        value = _coerce_numeric_range(raw[field])
+        raw[field] = value
         if not isinstance(value, list) or len(value) != 2:
             raise FoodVisionSchemaError(f"{field}_must_be_range")
         if not all(isinstance(item, int | float) for item in value):
@@ -83,6 +86,17 @@ def validate_food_analysis(raw: object) -> dict[str, Any]:
         raise FoodVisionSchemaError("safety_flags_must_be_list")
 
     return dict(raw)
+
+
+def _coerce_numeric_range(value: object) -> object:
+    if isinstance(value, str):
+        numbers = re.findall(r"\d+(?:\.\d+)?", value.replace("–", "-").replace("—", "-"))
+        if len(numbers) >= 2:
+            return [float(numbers[0]), float(numbers[1])]
+        if len(numbers) == 1:
+            parsed = float(numbers[0])
+            return [parsed, parsed]
+    return value
 
 
 def validate_file_insights(raw: object) -> dict[str, Any]:

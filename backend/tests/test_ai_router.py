@@ -94,6 +94,29 @@ def test_xiaomi_success_returns_normalized_food_analysis_and_logs_usage() -> Non
     assert model_calls.calls[0].estimated_cost_cents == 1
 
 
+def test_xiaomi_string_ranges_are_normalized_for_food_analysis() -> None:
+    xiaomi = FakeProvider(
+        "xiaomi",
+        "mimo-v2-omni",
+        [
+            VALID_ANALYSIS | {
+                "calories_range_kcal": "600-900",
+                "protein_g_range": "25-40",
+                "carbs_g_range": "70-100",
+                "fat_g_range": "18-35",
+            }
+        ],
+    )
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [])
+    router = FoodVisionRouter(primary_provider=xiaomi, fallback_provider=qwen)
+
+    result = router.analyze_food_photo(b"image")
+
+    assert result["model_provider"] == "xiaomi"
+    assert result["calories_range_kcal"] == [600.0, 900.0]
+    assert result["protein_g_range"] == [25.0, 40.0]
+
+
 def test_xiaomi_invalid_json_retries_once_and_logs_error_then_success() -> None:
     xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [{"meal_name": "bad"}, VALID_ANALYSIS])
     qwen = FakeProvider("qwen", "qwen3-vl-plus", [VALID_ANALYSIS])
@@ -153,6 +176,16 @@ def test_low_confidence_xiaomi_result_uses_qwen_fallback_and_logs_both() -> None
     assert result["confidence"] == 0.81
     assert result["model_provider"] == "qwen"
     assert [call.purpose for call in model_calls.calls] == ["food_photo", "fallback"]
+
+
+def test_food_vision_router_can_force_xiaomi_provider(monkeypatch) -> None:
+    monkeypatch.setenv("FOOD_VISION_PROVIDER", "xiaomi")
+    monkeypatch.setenv("XIAOMI_API_KEY", "xiaomi-key")
+    router = FoodVisionRouter(model_call_repository=InMemoryModelCallRepository())
+
+    assert router.primary_provider.provider_name == "xiaomi"
+    assert router.fallback_provider.provider_name == "xiaomi"
+    assert router.low_confidence_threshold == 0.0
 
 
 def test_file_insight_router_uses_ai_structured_output_and_logs_usage() -> None:
