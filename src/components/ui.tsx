@@ -59,7 +59,6 @@ export function FoodAnalysisCard({
         <Metric value={analysis.carbs} label="碳水" />
       </View>
       <Text style={styles.muted}>{analysis.advice}</Text>
-      {needsFollowUp ? <Text style={styles.warningText}>需要先补充：{analysis.followUpQuestion}</Text> : null}
       {canManage ? (
         <>
           <View style={styles.actionGrid}>

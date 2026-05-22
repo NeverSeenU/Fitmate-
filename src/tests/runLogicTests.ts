@@ -901,7 +901,8 @@ async function testFoodAnalysisUsesDetectedItemsForDetailAndFollowUpForAdvice() 
   assert(state.activeFoodAnalysis?.detail === 'rice, chicken, dark sauce', 'food detail must list detected food items, not the follow-up question');
   assert(state.activeFoodAnalysis?.needsFollowUp === true, 'food card must preserve that AI needs more user input');
   assert(state.activeFoodAnalysis?.followUpQuestion?.includes('酱料') === true, 'food card must keep the follow-up question separately');
-  assert(state.activeFoodAnalysis?.advice.includes('酱料') === true, 'food card advice should ask the follow-up question when AI is uncertain');
+  assert(state.activeFoodAnalysis?.advice.includes('酱料') === false, 'food card advice must not duplicate the follow-up question');
+  assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('酱料')), 'follow-up question must appear as a separate assistant chat bubble');
 
   await actions.saveFoodLogDetails(state.activeFoodAnalysis?.id ?? '', {
     title: 'Corrected mixed plate',
@@ -914,6 +915,144 @@ async function testFoodAnalysisUsesDetectedItemsForDetailAndFollowUpForAdvice() 
 
   assert(state.activeFoodAnalysis?.needsFollowUp === false, 'saving user corrections must clear follow-up blocking state');
   assert(state.activeFoodAnalysis?.followUpQuestion === undefined, 'saving user corrections must remove the follow-up question from the active card');
+}
+
+async function testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse() {
+  let state: AppDataState = {
+    ...initialAppState,
+    activeFoodAnalysis: null,
+    records: [],
+    chatMessages: [],
+  };
+  const actions = createAppActions({
+    api: {
+      chat: {
+        async createThread() {
+          return { id: '11111111-1111-4111-8111-111111111111', title: 'Food photo', kind: 'food' };
+        },
+        async sendTextMessage() {
+          return {};
+        },
+      },
+      food: {
+        async analyzePhoto() {
+          return {
+            food_analysis: {
+              food_log_id: null,
+              meal_name: 'Pasta plate',
+              detected_items: ['pasta', 'tomato sauce'],
+              calories_range_kcal: [500, 700],
+              protein_g_range: [15, 25],
+              carbs_g_range: [70, 95],
+              fat_g_range: [12, 25],
+              confidence: 0.7,
+              status: 'analysis_only',
+              needs_follow_up: false,
+              follow_up_question: null,
+              fat_loss_advice: 'Looks like a moderate carb meal.',
+              model_provider: 'xiaomi',
+              model_name: 'mimo-v2-omni',
+            },
+            assistant_message: { id: 'assistant-photo' },
+          };
+        },
+        async createLog() { return {}; },
+        async confirmLog() { return {}; },
+        async patchLog() { return {}; },
+        async discardLog() { return {}; },
+        async deleteLog() { return {}; },
+      },
+      profile: { async patchProfile() { return {}; } },
+      records: { async createCheckin() { return {}; }, async patchCheckin() { return {}; }, async deleteCheckin() { return {}; } },
+      workouts: { async analyze() { return {}; }, async createLog() { return {}; }, async confirmLog() { return {}; }, async patchLog() { return {}; } },
+      files: { async upload() { return {} as never; } },
+      subscription: { async restore() { return { entitlements: initialAppState.entitlements }; } },
+      privacy: { async deletePhotos() { return {}; }, async deleteAccount() { return {}; } },
+    },
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  await actions.analyzeFoodPhoto({
+    threadId: 'food-today',
+    imageUri: 'file:///pasta.jpg',
+    filename: 'pasta.jpg',
+    mimeType: 'image/jpeg',
+    userNote: '这是一人份',
+  });
+
+  assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///pasta.jpg' && message.text.includes('这是一人份')), 'successful photo analysis must keep the user image bubble');
+  assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('Pasta plate')), 'successful photo analysis must append assistant feedback');
+}
+
+async function testFoodFollowUpAnswerUpdatesExistingCard() {
+  let state: AppDataState = {
+    ...initialAppState,
+    activeFoodAnalysis: {
+      id: 'analysis-needs-context',
+      title: 'Pasta plate',
+      status: 'analysis_only',
+      confidence: 0.52,
+      needsFollowUp: true,
+      followUpQuestion: '这是一人份吗？',
+      calories: '500-760',
+      protein: '15-28g',
+      carbs: '70-100g',
+      fat: '12-30g',
+      caloriesKcal: 630,
+      proteinG: 22,
+      carbsG: 85,
+      fatG: 21,
+      detail: 'pasta, tomato sauce',
+      advice: '需要补充份量后再确认。',
+    },
+    records: [],
+    chatMessages: [],
+  };
+  const calls: string[] = [];
+  const actions = createAppActions({
+    api: {
+      chat: {
+        async createThread() {
+          return { id: '11111111-1111-4111-8111-111111111111', title: 'FitMate chat', kind: 'general' };
+        },
+        async sendTextMessage() {
+          calls.push('sendText');
+          return {};
+        },
+      },
+      food: {
+        async analyzePhoto() { return {} as never; },
+        async createLog() { return {}; },
+        async confirmLog() { return {}; },
+        async patchLog() { return {}; },
+        async discardLog() { return {}; },
+        async deleteLog() { return {}; },
+      },
+      profile: { async patchProfile() { return {}; } },
+      records: { async createCheckin() { return {}; }, async patchCheckin() { return {}; }, async deleteCheckin() { return {}; } },
+      workouts: { async analyze() { return {}; }, async createLog() { return {}; }, async confirmLog() { return {}; }, async patchLog() { return {}; } },
+      files: { async upload() { return {} as never; } },
+      subscription: { async restore() { return { entitlements: initialAppState.entitlements }; } },
+      privacy: { async deletePhotos() { return {}; }, async deleteAccount() { return {}; } },
+    },
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  await actions.sendText('food-today', '是一人份，酱料吃完了');
+
+  assert(calls.length === 0, 'follow-up answers should update the active food card instead of becoming a disconnected generic chat reply');
+  assert(state.activeFoodAnalysis?.id === 'analysis-needs-context', 'follow-up answer must keep the same food card');
+  assert(state.activeFoodAnalysis?.needsFollowUp === false, 'follow-up answer must clear the blocking question');
+  assert(state.activeFoodAnalysis?.status === 'edited', 'follow-up answer must make the card confirmable as an edited estimate');
+  assert(state.activeFoodAnalysis?.detail?.includes('酱料吃完了') === true, 'follow-up answer must be merged into food detail');
+  assert(state.records.some((record) => record.id === 'analysis-needs-context'), 'follow-up answer must create a confirmable record draft');
+  assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('当前食物卡片')), 'follow-up answer must give visible feedback');
 }
 
 async function testPhotoUploadShowsUserBubbleEvenWhenAnalysisFails() {
@@ -1226,6 +1365,8 @@ async function run() {
   await testFoodActionStateLifecycle();
   await testAnalysisOnlyFoodCardCanBeManaged();
   await testFoodAnalysisUsesDetectedItemsForDetailAndFollowUpForAdvice();
+  await testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse();
+  await testFoodFollowUpAnswerUpdatesExistingCard();
   await testPhotoUploadShowsUserBubbleEvenWhenAnalysisFails();
   await testBackendFileUploadCreatesStructuredInsightMessage();
   await testFileInsightSyncRequiresUserActionAndCreatesWeightCheckin();

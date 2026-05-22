@@ -104,6 +104,9 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         return;
       }
       addMessages(getState, setState, [userMessage]);
+      if (applyFoodFollowUpAnswer(getState, setState, text)) {
+        return;
+      }
       const backendThreadId = await ensureBackendThread(api, getState, setState, threadId, {
         title: 'FitMate chat',
         kind: 'general',
@@ -160,20 +163,30 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         : mockFoodPhotoResponse(backendInput.filename);
       const mapped = toFoodAnalysis(analysis);
       const state = getState();
+      const existingMessages = state.chatMessages.some((message) => message.id === userPhotoMessage.id)
+        ? state.chatMessages
+        : [...state.chatMessages, userPhotoMessage];
+      const assistantMessages: ChatMessage[] = [
+        {
+          id: `assistant-photo-${Date.now()}`,
+          role: 'assistant',
+          text: `${mapped.title} 已完成估算：${mapped.calories} kcal，蛋白 ${mapped.protein}。请确认、编辑份量或丢弃。`,
+        },
+      ];
+      if (mapped.needsFollowUp && mapped.followUpQuestion) {
+        assistantMessages.push({
+          id: `assistant-follow-up-${Date.now()}`,
+          role: 'assistant',
+          text: mapped.followUpQuestion,
+        });
+      }
       setState({
         ...state,
         activeFoodAnalysis: mapped,
         records: mapped.status === 'analysis_only'
           ? state.records
           : upsertFoodRecord(state.records, mapped, mapped.status),
-        chatMessages: [
-          ...state.chatMessages,
-          {
-            id: `assistant-photo-${Date.now()}`,
-            role: 'assistant',
-            text: `${mapped.title} 已完成估算：${mapped.calories} kcal，蛋白 ${mapped.protein}。请确认、编辑份量或丢弃。`,
-          },
-        ],
+        chatMessages: [...existingMessages, ...assistantMessages],
       });
     },
 
@@ -650,6 +663,44 @@ function updateFoodLogDetails(
   });
 }
 
+function applyFoodFollowUpAnswer(
+  getState: () => AppDataState,
+  setState: (state: AppDataState) => void,
+  answer: string,
+) {
+  const state = getState();
+  const active = state.activeFoodAnalysis;
+  if (!active?.needsFollowUp) {
+    return false;
+  }
+  const detail = [
+    active.detail,
+    `用户补充：${answer.trim()}`,
+  ].filter(Boolean).join(' · ');
+  const nextAnalysis: FoodAnalysis = {
+    ...active,
+    status: active.status === 'confirmed' ? 'confirmed' : 'edited',
+    needsFollowUp: false,
+    followUpQuestion: undefined,
+    detail,
+    advice: '已收到补充信息，并更新这张食物卡片。请检查营养数字，必要时点“编辑内容”修正后再确认写入。',
+  };
+  setState({
+    ...state,
+    activeFoodAnalysis: nextAnalysis,
+    records: upsertFoodRecord(state.records, nextAnalysis, nextAnalysis.status),
+    chatMessages: [
+      ...state.chatMessages,
+      {
+        id: `food-follow-up-${Date.now()}`,
+        role: 'assistant',
+        text: '收到补充信息，我已把它合并到当前食物卡片。请检查卡片内容，确认无误后再写入 Records。',
+      },
+    ],
+  });
+  return true;
+}
+
 function setActiveFoodAnalysis(
   getState: () => AppDataState,
   setState: (state: AppDataState) => void,
@@ -841,9 +892,7 @@ function toFoodAnalysis(response: FoodPhotoAnalysisResponse): FoodAnalysis {
     carbsG: rangeMidpoint(analysis.carbs_g_range),
     fatG: rangeMidpoint(analysis.fat_g_range),
     detail: detectedItems.join(', '),
-    advice: followUpQuestion
-      ? followUpQuestion
-      : analysis.fat_loss_advice || '已按图片估算营养区间，请确认份量后记录。',
+    advice: analysis.fat_loss_advice || '已按图片估算营养区间，请确认份量后记录。',
   };
 }
 
