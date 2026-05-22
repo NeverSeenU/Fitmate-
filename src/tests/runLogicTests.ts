@@ -971,6 +971,7 @@ async function testPhotoUploadShowsUserBubbleEvenWhenAnalysisFails() {
 
   assert(failed, 'photo analysis failure must still surface to caller');
   assert(state.chatMessages.some((message) => message.role === 'user' && message.text.includes('meal.jpg') && message.text.includes('意大利面')), 'failed photo uploads must still show the user photo bubble with typed context');
+  assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///meal.jpg' && message.imageFilename === 'meal.jpg'), 'failed photo uploads must keep the image preview data on the user bubble');
 }
 
 async function testBackendFileUploadCreatesStructuredInsightMessage() {

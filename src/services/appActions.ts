@@ -142,6 +142,8 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         text: input.userNote?.trim()
           ? `照片：${input.filename}\n\n${input.userNote.trim()}`
           : `照片：${input.filename}`,
+        imageUri: input.imageUri,
+        imageFilename: input.filename,
       };
       addMessages(getState, setState, [userPhotoMessage]);
       const backendInput = api

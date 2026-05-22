@@ -117,6 +117,30 @@ def test_xiaomi_string_ranges_are_normalized_for_food_analysis() -> None:
     assert result["protein_g_range"] == [25.0, 40.0]
 
 
+def test_xiaomi_string_items_and_boolean_are_normalized_for_food_analysis() -> None:
+    xiaomi = FakeProvider(
+        "xiaomi",
+        "mimo-v2-omni",
+        [
+            VALID_ANALYSIS | {
+                "detected_items": "rice, egg, sauce",
+                "needs_follow_up": "true",
+                "follow_up_question": "",
+                "safety_flags": "no_food_detected",
+            }
+        ],
+    )
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [])
+    router = FoodVisionRouter(primary_provider=xiaomi, fallback_provider=qwen)
+
+    result = router.analyze_food_photo(b"image")
+
+    assert result["detected_items"] == ["rice", "egg", "sauce"]
+    assert result["needs_follow_up"] is True
+    assert result["follow_up_question"] is None
+    assert result["safety_flags"] == ["no_food_detected"]
+
+
 def test_xiaomi_invalid_json_retries_once_and_logs_error_then_success() -> None:
     xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [{"meal_name": "bad"}, VALID_ANALYSIS])
     qwen = FakeProvider("qwen", "qwen3-vl-plus", [VALID_ANALYSIS])

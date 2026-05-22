@@ -95,7 +95,8 @@ class UrllibJsonTransport:
             with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
-            raise RuntimeError(f"provider_http_{exc.code}") from exc
+            detail = exc.read().decode("utf-8", errors="replace")[:500]
+            raise RuntimeError(f"provider_http_{exc.code}:{detail}") from exc
         except urllib.error.URLError as exc:
             raise RuntimeError("provider_network_error") from exc
         except TimeoutError as exc:

@@ -72,16 +72,21 @@ def validate_food_analysis(raw: object) -> dict[str, Any]:
         raise FoodVisionSchemaError("confidence_out_of_range")
     if not isinstance(raw["meal_name"], str) or not raw["meal_name"].strip():
         raise FoodVisionSchemaError("meal_name_required")
+    raw["detected_items"] = _coerce_string_list(raw["detected_items"])
     if not isinstance(raw["detected_items"], list):
         raise FoodVisionSchemaError("detected_items_must_be_list")
+    raw["needs_follow_up"] = _coerce_bool(raw["needs_follow_up"])
     if not isinstance(raw["needs_follow_up"], bool):
         raise FoodVisionSchemaError("needs_follow_up_must_be_bool")
+    if raw["follow_up_question"] == "":
+        raw["follow_up_question"] = None
     if raw["follow_up_question"] is not None and not isinstance(raw["follow_up_question"], str):
         raise FoodVisionSchemaError("follow_up_question_invalid")
     if not isinstance(raw["fat_loss_advice"], str):
         raise FoodVisionSchemaError("fat_loss_advice_required")
     if not isinstance(raw["supportive_reply"], str):
         raise FoodVisionSchemaError("supportive_reply_required")
+    raw["safety_flags"] = _coerce_string_list(raw["safety_flags"])
     if not isinstance(raw["safety_flags"], list):
         raise FoodVisionSchemaError("safety_flags_must_be_list")
 
@@ -96,6 +101,24 @@ def _coerce_numeric_range(value: object) -> object:
         if len(numbers) == 1:
             parsed = float(numbers[0])
             return [parsed, parsed]
+    return value
+
+
+def _coerce_string_list(value: object) -> object:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [item.strip() for item in re.split(r"[,;，；]\s*", value) if item.strip()]
+    return value
+
+
+def _coerce_bool(value: object) -> object:
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "yes", "1"}:
+            return True
+        if normalized in {"false", "no", "0"}:
+            return False
     return value
 
 

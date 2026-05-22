@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from typing import Protocol
 import uuid
@@ -44,6 +45,9 @@ class ModelCallRepository(Protocol):
 
 class FoodVisionUnavailableError(RuntimeError):
     pass
+
+
+logger = logging.getLogger(__name__)
 
 
 class FoodVisionRouter:
@@ -127,7 +131,14 @@ class FoodVisionRouter:
         try:
             raw = provider.analyze_food_photo(image_bytes=image_bytes, user_note=user_note)
             result = validate_food_analysis(raw)
-        except FoodVisionSchemaError:
+        except FoodVisionSchemaError as exc:
+            logger.warning(
+                "food vision provider schema error provider=%s model=%s purpose=%s error=%s",
+                provider.provider_name,
+                provider.model_name,
+                purpose,
+                exc,
+            )
             self._record_model_call(
                 provider=provider,
                 user_id=user_id,
@@ -138,6 +149,13 @@ class FoodVisionRouter:
             )
             return None
         except (RuntimeError, TimeoutError, ValueError) as exc:
+            logger.warning(
+                "food vision provider error provider=%s model=%s purpose=%s error=%s",
+                provider.provider_name,
+                provider.model_name,
+                purpose,
+                str(exc) or exc.__class__.__name__,
+            )
             self._record_model_call(
                 provider=provider,
                 user_id=user_id,

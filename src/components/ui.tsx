@@ -1,4 +1,4 @@
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, Text, TextInput, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import type { FileInsight, FoodAnalysis, SubscriptionTier } from '../domain/models';
 import type { Screen } from '../types';
@@ -279,17 +279,27 @@ export function ChatBubble({
   id,
   text,
   user,
+  imageUri,
+  imageFilename,
   fileInsight,
   onSyncFileInsight,
 }: {
   id: string;
   text: string;
   user?: boolean;
+  imageUri?: string;
+  imageFilename?: string;
   fileInsight?: FileInsight;
   onSyncFileInsight?: (messageId: string) => void;
 }) {
   return (
     <View style={[styles.bubble, user ? styles.userBubble : styles.aiBubble]}>
+      {imageUri ? (
+        <View style={styles.chatImageFrame}>
+          <Image source={{ uri: imageUri }} style={styles.chatImage} resizeMode="cover" />
+          {imageFilename ? <Text style={styles.chatImageCaption} numberOfLines={1}>{imageFilename}</Text> : null}
+        </View>
+      ) : null}
       <Text style={styles.body}>{text}</Text>
       {!user && fileInsight ? <FileInsightCard insight={fileInsight} onSync={() => onSyncFileInsight?.(id)} /> : null}
     </View>

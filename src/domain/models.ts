@@ -63,6 +63,8 @@ export type ChatMessage = {
   id: string;
   role: 'assistant' | 'user';
   text: string;
+  imageUri?: string;
+  imageFilename?: string;
   fileInsight?: FileInsight;
 };
 

@@ -320,6 +320,21 @@ export const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     backgroundColor: '#3a382f',
   },
+  chatImageFrame: {
+    gap: 6,
+    marginBottom: 8,
+  },
+  chatImage: {
+    width: narrowPhone ? 190 : 220,
+    height: narrowPhone ? 142 : 164,
+    borderRadius: 10,
+    backgroundColor: '#202020',
+  },
+  chatImageCaption: {
+    color: colors.muted,
+    fontSize: size(11),
+    fontWeight: '700',
+  },
   card: {
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',

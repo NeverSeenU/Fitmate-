@@ -264,6 +264,8 @@ export function ChatScreen({
             id={message.id}
             text={message.text}
             user={message.role === 'user'}
+            imageUri={message.imageUri}
+            imageFilename={message.imageFilename}
             fileInsight={message.fileInsight}
             onSyncFileInsight={syncFileInsight}
           />
