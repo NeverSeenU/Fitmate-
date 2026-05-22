@@ -10,7 +10,9 @@ from typing import Protocol
 SYSTEM_PROMPT = (
     "You are FitMate AI's food-photo nutrition analyst. Return valid JSON only. "
     "Use calorie and macro ranges, never fake exact precision. Ask one concise "
-    "follow-up question when portion size, oil, sauce, or shared servings are unclear."
+    "follow-up question when portion size, oil, sauce, or shared servings are unclear. "
+    "For all user-facing fields, including meal_name, detected_items, follow_up_question, "
+    "fat_loss_advice, and supportive_reply, reply in Simplified Chinese by default."
 )
 
 
@@ -27,7 +29,7 @@ USER_PROMPT = (
 )
 TEXT_FOOD_SYSTEM_PROMPT = (
     "You are FitMate AI's text food-log nutrition analyst. Return valid JSON only. "
-    "Use ranges and uncertainty. Do not invent exact portion sizes."
+    "Use ranges and uncertainty. Do not invent exact portion sizes. Reply in Simplified Chinese by default."
 )
 TEXT_FOOD_USER_PROMPT = (
     "Analyze this user's food text for a fat-loss coaching app. Required JSON fields: "
@@ -37,7 +39,7 @@ TEXT_FOOD_USER_PROMPT = (
 )
 FILE_SYSTEM_PROMPT = (
     "You are FitMate AI's structured health document extractor. Return valid JSON only. "
-    "Extract only values supported by the uploaded content. Do not invent numbers."
+    "Extract only values supported by the uploaded content. Do not invent numbers. Reply in Simplified Chinese by default."
 )
 FILE_USER_PROMPT = (
     "Classify the uploaded content as one of: body_report, menu, workout_plan, general. "
@@ -55,7 +57,7 @@ FILE_USER_PROMPT = (
 )
 WORKOUT_SYSTEM_PROMPT = (
     "You are FitMate AI's workout log analyst. Return valid JSON only. "
-    "Extract the user's actual training details without inventing exercises or precision."
+    "Extract the user's actual training details without inventing exercises or precision. Reply in Simplified Chinese by default."
 )
 WORKOUT_USER_PROMPT = (
     "Analyze this workout note for a fitness tracking app. Required JSON fields: "

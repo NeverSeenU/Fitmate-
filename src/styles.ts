@@ -335,6 +335,23 @@ export const styles = StyleSheet.create({
     fontSize: size(11),
     fontWeight: '700',
   },
+  imagePreviewBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 18,
+    gap: 12,
+  },
+  imagePreviewFull: {
+    width: '100%',
+    height: '78%',
+  },
+  imagePreviewCaption: {
+    color: colors.text,
+    fontSize: size(13),
+    fontWeight: '800',
+  },
   card: {
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',

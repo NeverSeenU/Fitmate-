@@ -104,7 +104,8 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         return;
       }
       addMessages(getState, setState, [userMessage]);
-      if (applyFoodFollowUpAnswer(getState, setState, text)) {
+      await yieldToUi();
+      if (await applyFoodFollowUpAnswer(api, getState, setState, threadId, text)) {
         return;
       }
       const backendThreadId = await ensureBackendThread(api, getState, setState, threadId, {
@@ -149,6 +150,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         imageFilename: input.filename,
       };
       addMessages(getState, setState, [userPhotoMessage]);
+      await yieldToUi();
       const backendInput = api
         ? {
           ...input,
@@ -161,7 +163,12 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       const analysis = api
         ? await api.food.analyzePhoto(backendInput)
         : mockFoodPhotoResponse(backendInput.filename);
-      const mapped = toFoodAnalysis(analysis);
+      const mapped = toFoodAnalysis(analysis, {
+        imageUri: input.imageUri,
+        filename: input.filename,
+        mimeType: input.mimeType,
+        userNote: input.userNote ?? undefined,
+      });
       const state = getState();
       const existingMessages = state.chatMessages.some((message) => message.id === userPhotoMessage.id)
         ? state.chatMessages
@@ -663,9 +670,11 @@ function updateFoodLogDetails(
   });
 }
 
-function applyFoodFollowUpAnswer(
+async function applyFoodFollowUpAnswer(
+  api: AppActionsApi | undefined,
   getState: () => AppDataState,
   setState: (state: AppDataState) => void,
+  threadId: string,
   answer: string,
 ) {
   const state = getState();
@@ -673,30 +682,71 @@ function applyFoodFollowUpAnswer(
   if (!active?.needsFollowUp) {
     return false;
   }
-  const detail = [
-    active.detail,
-    `用户补充：${answer.trim()}`,
-  ].filter(Boolean).join(' · ');
-  const nextAnalysis: FoodAnalysis = {
-    ...active,
-    status: active.status === 'confirmed' ? 'confirmed' : 'edited',
-    needsFollowUp: false,
-    followUpQuestion: undefined,
-    detail,
-    advice: '已收到补充信息，并更新这张食物卡片。请检查营养数字，必要时点“编辑内容”修正后再确认写入。',
-  };
-  setState({
-    ...state,
-    activeFoodAnalysis: nextAnalysis,
-    records: upsertFoodRecord(state.records, nextAnalysis, nextAnalysis.status),
-    chatMessages: [
-      ...state.chatMessages,
+  if (!api || !active.sourceImageUri || !active.sourceFilename || !active.sourceMimeType) {
+    addMessages(getState, setState, [
       {
-        id: `food-follow-up-${Date.now()}`,
+        id: `food-follow-up-missing-image-${Date.now()}`,
         role: 'assistant',
-        text: '收到补充信息，我已把它合并到当前食物卡片。请检查卡片内容，确认无误后再写入 Records。',
+        text: '我收到了补充信息，但当前卡片没有保留原图，不能重新让 AI 计算。请重新发送图片，或点“编辑内容”手动修正。',
       },
-    ],
+    ]);
+    return true;
+  }
+  addMessages(getState, setState, [
+    {
+      id: `food-follow-up-thinking-${Date.now()}`,
+      role: 'assistant',
+      text: '收到，我会结合原图和你的补充重新分析这张食物卡片。',
+    },
+  ]);
+  const backendThreadId = await ensureBackendThread(api, getState, setState, threadId, {
+    title: 'Food photo',
+    kind: 'food',
+  });
+  const combinedNote = [
+    active.sourceUserNote ? `Original user note: ${active.sourceUserNote}` : null,
+    active.followUpQuestion ? `Assistant follow-up question: ${active.followUpQuestion}` : null,
+    `User follow-up answer: ${answer.trim()}`,
+    'Re-analyze the original image using the follow-up answer. Return updated food details and nutrition ranges in Chinese.',
+  ].filter(Boolean).join('\n');
+  const response = await api.food.analyzePhoto({
+    threadId: backendThreadId,
+    imageUri: active.sourceImageUri,
+    filename: active.sourceFilename,
+    mimeType: active.sourceMimeType,
+    userNote: combinedNote,
+  });
+  const mapped = toFoodAnalysis(response, {
+    imageUri: active.sourceImageUri,
+    filename: active.sourceFilename,
+    mimeType: active.sourceMimeType,
+    userNote: combinedNote,
+  });
+  const nextAnalysis: FoodAnalysis = {
+    ...mapped,
+    id: active.id,
+    status: mapped.status === 'confirmed' ? 'confirmed' : 'edited',
+  };
+  const nextState = getState();
+  const assistantMessages: ChatMessage[] = [
+    {
+      id: `food-follow-up-done-${Date.now()}`,
+      role: 'assistant',
+      text: `${nextAnalysis.title} 已根据你的补充重新分析。请检查新的食物卡片，确认无误后写入 Records。`,
+    },
+  ];
+  if (nextAnalysis.needsFollowUp && nextAnalysis.followUpQuestion) {
+    assistantMessages.push({
+      id: `food-follow-up-again-${Date.now()}`,
+      role: 'assistant',
+      text: nextAnalysis.followUpQuestion,
+    });
+  }
+  setState({
+    ...nextState,
+    activeFoodAnalysis: nextAnalysis,
+    records: upsertFoodRecord(nextState.records, nextAnalysis, nextAnalysis.status),
+    chatMessages: [...nextState.chatMessages, ...assistantMessages],
   });
   return true;
 }
@@ -865,7 +915,12 @@ function foodStatusLabel(status: FoodAnalysis['status']) {
   return '待确认';
 }
 
-function toFoodAnalysis(response: FoodPhotoAnalysisResponse): FoodAnalysis {
+function toFoodAnalysis(response: FoodPhotoAnalysisResponse, source?: {
+  imageUri?: string;
+  filename?: string;
+  mimeType?: string;
+  userNote?: string;
+}): FoodAnalysis {
   const analysis = response.food_analysis;
   const detectedItems = Array.isArray(analysis.detected_items)
     ? analysis.detected_items.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
@@ -883,6 +938,10 @@ function toFoodAnalysis(response: FoodPhotoAnalysisResponse): FoodAnalysis {
     needsFollowUp: analysis.needs_follow_up,
     followUpQuestion,
     detectedItems,
+    sourceImageUri: source?.imageUri,
+    sourceFilename: source?.filename,
+    sourceMimeType: source?.mimeType,
+    sourceUserNote: source?.userNote,
     calories: rangeLabel(analysis.calories_range_kcal),
     protein: `${rangeLabel(analysis.protein_g_range)}g`,
     carbs: `${rangeLabel(analysis.carbs_g_range)}g`,
@@ -1060,6 +1119,12 @@ function rangeMidpoint(values: number[]) {
   }
   const sum = values.reduce((total, value) => total + value, 0);
   return Math.round(sum / values.length);
+}
+
+function yieldToUi() {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
 }
 
 function toFoodStatus(status: string): FoodAnalysis['status'] {

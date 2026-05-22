@@ -984,6 +984,7 @@ async function testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse() {
   });
 
   assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///pasta.jpg' && message.text.includes('这是一人份')), 'successful photo analysis must keep the user image bubble');
+  assert(state.activeFoodAnalysis?.sourceImageUri === 'file:///pasta.jpg', 'food card must retain original image URI for follow-up AI reanalysis');
   assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('Pasta plate')), 'successful photo analysis must append assistant feedback');
 }
 
@@ -1007,6 +1008,10 @@ async function testFoodFollowUpAnswerUpdatesExistingCard() {
       fatG: 21,
       detail: 'pasta, tomato sauce',
       advice: '需要补充份量后再确认。',
+      sourceImageUri: 'file:///pasta.jpg',
+      sourceFilename: 'pasta.jpg',
+      sourceMimeType: 'image/jpeg',
+      sourceUserNote: '帮我估算',
     },
     records: [],
     chatMessages: [],
@@ -1024,7 +1029,28 @@ async function testFoodFollowUpAnswerUpdatesExistingCard() {
         },
       },
       food: {
-        async analyzePhoto() { return {} as never; },
+        async analyzePhoto(input) {
+          calls.push(`analyzePhoto:${input.filename}:${input.userNote?.includes('酱料吃完了') ? 'has-answer' : 'missing-answer'}`);
+          return {
+            food_analysis: {
+              food_log_id: null,
+              meal_name: 'AI corrected pasta',
+              detected_items: ['one serving pasta', 'tomato sauce'],
+              calories_range_kcal: [620, 760],
+              protein_g_range: [20, 28],
+              carbs_g_range: [82, 100],
+              fat_g_range: [16, 24],
+              confidence: 0.76,
+              status: 'analysis_only',
+              needs_follow_up: false,
+              follow_up_question: null,
+              fat_loss_advice: '按一人份重新估算，晚餐后下一餐注意补蛋白。',
+              model_provider: 'xiaomi',
+              model_name: 'mimo-v2-omni',
+            },
+            assistant_message: { id: 'assistant-reanalysis' },
+          };
+        },
         async createLog() { return {}; },
         async confirmLog() { return {}; },
         async patchLog() { return {}; },
@@ -1046,13 +1072,15 @@ async function testFoodFollowUpAnswerUpdatesExistingCard() {
 
   await actions.sendText('food-today', '是一人份，酱料吃完了');
 
-  assert(calls.length === 0, 'follow-up answers should update the active food card instead of becoming a disconnected generic chat reply');
+  assert(!calls.includes('sendText'), 'follow-up answers should not become a disconnected generic chat reply');
+  assert(calls.includes('analyzePhoto:pasta.jpg:has-answer'), 'follow-up answers must trigger AI photo reanalysis with the user answer');
   assert(state.activeFoodAnalysis?.id === 'analysis-needs-context', 'follow-up answer must keep the same food card');
   assert(state.activeFoodAnalysis?.needsFollowUp === false, 'follow-up answer must clear the blocking question');
   assert(state.activeFoodAnalysis?.status === 'edited', 'follow-up answer must make the card confirmable as an edited estimate');
-  assert(state.activeFoodAnalysis?.detail?.includes('酱料吃完了') === true, 'follow-up answer must be merged into food detail');
+  assert(state.activeFoodAnalysis?.title === 'AI corrected pasta', 'follow-up answer must use AI reanalysis to update the card title');
+  assert(state.activeFoodAnalysis?.detail === 'one serving pasta, tomato sauce', 'follow-up answer must use AI-generated details instead of copying the raw user answer');
   assert(state.records.some((record) => record.id === 'analysis-needs-context'), 'follow-up answer must create a confirmable record draft');
-  assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('当前食物卡片')), 'follow-up answer must give visible feedback');
+  assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('重新分析')), 'follow-up answer must give visible feedback');
 }
 
 async function testPhotoUploadShowsUserBubbleEvenWhenAnalysisFails() {

@@ -95,6 +95,10 @@ export type FoodAnalysis = {
   needsFollowUp?: boolean;
   followUpQuestion?: string;
   detectedItems?: string[];
+  sourceImageUri?: string;
+  sourceFilename?: string;
+  sourceMimeType?: string;
+  sourceUserNote?: string;
   calories: string;
   protein: string;
   carbs: string;
