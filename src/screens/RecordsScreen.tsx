@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput,
 import { BottomTabs, Button, Metric, RecordCard, TopBar } from '../components/ui';
 import type { AppDataState, DailyRecord } from '../domain/models';
 import type { createAppActions, FoodLogEditInput } from '../services/appActions';
+import { calculateEnergyTarget, summarizeFoodIntake } from '../services/energyTargets';
 import { styles } from '../styles';
 import type { Screen, Sheet } from '../types';
 
@@ -28,7 +29,15 @@ export function RecordsScreen({
   const [foodForm, setFoodForm] = useState(recordToFoodForm(null));
   const [textForm, setTextForm] = useState({ title: '', detail: '' });
   const intake = useMemo(() => summarizeFoodIntake(appState.records), [appState.records]);
-  const energy = useMemo(() => estimateEnergyTarget(appState, intake.caloriesKcal), [appState, intake.caloriesKcal]);
+  const exerciseCalories = useMemo(() => summarizeExerciseCalories(appState.records), [appState.records]);
+  const energy = useMemo(
+    () => calculateEnergyTarget({
+      profile: appState.profile,
+      foodCaloriesKcal: intake.caloriesKcal,
+      exerciseCaloriesKcal: exerciseCalories,
+    }),
+    [appState.profile, exerciseCalories, intake.caloriesKcal],
+  );
 
   const runAction = async (label: string, action: () => Promise<void>) => {
     setBusy(true);
@@ -73,13 +82,14 @@ export function RecordsScreen({
               <Text style={styles.h2}>今日摄入</Text>
               <Text style={styles.muted}>目标基于资料估算，2-3 周后结合记录动态校准</Text>
             </View>
-            <EnergyRing progress={energy.progress} calories={intake.caloriesKcal} target={energy.targetCalories} />
+            <EnergyRing progress={energy.progress} calories={intake.caloriesKcal} target={energy.dailyTargetCalories} />
           </View>
           <View style={styles.energyStatsRow}>
             <Text style={styles.energyStat}>TDEE {energy.tdeeCalories} kcal</Text>
-            <Text style={styles.energyStat}>目标 {energy.targetCalories} kcal</Text>
-            <Text style={energy.remainingCalories >= 0 ? styles.energyStatAccent : styles.energyStatWarning}>
-              {energy.remainingCalories >= 0 ? `还可吃 ${energy.remainingCalories} kcal` : `超出 ${Math.abs(energy.remainingCalories)} kcal`}
+            <Text style={styles.energyStat}>目标 {energy.dailyTargetCalories} kcal</Text>
+            <Text style={styles.energyStat}>运动返还 +{energy.exerciseCreditCalories} kcal</Text>
+            <Text style={energy.caloriesLeft >= 0 ? styles.energyStatAccent : styles.energyStatWarning}>
+              {energy.caloriesLeft >= 0 ? `还可吃 ${energy.caloriesLeft} kcal` : `超出 ${Math.abs(energy.caloriesLeft)} kcal`}
             </Text>
           </View>
           <View style={styles.metricGrid}>
@@ -91,6 +101,11 @@ export function RecordsScreen({
             <Metric value={appState.dailySummary.weightKg.toFixed(1)} label="体重 kg" />
             <Metric value={appState.dailySummary.hungerScore} label="饥饿" />
             <Metric value={String(intake.count)} label="食物条目" />
+          </View>
+          <View style={styles.metricGrid}>
+            <Metric value={`${energy.bmrCalories}`} label="BMR" />
+            <Metric value={`${energy.proteinTargetG}g`} label="Protein target" />
+            <Metric value={`${energy.activityFactor}`} label="Activity" />
           </View>
         </View>
         <View style={styles.actionGrid}>
@@ -316,45 +331,11 @@ function EnergyRing({ progress, calories, target }: { progress: number; calories
   );
 }
 
-function estimateEnergyTarget(state: AppDataState, caloriesKcal: number) {
-  const { profile } = state;
-  const bmr = profile.gender === 'male'
-    ? (10 * profile.weightKg) + (6.25 * profile.heightCm) - (5 * profile.age) + 5
-    : (10 * profile.weightKg) + (6.25 * profile.heightCm) - (5 * profile.age) - 161;
-  const tdeeCalories = Math.round(bmr * activityMultiplier(profile.trainingFrequency));
-  const deficitRate = profile.goalLabel.includes('减脂') || profile.goalLabel.toLowerCase().includes('fat')
-    ? 0.82
-    : 0.92;
-  const targetCalories = Math.max(1100, Math.round(tdeeCalories * deficitRate));
-  return {
-    tdeeCalories,
-    targetCalories,
-    remainingCalories: targetCalories - caloriesKcal,
-    progress: targetCalories > 0 ? caloriesKcal / targetCalories : 0,
-  };
-}
-
-function activityMultiplier(trainingFrequency: string) {
-  const value = trainingFrequency.toLowerCase();
-  if (value.includes('每天') || value.includes('daily') || value.includes('6') || value.includes('7')) return 1.72;
-  if (value.includes('4') || value.includes('5')) return 1.55;
-  if (value.includes('2') || value.includes('3')) return 1.38;
-  if (value.includes('很少') || value.includes('sedentary')) return 1.2;
-  return 1.45;
-}
-
-function summarizeFoodIntake(records: DailyRecord[]) {
+function summarizeExerciseCalories(records: DailyRecord[]) {
   return records
-    .filter((record) => record.kind === 'food' && record.done)
-    .reduce((summary, record) => ({
-      count: summary.count + 1,
-      caloriesKcal: summary.caloriesKcal + (record.caloriesKcal ?? 0),
-      proteinG: summary.proteinG + (record.proteinG ?? 0),
-      carbsG: summary.carbsG + (record.carbsG ?? 0),
-      fatG: summary.fatG + (record.fatG ?? 0),
-    }), { count: 0, caloriesKcal: 0, proteinG: 0, carbsG: 0, fatG: 0 });
+    .filter((record) => record.kind === 'workout' && record.done)
+    .reduce((total, record) => total + (record.caloriesKcal ?? 0), 0);
 }
-
 function recordToFoodForm(record: DailyRecord | null): FoodForm {
   return {
     title: record?.title ?? '',
@@ -385,3 +366,4 @@ function parsePositiveNumber(value: string) {
 function clampScore(value: string) {
   return Math.min(10, Math.max(1, parsePositiveNumber(value)));
 }
+

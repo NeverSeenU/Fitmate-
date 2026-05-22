@@ -43,3 +43,18 @@ This file records project-level execution decisions for the main conversation an
 - Date: 2026-05-19
 - Decision: deterministic templates and heuristics are allowed for smoke tests, but production food, file, photo, and workout cards must be filled by an AI extraction pipeline with structured output validation.
 - Consequence: tests should keep stable fixture coverage, while product work must route real user uploads through AI/Vision providers before showing nutrition, body, or training parameters as user-facing insight.
+
+## ED-008: Energy Targets Start With BMR/TDEE And Later Calibrate From History
+
+- Date: 2026-05-22
+- Decision: Records uses Mifflin-St Jeor BMR as the MVP baseline, activity-factor TDEE, goal adjustment, partial exercise calorie return, and a protein target derived from body weight.
+- Formula:
+  - BMR male = `10 * weightKg + 6.25 * heightCm - 5 * age + 5`
+  - BMR female/unspecified = `10 * weightKg + 6.25 * heightCm - 5 * age - 161`
+  - TDEE = `BMR * activityFactor`
+  - Daily target = maintenance TDEE, fat-loss TDEE - 500 kcal, or muscle-gain TDEE + 200 kcal
+  - Calories left = `dailyTarget - foodLogged + exerciseCalories * returnRate`
+- Product rule: exercise calories are not fully returned; default return rate is 60%, clamped to 50-70% because device estimates can overstate burn.
+- Inputs: sex, age, height, weight, goal, activity/training frequency, confirmed food records, and workout calories when available.
+- Consequence: the MVP is an estimate, not a medical measurement. After 2-3 weeks of weight, food, and workout records, FitMate should dynamically adjust maintenance calories/TDEE from weight trend, expected deficit, and logging consistency.
+- Sources: National Academies DRI/EER materials define energy needs using age, sex, height, weight, and physical activity level; FitMate uses the simpler Mifflin-St Jeor implementation for mobile product clarity until the historical calibration module exists.

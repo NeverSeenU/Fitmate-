@@ -9,6 +9,7 @@ import { initialAppState } from '../state/appState';
 import type { AppDataState } from '../domain/models';
 import { saveFitMateState, loadFitMateState } from '../state/persistence';
 import { createMemoryStore } from '../storage/localStore';
+import { runEnergyTargetTests } from './energyTargets.test';
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -1393,6 +1394,7 @@ async function testSendTextShowsUserMessageBeforeBackendReply() {
 }
 
 async function run() {
+  runEnergyTargetTests();
   await testSubscriptionEntitlements();
   await testVisionFallback();
   await testPickerMimeNormalizationPreservesExplicitHeic();
