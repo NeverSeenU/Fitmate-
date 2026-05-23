@@ -29,6 +29,8 @@ export function runEnergyTargetTests() {
   assert(energy.exerciseCreditCalories === 150, 'exercise credit must support conservative 50 percent return');
   assert(energy.caloriesLeft === 834, 'calories left must include partial exercise credit');
   assert(energy.proteinTargetG === 135, 'fat loss protein target should be weight-based');
+  assert(energy.fatTargetG === 52, 'fat target should reserve roughly 25 percent of daily calories');
+  assert(energy.carbsTargetG === 219, 'carb target should use remaining calories after protein and fat');
 
   const records: DailyRecord[] = [
     { id: 'food-1', kind: 'food', title: 'Meal', status: 'done', text: '', done: true, caloriesKcal: 500, proteinG: 30, carbsG: 50, fatG: 18 },

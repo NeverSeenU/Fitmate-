@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { Button, Field, Plan, SettingsRow, TopBar } from '../components/ui';
 import type { AppDataState, Gender } from '../domain/models';
 import type { createAppActions } from '../services/appActions';
@@ -193,7 +193,7 @@ export function ProfileSheet({
         <Field label="电话" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
         <View style={styles.formGrid}>
           <Field label="年龄" value={age} onChangeText={setAge} keyboardType="numeric" compact />
-          <Field label="性别" value={gender} onChangeText={(value) => setGender(toGender(value))} compact />
+          <GenderSegment value={gender} setValue={setGender} />
           <Field label="身高 cm" value={heightCm} onChangeText={setHeightCm} keyboardType="numeric" compact />
           <Field label="体重 kg" value={weightKg} onChangeText={setWeightKg} keyboardType="numeric" compact />
         </View>
@@ -208,17 +208,30 @@ export function ProfileSheet({
   );
 }
 
+function GenderSegment({ value, setValue }: { value: Gender; setValue: (value: Gender) => void }) {
+  return (
+    <View style={[styles.field, styles.compactField]}>
+      <Text style={styles.label}>性别</Text>
+      <View style={styles.segmentedControl}>
+        <Pressable
+          style={[styles.segmentOption, value === 'male' && styles.segmentOptionActive]}
+          onPress={() => setValue('male')}
+        >
+          <Text style={[styles.segmentText, value === 'male' && styles.segmentTextActive]}>男</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.segmentOption, value === 'female' && styles.segmentOptionActive]}
+          onPress={() => setValue('female')}
+        >
+          <Text style={[styles.segmentText, value === 'female' && styles.segmentTextActive]}>女</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function numberOr(fallback: number, value: string) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function toGender(value: string): Gender {
-  if (value === 'male' || value === '男') {
-    return 'male';
-  }
-  if (value === 'female' || value === '女') {
-    return 'female';
-  }
-  return 'unspecified';
-}

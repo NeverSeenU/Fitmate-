@@ -82,30 +82,18 @@ export function RecordsScreen({
               <Text style={styles.h2}>今日摄入</Text>
               <Text style={styles.muted}>目标基于资料估算，2-3 周后结合记录动态校准</Text>
             </View>
-            <EnergyRing progress={energy.progress} calories={intake.caloriesKcal} target={energy.dailyTargetCalories} />
+            <EnergyRing
+              progress={energy.progress}
+              value={energy.caloriesLeft >= 0 ? energy.caloriesLeft : Math.abs(energy.caloriesLeft)}
+              label={energy.caloriesLeft >= 0 ? '还可吃' : '超出'}
+              sublabel={`${intake.caloriesKcal}/${energy.dailyTargetCalories} kcal`}
+            />
           </View>
-          <View style={styles.energyStatsRow}>
-            <Text style={styles.energyStat}>TDEE {energy.tdeeCalories} kcal</Text>
-            <Text style={styles.energyStat}>目标 {energy.dailyTargetCalories} kcal</Text>
-            <Text style={styles.energyStat}>运动返还 +{energy.exerciseCreditCalories} kcal</Text>
-            <Text style={energy.caloriesLeft >= 0 ? styles.energyStatAccent : styles.energyStatWarning}>
-              {energy.caloriesLeft >= 0 ? `还可吃 ${energy.caloriesLeft} kcal` : `超出 ${Math.abs(energy.caloriesLeft)} kcal`}
-            </Text>
-          </View>
-          <View style={styles.metricGrid}>
-            <Metric value={`${intake.proteinG}g`} label="蛋白" />
-            <Metric value={`${intake.carbsG}g`} label="碳水" />
-            <Metric value={`${intake.fatG}g`} label="脂肪" />
-          </View>
-          <View style={styles.metricGrid}>
-            <Metric value={appState.dailySummary.weightKg.toFixed(1)} label="体重 kg" />
-            <Metric value={appState.dailySummary.hungerScore} label="饥饿" />
-            <Metric value={String(intake.count)} label="食物条目" />
-          </View>
-          <View style={styles.metricGrid}>
-            <Metric value={`${energy.bmrCalories}`} label="BMR" />
-            <Metric value={`${energy.proteinTargetG}g`} label="Protein target" />
-            <Metric value={`${energy.activityFactor}`} label="Activity" />
+          <View style={styles.macroRingGrid}>
+            <MacroRing label="蛋白" value={intake.proteinG} target={energy.proteinTargetG} unit="g" />
+            <MacroRing label="碳水" value={intake.carbsG} target={energy.carbsTargetG} unit="g" />
+            <MacroRing label="脂肪" value={intake.fatG} target={energy.fatTargetG} unit="g" />
+            <MacroRing label="热量" value={intake.caloriesKcal} target={energy.dailyTargetCalories} unit="kcal" />
           </View>
         </View>
         <View style={styles.actionGrid}>
@@ -308,7 +296,17 @@ function TextArea({ label, value, onChangeText, placeholder }: { label: string; 
   );
 }
 
-function EnergyRing({ progress, calories, target }: { progress: number; calories: number; target: number }) {
+function EnergyRing({
+  progress,
+  value,
+  label,
+  sublabel,
+}: {
+  progress: number;
+  value: number;
+  label: string;
+  sublabel: string;
+}) {
   const segmentCount = 24;
   const activeSegments = Math.round(Math.min(1, progress) * segmentCount);
   return (
@@ -324,9 +322,24 @@ function EnergyRing({ progress, calories, target }: { progress: number; calories
         />
       ))}
       <View style={styles.energyRingCore}>
-        <Text style={styles.energyRingValue}>{calories}</Text>
-        <Text style={styles.energyRingLabel}>/ {target}</Text>
+        <Text style={styles.energyRingCaption}>{label}</Text>
+        <Text style={styles.energyRingValue}>{value}</Text>
+        <Text style={styles.energyRingLabel}>{sublabel}</Text>
       </View>
+    </View>
+  );
+}
+
+function MacroRing({ label, value, target, unit }: { label: string; value: number; target: number; unit: string }) {
+  const progress = target > 0 ? value / target : 0;
+  const over = progress > 1.05;
+  return (
+    <View style={styles.macroRingCard}>
+      <View style={styles.macroTrack}>
+        <View style={[styles.macroFill, { width: `${Math.min(100, Math.round(progress * 100))}%` }, over && styles.macroFillOver]} />
+      </View>
+      <Text style={styles.macroValue}>{value}{unit}</Text>
+      <Text style={styles.macroLabel}>{label} / {target}{unit}</Text>
     </View>
   );
 }

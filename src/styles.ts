@@ -203,6 +203,33 @@ export const styles = StyleSheet.create({
     minWidth: 0,
     marginBottom: 0,
   },
+  segmentedControl: {
+    minHeight: compactPhone ? 44 : 47,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: '#242424',
+    flexDirection: 'row',
+    padding: 3,
+    gap: 3,
+  },
+  segmentOption: {
+    flex: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentOptionActive: {
+    backgroundColor: colors.lime,
+  },
+  segmentText: {
+    color: colors.muted,
+    fontSize: size(13),
+    fontWeight: '900',
+  },
+  segmentTextActive: {
+    color: '#111',
+  },
   label: {
     color: colors.muted,
     fontSize: size(12),
@@ -645,12 +672,55 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  energyRingCaption: {
+    color: colors.muted,
+    fontSize: size(9),
+    fontWeight: '800',
+  },
   energyRingValue: {
     color: colors.text,
     fontSize: narrowPhone ? 14 : 15,
     fontWeight: '900',
   },
   energyRingLabel: {
+    color: colors.muted,
+    fontSize: size(10),
+    fontWeight: '800',
+  },
+  macroRingGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  macroRingCard: {
+    flexGrow: 1,
+    flexBasis: '47%',
+    minWidth: 0,
+    borderRadius: 8,
+    backgroundColor: '#191919',
+    padding: compactPhone ? 9 : 10,
+    gap: 6,
+  },
+  macroTrack: {
+    height: 7,
+    borderRadius: 99,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
+  },
+  macroFill: {
+    height: '100%',
+    borderRadius: 99,
+    backgroundColor: colors.lime,
+  },
+  macroFillOver: {
+    backgroundColor: '#f5c542',
+  },
+  macroValue: {
+    color: colors.text,
+    fontSize: narrowPhone ? 13 : 14,
+    fontWeight: '900',
+  },
+  macroLabel: {
     color: colors.muted,
     fontSize: size(10),
     fontWeight: '800',

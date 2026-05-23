@@ -17,6 +17,8 @@ export type EnergyTarget = {
   exerciseCreditCalories: number;
   caloriesLeft: number;
   proteinTargetG: number;
+  carbsTargetG: number;
+  fatTargetG: number;
   progress: number;
   goalMode: GoalMode;
 };
@@ -35,6 +37,10 @@ export function calculateEnergyTarget({
   const exerciseCreditCalories = Math.round(Math.max(0, exerciseCaloriesKcal) * clamp(exerciseReturnRate, 0.5, 0.7));
   const caloriesLeft = dailyTargetCalories - Math.max(0, foodCaloriesKcal) + exerciseCreditCalories;
   const proteinTargetG = calculateProteinTarget(profile.weightKg, goalMode);
+  const fatTargetG = Math.round((dailyTargetCalories * 0.25) / 9);
+  const proteinCalories = proteinTargetG * 4;
+  const fatCalories = fatTargetG * 9;
+  const carbsTargetG = Math.max(0, Math.round((dailyTargetCalories - proteinCalories - fatCalories) / 4));
   return {
     bmrCalories,
     activityFactor,
@@ -43,6 +49,8 @@ export function calculateEnergyTarget({
     exerciseCreditCalories,
     caloriesLeft,
     proteinTargetG,
+    carbsTargetG,
+    fatTargetG,
     progress: dailyTargetCalories > 0 ? Math.max(0, foodCaloriesKcal) / dailyTargetCalories : 0,
     goalMode,
   };
