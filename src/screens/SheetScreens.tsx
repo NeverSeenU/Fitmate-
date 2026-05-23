@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { Button, Field, Plan, SettingsRow, TopBar } from '../components/ui';
 import type { AppDataState, Gender } from '../domain/models';
@@ -153,6 +153,33 @@ export function ProfileSheet({
   const [healthRiskNote, setHealthRiskNote] = useState(profile.healthRiskNote);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showUnsavedPrompt, setShowUnsavedPrompt] = useState(false);
+
+  const draft = useMemo(() => ({
+    displayName,
+    phone,
+    age,
+    gender,
+    heightCm,
+    weightKg,
+    goalLabel,
+    dietPreference,
+    trainingFrequency,
+    healthRiskNote,
+  }), [age, dietPreference, displayName, gender, goalLabel, healthRiskNote, heightCm, phone, trainingFrequency, weightKg]);
+
+  const hasChanges = useMemo(() => (
+    draft.displayName !== profile.displayName ||
+    draft.phone !== profile.phone ||
+    draft.age !== String(profile.age) ||
+    draft.gender !== profile.gender ||
+    draft.heightCm !== String(profile.heightCm) ||
+    draft.weightKg !== String(profile.weightKg) ||
+    draft.goalLabel !== profile.goalLabel ||
+    draft.dietPreference !== profile.dietPreference ||
+    draft.trainingFrequency !== profile.trainingFrequency ||
+    draft.healthRiskNote !== profile.healthRiskNote
+  ), [draft, profile]);
 
   const save = async () => {
     setBusy(true);
@@ -171,10 +198,29 @@ export function ProfileSheet({
         healthRiskNote,
       });
       setStatus('资料已保存');
+      return true;
     } catch (error) {
       setStatus(error instanceof Error ? error.message : '保存失败');
+      return false;
     } finally {
       setBusy(false);
+    }
+  };
+
+  const requestClose = () => {
+    if (busy) return;
+    if (hasChanges) {
+      setShowUnsavedPrompt(true);
+      return;
+    }
+    close();
+  };
+
+  const saveAndClose = async () => {
+    const saved = await save();
+    if (saved) {
+      setShowUnsavedPrompt(false);
+      close();
     }
   };
 
@@ -184,7 +230,7 @@ export function ProfileSheet({
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
     >
-      <TopBar title="用户资料" subtitle="身体数据仅用于营养和训练建议" right="X" onRight={close} />
+      <TopBar title="用户资料" subtitle="身体数据仅用于营养和训练建议" right="X" onRight={requestClose} />
       <ScrollView contentContainerStyle={styles.keyboardContent} keyboardShouldPersistTaps="handled">
         <View style={styles.privacyCard}>
           <Text style={styles.h2}>身体数据属于隐私信息</Text>
@@ -200,11 +246,38 @@ export function ProfileSheet({
         </View>
         <Field label="目标" value={goalLabel} onChangeText={setGoalLabel} />
         <ActivityLevelPicker value={trainingFrequency} setValue={setTrainingFrequency} />
-        <Field label="训练频率" value={trainingFrequency} onChangeText={setTrainingFrequency} />
         <Field label="风险提示" value={healthRiskNote} onChangeText={setHealthRiskNote} />
         <Button label={busy ? '保存中...' : '保存修改'} onPress={() => void save()} disabled={busy} />
         {status ? <Text style={styles.formStatus}>{status}</Text> : null}
       </ScrollView>
+      {showUnsavedPrompt ? (
+        <View style={styles.confirmBackdrop}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>{'\u6709\u672a\u4fdd\u5b58\u7684\u6539\u52a8'}</Text>
+            <Text style={styles.confirmText}>{'\u4f60\u521a\u521a\u4fee\u6539\u4e86\u7528\u6237\u8d44\u6599\uff0c\u9000\u51fa\u524d\u8981\u4fdd\u5b58\u5417\uff1f'}</Text>
+            <View style={styles.confirmActions}>
+              <Button
+                label={'\u653e\u5f03'}
+                variant="secondary"
+                disabled={busy}
+                onPress={() => {
+                  setShowUnsavedPrompt(false);
+                  close();
+                }}
+                style={styles.actionButton}
+              />
+              <Button
+                label={'\u7ee7\u7eed\u7f16\u8f91'}
+                variant="secondary"
+                disabled={busy}
+                onPress={() => setShowUnsavedPrompt(false)}
+                style={styles.actionButton}
+              />
+            </View>
+            <Button label={busy ? '\u4fdd\u5b58\u4e2d...' : '\u4fdd\u5b58\u5e76\u9000\u51fa'} disabled={busy} onPress={() => void saveAndClose()} />
+          </View>
+        </View>
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -267,4 +340,3 @@ function numberOr(fallback: number, value: string) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
-

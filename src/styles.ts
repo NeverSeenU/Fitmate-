@@ -767,13 +767,91 @@ export const styles = StyleSheet.create({
   },
   macroValue: {
     color: colors.text,
-    fontSize: narrowPhone ? 13 : 14,
+    fontSize: narrowPhone ? 17 : 19,
     fontWeight: '900',
   },
-  macroLabel: {
+  macroInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  macroNumberBlock: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  macroTarget: {
     color: colors.muted,
-    fontSize: size(10),
-    fontWeight: '800',
+    fontSize: size(11),
+    fontWeight: '900',
+  },
+  macroNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+    flexShrink: 0,
+  },
+  macroIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  macroIconProtein: {
+    backgroundColor: '#74e4ff',
+  },
+  macroIconCarbs: {
+    backgroundColor: '#c8ff3d',
+  },
+  macroIconFat: {
+    backgroundColor: '#ffcf5a',
+  },
+  macroIconCalories: {
+    backgroundColor: '#b58cff',
+  },
+  macroIconText: {
+    color: '#111',
+    fontSize: size(11),
+    fontWeight: '900',
+  },
+  macroName: {
+    color: colors.text,
+    fontSize: size(14),
+    fontWeight: '900',
+  },
+  confirmBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,0.62)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 18,
+  },
+  confirmCard: {
+    width: '100%',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: colors.panel,
+    padding: compactPhone ? 14 : 16,
+    gap: 10,
+  },
+  confirmTitle: {
+    color: colors.text,
+    fontSize: size(18),
+    fontWeight: '900',
+  },
+  confirmText: {
+    color: colors.muted,
+    fontSize: size(13),
+    lineHeight: size(19),
+    fontWeight: '700',
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 8,
   },
   score: {
     color: colors.lime,

@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { BottomTabs, Button, Metric, RecordCard, TopBar } from '../components/ui';
+import { BottomTabs, Button, RecordCard, TopBar } from '../components/ui';
 import type { AppDataState, DailyRecord } from '../domain/models';
 import type { createAppActions, FoodLogEditInput } from '../services/appActions';
 import { calculateEnergyTarget, summarizeFoodIntake } from '../services/energyTargets';
@@ -8,6 +8,13 @@ import { styles } from '../styles';
 import type { Screen, Sheet } from '../types';
 
 type Panel = 'weight' | 'mood' | 'foodRecord' | 'textRecord' | null;
+
+const MACRO_COPY = {
+  protein: { label: '\u86cb\u767d', icon: 'P' },
+  carbs: { label: '\u78b3\u6c34', icon: 'C' },
+  fat: { label: '\u8102\u80aa', icon: 'F' },
+  calories: { label: '\u70ed\u91cf', icon: 'K' },
+} as const;
 
 export function RecordsScreen({
   go,
@@ -89,10 +96,10 @@ export function RecordsScreen({
             />
           </View>
           <View style={styles.macroRingGrid}>
-            <MacroRing label="??" value={intake.proteinG} target={energy.proteinTargetG} unit="g" tone="protein" />
-            <MacroRing label="??" value={intake.carbsG} target={energy.carbsTargetG} unit="g" tone="carbs" />
-            <MacroRing label="??" value={intake.fatG} target={energy.fatTargetG} unit="g" tone="fat" />
-            <MacroRing label="??" value={intake.caloriesKcal} target={energy.dailyTargetCalories} unit="kcal" tone="calories" />
+            <MacroRing {...MACRO_COPY.protein} value={intake.proteinG} target={energy.proteinTargetG} unit="g" tone="protein" />
+            <MacroRing {...MACRO_COPY.carbs} value={intake.carbsG} target={energy.carbsTargetG} unit="g" tone="carbs" />
+            <MacroRing {...MACRO_COPY.fat} value={intake.fatG} target={energy.fatTargetG} unit="g" tone="fat" />
+            <MacroRing {...MACRO_COPY.calories} value={intake.caloriesKcal} target={energy.dailyTargetCalories} unit="kcal" tone="calories" />
           </View>
         </View>
         <View style={styles.actionGrid}>
@@ -329,12 +336,14 @@ function EnergyRing({
 
 function MacroRing({
   label,
+  icon,
   value,
   target,
   unit,
   tone,
 }: {
   label: string;
+  icon: string;
   value: number;
   target: number;
   unit: string;
@@ -352,8 +361,18 @@ function MacroRing({
           over && styles.macroFillOver,
         ]} />
       </View>
-      <Text style={styles.macroValue}>{value}{unit}</Text>
-      <Text style={styles.macroLabel}>{label} / {target}{unit}</Text>
+      <View style={styles.macroInfoRow}>
+        <View style={styles.macroNumberBlock}>
+          <Text style={styles.macroValue}>{value}{unit}</Text>
+          <Text style={styles.macroTarget}>/ {target}{unit}</Text>
+        </View>
+        <View style={styles.macroNameRow}>
+          <View style={[styles.macroIcon, macroIconStyle(tone)]}>
+            <Text style={styles.macroIconText}>{icon}</Text>
+          </View>
+          <Text style={styles.macroName}>{label}</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -363,6 +382,13 @@ function macroFillStyle(tone: 'protein' | 'carbs' | 'fat' | 'calories') {
   if (tone === 'carbs') return styles.macroFillCarbs;
   if (tone === 'fat') return styles.macroFillFat;
   return styles.macroFillCalories;
+}
+
+function macroIconStyle(tone: 'protein' | 'carbs' | 'fat' | 'calories') {
+  if (tone === 'protein') return styles.macroIconProtein;
+  if (tone === 'carbs') return styles.macroIconCarbs;
+  if (tone === 'fat') return styles.macroIconFat;
+  return styles.macroIconCalories;
 }
 
 function summarizeExerciseCalories(records: DailyRecord[]) {

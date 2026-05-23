@@ -36,8 +36,11 @@ The main conversation owns product and technical direction. Subagents take bound
 - Records summary now uses a progress-ring style for calories and macro progress.
 - Profile gender is a two-option selector: male/female.
 - Profile activity level is a fixed selector: sedentary, lightly active, moderately active, very active, extra active.
+- Profile no longer shows the old manual training-frequency field once activity level exists.
+- Profile close now guards unsaved edits with a save/discard/continue prompt.
 - Records UI does not show BMR/TDEE implementation details; those stay inside the calculation module.
 - Daily food intake is calculated from the first confirmed food record in a 24-hour rolling window, then resets until a new food record starts the next window.
+- Records macro cards use explicit labels/icons and colored progress bars instead of placeholder text.
 
 ## Not Done Yet
 
