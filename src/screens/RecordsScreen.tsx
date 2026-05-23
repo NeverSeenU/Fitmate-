@@ -86,14 +86,13 @@ export function RecordsScreen({
               progress={energy.progress}
               value={energy.caloriesLeft >= 0 ? energy.caloriesLeft : Math.abs(energy.caloriesLeft)}
               label={energy.caloriesLeft >= 0 ? '还可吃' : '超出'}
-              sublabel={`${intake.caloriesKcal}/${energy.dailyTargetCalories} kcal`}
             />
           </View>
           <View style={styles.macroRingGrid}>
-            <MacroRing label="蛋白" value={intake.proteinG} target={energy.proteinTargetG} unit="g" />
-            <MacroRing label="碳水" value={intake.carbsG} target={energy.carbsTargetG} unit="g" />
-            <MacroRing label="脂肪" value={intake.fatG} target={energy.fatTargetG} unit="g" />
-            <MacroRing label="热量" value={intake.caloriesKcal} target={energy.dailyTargetCalories} unit="kcal" />
+            <MacroRing label="??" value={intake.proteinG} target={energy.proteinTargetG} unit="g" tone="protein" />
+            <MacroRing label="??" value={intake.carbsG} target={energy.carbsTargetG} unit="g" tone="carbs" />
+            <MacroRing label="??" value={intake.fatG} target={energy.fatTargetG} unit="g" tone="fat" />
+            <MacroRing label="??" value={intake.caloriesKcal} target={energy.dailyTargetCalories} unit="kcal" tone="calories" />
           </View>
         </View>
         <View style={styles.actionGrid}>
@@ -300,12 +299,10 @@ function EnergyRing({
   progress,
   value,
   label,
-  sublabel,
 }: {
   progress: number;
   value: number;
   label: string;
-  sublabel: string;
 }) {
   const segmentCount = 24;
   const activeSegments = Math.round(Math.min(1, progress) * segmentCount);
@@ -317,31 +314,55 @@ function EnergyRing({
           style={[
             styles.energyRingSegment,
             index < activeSegments && styles.energyRingSegmentActive,
-            { transform: [{ rotate: `${(360 / segmentCount) * index}deg` }, { translateY: -36 }] },
+            { transform: [{ rotate: `${(360 / segmentCount) * index}deg` }, { translateY: -48 }] },
           ]}
         />
       ))}
       <View style={styles.energyRingCore}>
         <Text style={styles.energyRingCaption}>{label}</Text>
         <Text style={styles.energyRingValue}>{value}</Text>
-        <Text style={styles.energyRingLabel}>{sublabel}</Text>
+        <Text style={styles.energyRingLabel}>kcal</Text>
       </View>
     </View>
   );
 }
 
-function MacroRing({ label, value, target, unit }: { label: string; value: number; target: number; unit: string }) {
+function MacroRing({
+  label,
+  value,
+  target,
+  unit,
+  tone,
+}: {
+  label: string;
+  value: number;
+  target: number;
+  unit: string;
+  tone: 'protein' | 'carbs' | 'fat' | 'calories';
+}) {
   const progress = target > 0 ? value / target : 0;
   const over = progress > 1.05;
   return (
     <View style={styles.macroRingCard}>
       <View style={styles.macroTrack}>
-        <View style={[styles.macroFill, { width: `${Math.min(100, Math.round(progress * 100))}%` }, over && styles.macroFillOver]} />
+        <View style={[
+          styles.macroFill,
+          macroFillStyle(tone),
+          { width: `${Math.min(100, Math.round(progress * 100))}%` },
+          over && styles.macroFillOver,
+        ]} />
       </View>
       <Text style={styles.macroValue}>{value}{unit}</Text>
       <Text style={styles.macroLabel}>{label} / {target}{unit}</Text>
     </View>
   );
+}
+
+function macroFillStyle(tone: 'protein' | 'carbs' | 'fat' | 'calories') {
+  if (tone === 'protein') return styles.macroFillProtein;
+  if (tone === 'carbs') return styles.macroFillCarbs;
+  if (tone === 'fat') return styles.macroFillFat;
+  return styles.macroFillCalories;
 }
 
 function summarizeExerciseCalories(records: DailyRecord[]) {

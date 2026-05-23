@@ -139,6 +139,7 @@ function mapRecords(
     title: stringValue(log.meal_name) ?? 'Food log',
     status: stringValue(log.status) ?? 'pending',
     text: foodRecordText(log),
+    recordedAt: stringValue(log.created_at),
     done: stringValue(log.status) === 'confirmed',
     caloriesKcal: rangeMidpoint(log.calories_range_kcal),
     proteinG: rangeMidpoint(log.protein_g_range),
@@ -152,6 +153,7 @@ function mapRecords(
     title: stringValue(log.workout_type) ?? 'Workout',
     status: stringValue(log.status) ?? 'pending',
     text: `${numberValue(log.duration_minutes) ?? 0} min`,
+    recordedAt: stringValue(log.created_at),
     done: stringValue(log.status) === 'confirmed',
   }));
   const checkinRecords = (records.checkins ?? []).map((checkin) => {
@@ -172,6 +174,7 @@ function mapRecords(
         craving !== undefined ? `嘴馋 ${craving}/10` : null,
         stringValue(checkin.notes),
       ].filter(Boolean).join(' · '),
+      recordedAt: stringValue(checkin.created_at),
       done: true,
       weightKg: weight,
       moodLevel: mood,

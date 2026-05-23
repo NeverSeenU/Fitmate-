@@ -35,6 +35,9 @@ The main conversation owns product and technical direction. Subagents take bound
 - Energy target module calculates BMR, TDEE, daily target, exercise credit, calories left, and macro targets.
 - Records summary now uses a progress-ring style for calories and macro progress.
 - Profile gender is a two-option selector: male/female.
+- Profile activity level is a fixed selector: sedentary, lightly active, moderately active, very active, extra active.
+- Records UI does not show BMR/TDEE implementation details; those stay inside the calculation module.
+- Daily food intake is calculated from the first confirmed food record in a 24-hour rolling window, then resets until a new food record starts the next window.
 
 ## Not Done Yet
 

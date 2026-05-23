@@ -11,7 +11,7 @@ export const initialAppState: AppDataState = {
     age: 23,
     gender: 'female',
     goalLabel: '婚纱减脂阶段',
-    trainingFrequency: '几乎每天 2 小时',
+    trainingFrequency: 'very_active',
     dietPreference: '辣、重口、控油',
     healthRiskNote: '无已填写慢病信息',
   },

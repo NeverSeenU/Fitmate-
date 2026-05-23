@@ -125,6 +125,7 @@ export type DailyRecord = {
   title: string;
   status: string;
   text: string;
+  recordedAt?: string;
   done?: boolean;
   caloriesKcal?: number;
   proteinG?: number;

@@ -40,6 +40,15 @@ export function runEnergyTargetTests() {
   const intake = summarizeFoodIntake(records);
   assert(intake.caloriesKcal === 500, 'food intake must only include confirmed food records');
   assert(intake.proteinG === 30, 'food intake must aggregate confirmed protein');
+
+  const rollingRecords: DailyRecord[] = [
+    { id: 'old-food', kind: 'food', title: 'Old', status: 'done', text: '', done: true, caloriesKcal: 400, recordedAt: '2026-05-20T08:00:00.000Z' },
+    { id: 'new-food', kind: 'food', title: 'New', status: 'done', text: '', done: true, caloriesKcal: 600, recordedAt: '2026-05-21T09:00:00.000Z' },
+  ];
+  const rolling = summarizeFoodIntake(rollingRecords, new Date('2026-05-21T12:00:00.000Z'));
+  assert(rolling.caloriesKcal === 600, 'daily intake must refresh from the first food record after the previous 24-hour window');
+  const expired = summarizeFoodIntake(rollingRecords, new Date('2026-05-22T10:00:00.000Z'));
+  assert(expired.caloriesKcal === 0, 'daily intake must reset after 24 hours if no new food starts a new window');
 }
 
 function assert(condition: boolean, message: string) {

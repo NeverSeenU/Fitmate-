@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } fro
 import { Button, Field, Plan, SettingsRow, TopBar } from '../components/ui';
 import type { AppDataState, Gender } from '../domain/models';
 import type { createAppActions } from '../services/appActions';
+import { ACTIVITY_LEVELS } from '../services/energyTargets';
 import { styles } from '../styles';
 import type { Sheet } from '../types';
 
@@ -198,7 +199,7 @@ export function ProfileSheet({
           <Field label="体重 kg" value={weightKg} onChangeText={setWeightKg} keyboardType="numeric" compact />
         </View>
         <Field label="目标" value={goalLabel} onChangeText={setGoalLabel} />
-        <Field label="饮食偏好" value={dietPreference} onChangeText={setDietPreference} />
+        <ActivityLevelPicker value={trainingFrequency} setValue={setTrainingFrequency} />
         <Field label="训练频率" value={trainingFrequency} onChangeText={setTrainingFrequency} />
         <Field label="风险提示" value={healthRiskNote} onChangeText={setHealthRiskNote} />
         <Button label={busy ? '保存中...' : '保存修改'} onPress={() => void save()} disabled={busy} />
@@ -228,6 +229,38 @@ function GenderSegment({ value, setValue }: { value: Gender; setValue: (value: G
       </View>
     </View>
   );
+}
+
+function ActivityLevelPicker({ value, setValue }: { value: string; setValue: (value: string) => void }) {
+  const selected = activityLevelValue(value);
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>活动水平</Text>
+      <View style={styles.activityGrid}>
+        {ACTIVITY_LEVELS.map((level) => (
+          <Pressable
+            key={level.value}
+            style={[styles.activityOption, selected === level.value && styles.activityOptionActive]}
+            onPress={() => setValue(level.value)}
+          >
+            <Text style={[styles.activityOptionText, selected === level.value && styles.activityOptionTextActive]}>{level.label}</Text>
+            <Text style={[styles.activityOptionMeta, selected === level.value && styles.activityOptionMetaActive]}>{level.factor}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function activityLevelValue(value: string) {
+  const lower = value.toLowerCase();
+  if (ACTIVITY_LEVELS.some((level) => level.value === lower)) return lower;
+  if (lower.includes('extra')) return 'extra_active';
+  if (lower.includes('daily') || lower.includes('very') || lower.includes('6') || lower.includes('7')) return 'very_active';
+  if (lower.includes('moderate') || lower.includes('4') || lower.includes('5')) return 'moderately_active';
+  if (lower.includes('light') || lower.includes('1') || lower.includes('2') || lower.includes('3')) return 'lightly_active';
+  if (lower.includes('sedentary')) return 'sedentary';
+  return 'lightly_active';
 }
 
 function numberOr(fallback: number, value: string) {

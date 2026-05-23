@@ -230,6 +230,44 @@ export const styles = StyleSheet.create({
   segmentTextActive: {
     color: '#111',
   },
+  activityGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+  activityOption: {
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 0,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: '#242424',
+    paddingVertical: compactPhone ? 8 : 9,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    gap: 2,
+  },
+  activityOptionActive: {
+    borderColor: colors.lime,
+    backgroundColor: '#d6ff3d',
+  },
+  activityOptionText: {
+    color: colors.text,
+    fontSize: size(12),
+    fontWeight: '900',
+  },
+  activityOptionTextActive: {
+    color: '#111',
+  },
+  activityOptionMeta: {
+    color: colors.muted,
+    fontSize: size(10),
+    fontWeight: '800',
+  },
+  activityOptionMetaActive: {
+    color: '#293000',
+  },
   label: {
     color: colors.muted,
     fontSize: size(12),
@@ -649,8 +687,8 @@ export const styles = StyleSheet.create({
     fontWeight: '900',
   },
   energyRing: {
-    width: 92,
-    height: 92,
+    width: 118,
+    height: 118,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -665,9 +703,9 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.lime,
   },
   energyRingCore: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 78,
+    height: 78,
+    borderRadius: 39,
     backgroundColor: '#151515',
     alignItems: 'center',
     justifyContent: 'center',
@@ -679,7 +717,7 @@ export const styles = StyleSheet.create({
   },
   energyRingValue: {
     color: colors.text,
-    fontSize: narrowPhone ? 14 : 15,
+    fontSize: narrowPhone ? 17 : 19,
     fontWeight: '900',
   },
   energyRingLabel: {
@@ -711,6 +749,18 @@ export const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 99,
     backgroundColor: colors.lime,
+  },
+  macroFillProtein: {
+    backgroundColor: '#74e4ff',
+  },
+  macroFillCarbs: {
+    backgroundColor: '#c8ff3d',
+  },
+  macroFillFat: {
+    backgroundColor: '#ffcf5a',
+  },
+  macroFillCalories: {
+    backgroundColor: '#b58cff',
   },
   macroFillOver: {
     backgroundColor: '#f5c542',

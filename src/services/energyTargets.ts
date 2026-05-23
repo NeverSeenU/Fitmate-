@@ -2,6 +2,14 @@ import type { DailyRecord, UserProfile } from '../domain/models';
 
 export type GoalMode = 'fat_loss' | 'maintenance' | 'muscle_gain';
 
+export const ACTIVITY_LEVELS = [
+  { label: '久坐', value: 'sedentary', factor: 1.2 },
+  { label: '轻动', value: 'lightly_active', factor: 1.375 },
+  { label: '中等', value: 'moderately_active', factor: 1.55 },
+  { label: '高强', value: 'very_active', factor: 1.725 },
+  { label: '超高', value: 'extra_active', factor: 1.9 },
+] as const;
+
 export type EnergyTargetInput = {
   profile: UserProfile;
   foodCaloriesKcal: number;
@@ -56,8 +64,8 @@ export function calculateEnergyTarget({
   };
 }
 
-export function summarizeFoodIntake(records: DailyRecord[]) {
-  return records
+export function summarizeFoodIntake(records: DailyRecord[], now = new Date()) {
+  return recordsInActiveFoodWindow(records, now)
     .filter((record) => record.kind === 'food' && record.done)
     .reduce((summary, record) => ({
       count: summary.count + 1,
@@ -66,6 +74,41 @@ export function summarizeFoodIntake(records: DailyRecord[]) {
       carbsG: summary.carbsG + (record.carbsG ?? 0),
       fatG: summary.fatG + (record.fatG ?? 0),
     }), { count: 0, caloriesKcal: 0, proteinG: 0, carbsG: 0, fatG: 0 });
+}
+
+export function recordsInActiveFoodWindow(records: DailyRecord[], now = new Date()) {
+  const doneFoodRecords = records
+    .filter((record) => record.kind === 'food' && record.done)
+    .map((record) => ({ record, time: recordTime(record) }))
+    .filter((item): item is { record: DailyRecord; time: Date } => Boolean(item.time))
+    .sort((a, b) => a.time.getTime() - b.time.getTime());
+
+  if (doneFoodRecords.length === 0) {
+    return records;
+  }
+
+  let anchor = doneFoodRecords[0].time;
+  doneFoodRecords.forEach(({ time }) => {
+    if (time.getTime() >= anchor.getTime() + DAY_MS) {
+      anchor = time;
+    }
+  });
+
+  const end = new Date(anchor.getTime() + DAY_MS);
+  if (now.getTime() >= end.getTime()) {
+    return records.filter((record) => record.kind !== 'food');
+  }
+
+  return records.filter((record) => {
+    if (record.kind !== 'food') {
+      return true;
+    }
+    const time = recordTime(record);
+    if (!time) {
+      return true;
+    }
+    return time.getTime() >= anchor.getTime() && time.getTime() < end.getTime();
+  });
 }
 
 function calculateBmr(profile: UserProfile) {
@@ -90,6 +133,8 @@ function calculateProteinTarget(weightKg: number, goalMode: GoalMode) {
 
 function inferActivityFactor(trainingFrequency: string) {
   const value = trainingFrequency.toLowerCase();
+  const exact = ACTIVITY_LEVELS.find((level) => level.value === value);
+  if (exact) return exact.factor;
   if (value.includes('体力') || value.includes('extra')) return 1.9;
   if (value.includes('每天') || value.includes('daily') || value.includes('6') || value.includes('7')) return 1.725;
   if (value.includes('4') || value.includes('5') || value.includes('中等') || value.includes('moderate')) return 1.55;
@@ -107,4 +152,14 @@ function inferGoalMode(goalLabel: string): GoalMode {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function recordTime(record: DailyRecord) {
+  if (!record.recordedAt) {
+    return null;
+  }
+  const time = new Date(record.recordedAt);
+  return Number.isFinite(time.getTime()) ? time : null;
 }
