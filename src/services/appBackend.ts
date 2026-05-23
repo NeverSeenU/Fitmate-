@@ -43,11 +43,18 @@ export async function loadAppDataFromBackend(
     api.records.today(),
   ]);
 
+  const mappedThreads = mapThreads(threads, fallback);
+  const activeThreadId = mappedThreads.some((thread) => thread.id === fallback.activeThreadId)
+    ? fallback.activeThreadId
+    : mappedThreads[0]?.id ?? fallback.activeThreadId;
+  const activeThread = mappedThreads.find((thread) => thread.id === activeThreadId);
   return {
     ...fallback,
     profile: mapProfile(me, fallback),
     entitlements: subscription.entitlements,
-    threads: mapThreads(threads, fallback),
+    threads: mappedThreads,
+    activeThreadId,
+    chatMessages: activeThread?.messages ?? (activeThreadId === fallback.activeThreadId ? fallback.chatMessages : []),
     activeFoodAnalysis: mapActiveFoodAnalysis(records, fallback),
     dailySummary: mapDailySummary(records, fallback),
     records: mapRecords(records, fallback),
@@ -110,7 +117,14 @@ function mapThreads(threads: { threads?: Array<Record<string, unknown>> }, fallb
     id: stringValue(item.id) ?? 'thread',
     title: stringValue(item.title) ?? 'FitMate chat',
     subtitle: stringValue(item.kind) ?? 'backend',
-  }));
+  })).map((thread) => {
+    const local = fallback.threads.find((item) => item.id === thread.id);
+    return {
+      ...thread,
+      messages: local?.messages,
+      updatedAt: local?.updatedAt,
+    };
+  });
 }
 
 function mapDailySummary(

@@ -48,6 +48,7 @@ export const initialAppState: AppDataState = {
     { id: 'wedding-plan', title: '婚纱塑形计划', subtitle: '本周热量和蛋白目标' },
     { id: 'training', title: '运动记录', subtitle: '有氧 + 无氧 120 分钟' },
   ],
+  activeThreadId: 'food-today',
   chatMessages: [
     {
       id: 'assistant-1',

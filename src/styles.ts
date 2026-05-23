@@ -1042,6 +1042,10 @@ export const styles = StyleSheet.create({
     paddingVertical: 10,
     justifyContent: 'center',
   },
+  threadRowActive: {
+    borderColor: 'rgba(200,255,61,0.72)',
+    backgroundColor: '#23281b',
+  },
   drawerNewChat: {
     alignSelf: 'flex-end',
     minHeight: 58,

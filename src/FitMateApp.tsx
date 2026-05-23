@@ -9,7 +9,7 @@ import { initialAppState } from './state/appState';
 import { createFitMateServices } from './services/apiClient';
 import { createAppActions } from './services/appActions';
 import { loadAppDataFromBackend } from './services/appBackend';
-import { loadFitMateState } from './state/persistence';
+import { loadFitMateState, saveFitMateState } from './state/persistence';
 import { createAsyncStorageStore } from './storage/localStore';
 import { runtimeConfig } from './config/env';
 import { styles } from './styles';
@@ -57,11 +57,18 @@ export default function App() {
     void (async () => {
       const saved = await loadFitMateState(store);
       if (cancelled) return;
+      const threads = saved.conversations ?? initialAppState.threads;
+      const activeThreadId = saved.activeThreadId && threads.some((thread) => thread.id === saved.activeThreadId)
+        ? saved.activeThreadId
+        : threads[0]?.id ?? initialAppState.activeThreadId;
+      const activeThread = threads.find((thread) => thread.id === activeThreadId);
       setAppState({
         ...initialAppState,
         ...(saved.profile ? { profile: saved.profile } : {}),
         ...(saved.records ? { records: saved.records } : {}),
-        ...(saved.conversations ? { threads: saved.conversations } : {}),
+        threads,
+        activeThreadId,
+        chatMessages: activeThread?.messages ?? (saved.conversations ? [] : initialAppState.chatMessages),
       });
       if (saved.session && isSessionFresh(saved.session)) {
         setPersistedSession(saved.session);
@@ -74,6 +81,13 @@ export default function App() {
       cancelled = true;
     };
   }, [store]);
+
+  useEffect(() => {
+    if (!authenticated) {
+      return;
+    }
+    void saveFitMateState(store, appState, persistedSession);
+  }, [appState, authenticated, persistedSession, store]);
 
   useEffect(() => {
     if (!authenticated || !persistedSession || !services.api) {

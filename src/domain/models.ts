@@ -57,6 +57,8 @@ export type ConversationThread = {
   id: string;
   title: string;
   subtitle: string;
+  updatedAt?: string;
+  messages?: ChatMessage[];
 };
 
 export type ChatMessage = {
@@ -144,6 +146,7 @@ export type AppDataState = {
   entitlements: Entitlements;
   plans: SubscriptionPlan[];
   threads: ConversationThread[];
+  activeThreadId: string;
   chatMessages: ChatMessage[];
   activeFoodAnalysis: FoodAnalysis | null;
   dailySummary: DailySummary;

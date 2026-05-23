@@ -71,6 +71,8 @@ async function testPersistenceRoundTrip() {
   assert(loaded.profile?.weightKg === 72, 'profile weight should round-trip');
   assert(loaded.records?.length === initialAppState.records.length, 'records should round-trip');
   assert(loaded.conversations?.length === initialAppState.threads.length, 'conversations should round-trip');
+  assert(loaded.conversations?.find((thread) => thread.id === initialAppState.activeThreadId)?.messages?.length === initialAppState.chatMessages.length, 'active conversation messages should round-trip');
+  assert(loaded.activeThreadId === initialAppState.activeThreadId, 'active thread id should round-trip');
   assert(loaded.session === null, 'missing session should load as null');
 }
 
@@ -1393,6 +1395,37 @@ async function testSendTextShowsUserMessageBeforeBackendReply() {
   assert(state.chatMessages.filter((message) => message.role === 'user').length === 1, 'sendText must not duplicate the user bubble');
 }
 
+async function testConversationThreadsKeepIndependentLocalHistory() {
+  let state: AppDataState = {
+    ...initialAppState,
+    activeThreadId: 'food-today',
+    threads: [
+      { id: 'food-today', title: '今日饮食分析', subtitle: '旧聊天', messages: [{ id: 'old-user', role: 'user', text: '旧消息' }] },
+    ],
+    chatMessages: [{ id: 'old-user', role: 'user', text: '旧消息' }],
+  };
+  const actions = createAppActions({
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  await actions.createThread('新对话', 'general');
+  const newThreadId = state.activeThreadId;
+  assert(Boolean(newThreadId && newThreadId !== 'food-today'), 'creating a thread should make it the active conversation');
+  assert(state.chatMessages.length === 0, 'new conversation should open with an empty local history');
+
+  await actions.sendText(newThreadId, '帮我分析今天训练后晚餐怎么吃');
+  const newThread = state.threads.find((thread) => thread.id === newThreadId);
+  assert(Boolean(newThread?.messages?.some((message) => message.text.includes('晚餐'))), 'new conversation should persist its own messages');
+  assert(Boolean(newThread?.title.includes('训练后晚餐')), 'first user message should become a useful local chat title');
+
+  actions.selectThread('food-today');
+  assert(state.activeThreadId === 'food-today', 'selectThread should switch the active conversation');
+  assert(state.chatMessages.length === 1 && state.chatMessages[0].text === '旧消息', 'switching threads should restore that thread history');
+}
+
 async function run() {
   runEnergyTargetTests();
   await testSubscriptionEntitlements();
@@ -1423,6 +1456,7 @@ async function run() {
   await testFileInsightSyncRequiresUserActionAndCreatesWeightCheckin();
   await testExpandedFileInsightSyncCreatesMenuAndWorkoutRecords();
   await testSendTextShowsUserMessageBeforeBackendReply();
+  await testConversationThreadsKeepIndependentLocalHistory();
 }
 
 void run();

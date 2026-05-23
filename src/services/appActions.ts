@@ -91,6 +91,19 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       });
     },
 
+    selectThread(threadId: string) {
+      const state = syncCurrentThreadMessages(getState());
+      const thread = state.threads.find((item) => item.id === threadId);
+      if (!thread) {
+        return;
+      }
+      setState({
+        ...state,
+        activeThreadId: thread.id,
+        chatMessages: thread.messages ?? [],
+      });
+    },
+
     async sendText(threadId: string, text: string) {
       if (!text.trim()) {
         return;
@@ -1257,10 +1270,19 @@ function addThread(
   setState: (state: AppDataState) => void,
   thread: ConversationThread,
 ) {
-  const state = getState();
+  const state = syncCurrentThreadMessages(getState());
+  const nextThread = {
+    ...thread,
+    title: shouldReplaceThreadTitle(thread.title) ? summarizeThreadTitle(thread.messages ?? []) || thread.title : thread.title,
+    subtitle: threadSubtitleFromMessages(thread.messages ?? [], thread.subtitle),
+    updatedAt: new Date().toISOString(),
+    messages: thread.messages ?? [],
+  };
   setState({
     ...state,
-    threads: [thread, ...state.threads],
+    activeThreadId: nextThread.id,
+    chatMessages: nextThread.messages,
+    threads: [nextThread, ...state.threads.filter((item) => item.id !== nextThread.id)],
   });
 }
 
@@ -1270,10 +1292,71 @@ function addMessages(
   messages: ChatMessage[],
 ) {
   const state = getState();
-  setState({
+  const chatMessages = [...state.chatMessages, ...messages];
+  setState(syncCurrentThreadMessages({
     ...state,
-    chatMessages: [...state.chatMessages, ...messages],
+    chatMessages,
+  }, messages));
+}
+
+function syncCurrentThreadMessages(state: AppDataState, addedMessages: ChatMessage[] = []) {
+  const activeThreadId = state.activeThreadId || state.threads[0]?.id || 'food-today';
+  const titleCandidate = summarizeThreadTitle(addedMessages);
+  const updatedAt = new Date().toISOString();
+  let found = false;
+  const threads = state.threads.map((thread) => {
+    if (thread.id !== activeThreadId) {
+      return thread;
+    }
+    found = true;
+    return {
+      ...thread,
+      title: shouldReplaceThreadTitle(thread.title) && titleCandidate ? titleCandidate : thread.title,
+      subtitle: threadSubtitleFromMessages(state.chatMessages, thread.subtitle),
+      updatedAt,
+      messages: state.chatMessages,
+    };
   });
+  if (!found) {
+    threads.unshift({
+      id: activeThreadId,
+      title: titleCandidate || '新对话',
+      subtitle: threadSubtitleFromMessages(state.chatMessages, 'general'),
+      updatedAt,
+      messages: state.chatMessages,
+    });
+  }
+  return {
+    ...state,
+    activeThreadId,
+    threads,
+  };
+}
+
+function summarizeThreadTitle(messages: ChatMessage[]) {
+  const firstUserText = messages.find((message) => message.role === 'user' && message.text.trim())?.text;
+  if (!firstUserText) {
+    return '';
+  }
+  return firstUserText
+    .replace(/\s+/g, ' ')
+    .replace(/^照片[:：]\s*/i, '')
+    .replace(/^Uploading file:\s*/i, '')
+    .slice(0, 18);
+}
+
+function shouldReplaceThreadTitle(title: string) {
+  const normalized = title.trim().toLowerCase();
+  return !normalized || normalized === '新对话' || normalized === 'fitmate chat' || normalized === 'food photo' || normalized === 'file insight';
+}
+
+function threadSubtitleFromMessages(messages: ChatMessage[], fallback: string) {
+  const latest = [...messages].reverse().find((message) => message.text.trim());
+  if (!latest) {
+    return fallback;
+  }
+  const prefix = latest.role === 'user' ? '你' : 'FitMate';
+  return `${prefix}: ${latest.text.replace(/\s+/g, ' ').slice(0, 26)}`;
 }
 
 async function ensureBackendThread(
@@ -1288,10 +1371,12 @@ async function ensureBackendThread(
   }
   const created = await api.chat.createThread({ title: fallback.title, kind: fallback.kind }) as { id?: string; title?: string; kind?: string };
   const threadId = created.id ?? `thread-${Date.now()}`;
+  const state = getState();
   addThread(getState, setState, {
     id: threadId,
     title: created.title ?? fallback.title,
     subtitle: created.kind ?? fallback.kind,
+    messages: state.chatMessages,
   });
   return threadId;
 }

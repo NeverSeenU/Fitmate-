@@ -2,6 +2,7 @@ export type StorageKey =
   | 'fitmate.profile'
   | 'fitmate.records'
   | 'fitmate.conversations'
+  | 'fitmate.activeThreadId'
   | 'fitmate.session';
 
 export type LocalStore = {

@@ -41,6 +41,8 @@ The main conversation owns product and technical direction. Subagents take bound
 - Records UI does not show BMR/TDEE implementation details; those stay inside the calculation module.
 - Daily food intake is calculated from the first confirmed food record in a 24-hour rolling window, then resets until a new food record starts the next window.
 - Records macro cards use explicit labels/icons and colored progress bars instead of placeholder text.
+- Chat now supports real local conversation history: each thread stores its own messages, switching threads restores that thread, and the first user message can become the local chat title.
+- Local persistence saves conversations, active thread id, and active thread messages so old chats survive app restarts.
 
 ## Not Done Yet
 
@@ -49,7 +51,7 @@ The main conversation owns product and technical direction. Subagents take bound
 - Onboarding flow that forces the required energy inputs: sex, age, height, weight, goal, activity level.
 - Apple Health / iPhone files / photo library deeper integration.
 - Soul.md companion identity and safety rules for the emotional coach persona.
-- Persistent chat history/cards across backend reloads beyond the current local app state.
+- Backend-side long-term chat message sync; current implementation keeps full local conversation history in AsyncStorage.
 - Better AI uncertainty flow: ask separate question bubbles, update the existing card after answer, avoid premature confirm state.
 - Visual polish pass across Records, Chat, Profile, and card density after more true-device screenshots.
 

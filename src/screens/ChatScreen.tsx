@@ -39,6 +39,7 @@ export function ChatScreen({
   const [foodForm, setFoodForm] = useState(foodAnalysisToForm(appState.activeFoodAnalysis));
   const [weightForm, setWeightForm] = useState({ weightKg: appState.profile.weightKg.toFixed(1), notes: '' });
   const [workoutForm, setWorkoutForm] = useState({ detail: '' });
+  const activeThreadId = appState.activeThreadId || appState.threads[0]?.id || 'food-today';
   const scrollRef = useRef<ScrollView | null>(null);
   const swipeResponder = useRef(
     PanResponder.create({
@@ -127,7 +128,7 @@ export function ChatScreen({
         await actions.attachFile(attachment, text);
       } else if (attachment?.kind === 'photo') {
         await actions.analyzeFoodPhoto({
-          threadId: appState.threads[0]?.id ?? 'food-today',
+          threadId: activeThreadId,
           imageUri: attachment.imageUri,
           filename: attachment.filename,
           mimeType: attachment.mimeType,
@@ -135,7 +136,7 @@ export function ChatScreen({
         });
         setFoodEditorOpen(false);
       } else if (text) {
-        await actions.sendText(appState.threads[0]?.id ?? 'food-today', text);
+        await actions.sendText(activeThreadId, text);
       }
     });
   };
@@ -361,6 +362,8 @@ export function ChatScreen({
           }}
           profile={appState.profile}
           threads={appState.threads}
+          activeThreadId={activeThreadId}
+          selectThread={actions.selectThread}
         />
       )}
       {panel === 'new' && <NewChatPanel close={closePanel} createThread={actions.createThread} />}

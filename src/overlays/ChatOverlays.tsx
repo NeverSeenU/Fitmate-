@@ -64,12 +64,16 @@ export function ThreadDrawer({
   close,
   openUser,
   openNewChat,
+  activeThreadId,
+  selectThread,
   profile,
   threads,
 }: {
   close: () => void;
   openUser: () => void;
   openNewChat: () => void;
+  activeThreadId?: string;
+  selectThread?: (threadId: string) => void;
   profile: UserProfile;
   threads: ConversationThread[];
 }) {
@@ -93,7 +97,14 @@ export function ThreadDrawer({
           </View>
         </Pressable>
         {threads.map((thread) => (
-          <Pressable key={thread.id} style={styles.threadRow}>
+          <Pressable
+            key={thread.id}
+            style={[styles.threadRow, activeThreadId === thread.id && styles.threadRowActive]}
+            onPress={() => {
+              selectThread?.(thread.id);
+              close();
+            }}
+          >
             <Text style={styles.bodyStrong}>{thread.title}</Text>
             <Text style={styles.muted}>{thread.subtitle}</Text>
           </Pressable>
