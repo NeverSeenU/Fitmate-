@@ -1,5 +1,6 @@
 import { createBackendApi, createFitMateServices, type ApiRequestRecord } from '../services/apiClient';
 import { createAppActions } from '../services/appActions';
+import { RECOVERY_PROMPTS, recoveryPromptText } from '../product/recoveryPrompts';
 import { loadAppDataFromBackend } from '../services/appBackend';
 import { createRuntimeConfig } from '../config/env';
 import { createAiVisionService, type FoodVisionInput, type VisionProvider } from '../services/aiVision';
@@ -1426,6 +1427,18 @@ async function testConversationThreadsKeepIndependentLocalHistory() {
   assert(state.chatMessages.length === 1 && state.chatMessages[0].text === '旧消息', 'switching threads should restore that thread history');
 }
 
+function testRecoveryPromptsTargetRealFatLossPain() {
+  assert(RECOVERY_PROMPTS.length === 4, 'recovery prompts should stay focused on the four highest-friction fat-loss moments');
+  const ids = RECOVERY_PROMPTS.map((prompt) => prompt.id).join(',');
+  assert(ids === 'overeaten,reset,next_meal,scale_panic', 'recovery prompts should prioritize overeating, reset, next meal, and scale panic');
+  for (const prompt of RECOVERY_PROMPTS) {
+    assert(prompt.label.length <= 5, 'recovery prompt labels must stay short enough for one-tap mobile use');
+    assert(prompt.message.includes('下一步') || prompt.message.includes('下一餐'), 'recovery prompts must ask FitMate for a concrete next action');
+  }
+  assert(recoveryPromptText('overeaten').includes('不要羞辱我'), 'overeating recovery should explicitly protect the user from shame');
+  assert(recoveryPromptText('scale_panic').includes('体重'), 'scale-panic recovery should address weight anxiety directly');
+}
+
 async function run() {
   runEnergyTargetTests();
   await testSubscriptionEntitlements();
@@ -1457,6 +1470,7 @@ async function run() {
   await testExpandedFileInsightSyncCreatesMenuAndWorkoutRecords();
   await testSendTextShowsUserMessageBeforeBackendReply();
   await testConversationThreadsKeepIndependentLocalHistory();
+  testRecoveryPromptsTargetRealFatLossPain();
 }
 
 void run();

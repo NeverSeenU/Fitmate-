@@ -1,11 +1,17 @@
 # Progress: FitMate AI MVP Engineering
 
 ## Current State
-- **Last completed task:** P2-2 settings first pass and direct new-chat flow
-- **Current task:** Expo Go real-device verification for Settings rows and ChatGPT-style new conversation behavior
-- **Next task:** P2-2 backend-backed account/purchase/legal completion and P2-4 conversation management polish
+- **Last completed task:** Trust-first fat-loss recovery direction and chat recovery shortcuts
+- **Current task:** Expo Go real-device verification for low-friction recovery prompts in AI Chat
+- **Next task:** Wire `Soul.md` into backend chat prompts and add emotional/safety routing tests
 
 ## What's Been Done
+- `docs/product/fat-loss-pain-map.md` now explains the hardest real fat-loss moments: overeating panic, record gaps, scale anxiety, cravings, post-workout hunger, social meal uncertainty, and AI trust loss.
+- `Soul.md` now treats those moments as first-class product behavior, not generic motivation copy.
+- AI Chat now shows four low-friction recovery shortcuts when the composer is empty: eating too much, restarting after a gap, next meal, and scale anxiety.
+- Recovery shortcuts send concrete prompts that ask FitMate for one safe next step instead of generic chat.
+- Logic tests now lock the recovery shortcuts to real fat-loss pain moments and short mobile labels.
+- `npm.cmd test` and `npm.cmd run typecheck` passed after the recovery direction work.
 - Chat drawer "New chat" now creates a blank conversation directly instead of opening the old template bottom sheet.
 - The old `NewChatPanel` component and `ChatPanel = 'new'` state were removed.
 - Settings rows now respond: account info, health/safety, language, appearance, notifications, personalization, data control, safety disclaimer, help, bug report, terms, privacy policy, and app version open detail sheets.

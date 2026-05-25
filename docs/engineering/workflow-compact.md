@@ -4,7 +4,9 @@ Date: 2026-05-24
 
 ## Project Goal
 
-FitMate is an AI fitness, fat-loss, food logging, workout logging, and emotional companion app. The product should feel clean, premium, dark-mode friendly, coaching-oriented, and practical for daily use.
+FitMate is a trust-first fat-loss recovery companion. It helps users record food, understand trends, and recover from the moments where weight loss usually breaks: overeating panic, missed records, cravings, post-workout hunger, scale anxiety, and feeling that one imperfect meal ruined the whole plan.
+
+The product should feel clean, premium, dark-mode friendly, coaching-oriented, emotionally steady, and practical for daily use.
 
 The main conversation owns product and technical direction. Subagents take bounded tasks through the documented workflow, not through scattered chat memory.
 
@@ -23,6 +25,11 @@ The main conversation owns product and technical direction. Subagents take bound
 
 ## Completed Recently
 
+- Red-team response shifted FitMate away from "broad AI fitness app" toward "non-shaming fat-loss recovery companion."
+- `docs/product/fat-loss-pain-map.md` documents the real hard moments developers and FitMate AI must design for.
+- `Soul.md` now includes trust, uncertainty, emotional recovery, and hard-moment behavior rules.
+- AI Chat now has one-tap recovery prompts: eating too much, restarting after a gap, next meal, and scale anxiety.
+- Recovery prompt tests ensure those shortcuts stay focused on real fat-loss pain and concrete next actions.
 - Chat drawer "New chat" now directly creates a blank conversation. The template selection bottom sheet was removed.
 - Settings P2-2 first pass is implemented: rows open account/info/legal/privacy/help/detail sheets instead of being dead buttons.
 - Settings destructive actions now require a confirmation dialog before deleting photos/records or account data.
@@ -53,6 +60,9 @@ The main conversation owns product and technical direction. Subagents take bound
 
 ## Not Done Yet
 
+- Backend chat prompts do not yet load/enforce `Soul.md`.
+- Emotional risk routing still needs tests for overeating panic, guilt, restriction, purging, scale anxiety, missed records, and unsafe overtraining.
+- Recovery shortcuts currently send text prompts; they do not yet create a structured recovery card or state machine.
 - Settings P2-2 still needs real App Store / Play Store purchase restore, real logout, email/phone editing, data export, backend account deletion verification, and release-reviewed legal copy.
 - Dynamic calibration backend persistence and richer 21-day trend UI.
 - Better workout calorie estimation and explicit exercise credit source.
@@ -66,14 +76,14 @@ The main conversation owns product and technical direction. Subagents take bound
 
 ## Next Recommended Build Step
 
-Continue P2-2 from placeholder screens to production-grade account/legal flows:
+Wire Soul into the actual AI path:
 
-1. Replace mock restore receipts with real App Store / Play Store receipt restore boundaries.
-2. Add editable email/phone/account screens and real logout.
-3. Add data export and backend-verified account deletion.
-4. Add smoke tests for every Settings row.
+1. Add backend prompt assembly that includes `Soul.md` or a compiled Soul policy.
+2. Add tests for shame/guilt/restriction/craving/scale-panic inputs.
+3. Route high-risk restriction, purging, self-harm, and medical-risk messages through safety before nutrition optimization.
+4. Make photo/file failure responses preserve the user's input and offer retry, describe manually, or save for later.
 
-After that, continue P2-4 conversation management: search, rename, delete, pinned conversations, and backend-synced chat history.
+After that, return to P2-2 trust-center Settings: purchase restore, data export, legal copy, privacy controls, logout, and backend-verified account deletion.
 
 ## Whole-App Audit Snapshot
 

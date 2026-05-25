@@ -3,6 +3,7 @@ import { Keyboard, KeyboardAvoidingView, PanResponder, Platform, Pressable, Scro
 import { BottomTabs, Button, ChatBubble, ChatHeader, FoodAnalysisCard } from '../components/ui';
 import type { AppDataState, ChatMessage, FoodAnalysis } from '../domain/models';
 import { AttachmentPanel, ThreadDrawer } from '../overlays/ChatOverlays';
+import { RECOVERY_PROMPTS, type RecoveryPrompt } from '../product/recoveryPrompts';
 import type { createAppActions, FoodLogEditInput } from '../services/appActions';
 import { formatFileSize, pickFitMateFile, type PickedFile } from '../services/filePicker';
 import { pickFoodPhoto, type PickedPhoto, type PhotoPickerSource } from '../services/photoPicker';
@@ -126,6 +127,15 @@ export function ChatScreen({
       } else if (text) {
         await actions.sendText(activeThreadId, text);
       }
+    });
+  };
+
+  const sendRecoveryPrompt = (prompt: RecoveryPrompt) => {
+    if (busy) return;
+    setComposerText('');
+    setPendingAttachment(null);
+    void runAction('正在让 FitMate 帮你稳住...', 'FitMate 已给出下一步', async () => {
+      await actions.sendText(activeThreadId, prompt.message);
     });
   };
 
@@ -275,6 +285,19 @@ export function ChatScreen({
       </ScrollView>
       {!foodEditorOpen ? (
         <View style={styles.composer}>
+          {!pendingAttachment && !composerText.trim() ? (
+            <View style={styles.quickRow}>
+              {RECOVERY_PROMPTS.map((prompt) => (
+                <Pressable
+                  key={prompt.id}
+                  style={[styles.smallButton, busy && styles.disabledButton]}
+                  onPress={busy ? undefined : () => sendRecoveryPrompt(prompt)}
+                >
+                  <Text style={styles.smallButtonText}>{prompt.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           {pendingAttachment ? (
             <View style={styles.pendingAttachment}>
               <View style={styles.pendingAttachmentBadge}>

@@ -16,6 +16,24 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ## Priority 1: Safety And Production Readiness
 
+### P1-1: Soul And Trust Constitution
+- Owner: Product/PM Lead / AI/Vision Lead / QA Lead
+- Files: `Soul.md`, `docs/engineering/red-team-response.md`, backend prompt/risk routing, mobile card/error copy
+- Scope: convert the companion identity into enforceable rules for AI wording, card states, follow-up placement, failure copy, privacy copy, and safety escalation.
+- Done when: shame/guilt/craving/restriction/scale-panic prompts produce emotionally safe responses; AI cards show draft/confirmed/edited state and uncertainty clearly; product copy follows `Soul.md`.
+
+### P1-2: Humane Failure And Recovery States
+- Owner: Frontend Lead / Backend Lead / QA Lead
+- Files: `src/screens/ChatScreen.tsx`, `src/services/appActions.ts`, backend provider error mapping
+- Scope: replace raw provider/backend failures with recovery options; preserve outgoing user bubbles, attachment previews, and drafts after failure.
+- Done when: photo/file/text model failures never erase input and always offer retry, describe manually, or save for later.
+
+### P1-3: Emotional And Health Risk Routing
+- Owner: AI/Vision Lead / Backend Lead / Product/PM Lead
+- Files: `backend/app/api/safety.py`, chat service, `Soul.md`, tests
+- Scope: detect extreme restriction, purging/laxative language, binge panic, self-harm risk, medical-risk phrases, and unsafe overtraining before ordinary diet advice.
+- Done when: high-risk chat messages route to safe supportive responses and log safety events without continuing normal weight-loss optimization.
+
 ## Priority 2: Core Product Stabilization
 
 ### P2-1: On-Device Smoke Test Pass

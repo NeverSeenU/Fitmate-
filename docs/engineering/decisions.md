@@ -58,3 +58,16 @@ This file records project-level execution decisions for the main conversation an
 - Inputs: sex, age, height, weight, goal, activity/training frequency, confirmed food records, and workout calories when available.
 - Consequence: the MVP is an estimate, not a medical measurement. After 2-3 weeks of weight, food, and workout records, FitMate should dynamically adjust maintenance calories/TDEE from weight trend, expected deficit, and logging consistency.
 - Sources: National Academies DRI/EER materials define energy needs using age, sex, height, weight, and physical activity level; FitMate uses the simpler Mifflin-St Jeor implementation for mobile product clarity until the historical calibration module exists.
+
+## ED-009: FitMate Is Trust-First, Not Logging-First
+
+- Date: 2026-05-24
+- Decision: FitMate must behave as a trusted companion first and a tracking system second. Product and engineering work should reduce user burden, preserve user control, and make uncertainty visible instead of optimizing only for automatic logging.
+- Source: red-team critique summarized in `docs/engineering/red-team-response.md`.
+- Product rules:
+  - AI-generated records are drafts until user-confirmed or governed by a clear automation policy.
+  - User corrections override AI estimates.
+  - Failure states must preserve user input and offer recovery options.
+  - Follow-up questions belong in chat bubbles, not buried inside record details.
+  - Emotional safety takes priority over calorie optimization when the user expresses guilt, shame, binge panic, extreme restriction, or self-harm risk.
+- Consequence: `Soul.md` is now a product contract, not only a prompt. Frontend card states, backend AI routing, settings/privacy language, and QA tests must align with it.
