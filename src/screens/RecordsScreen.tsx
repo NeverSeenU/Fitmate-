@@ -3,7 +3,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput,
 import { BottomTabs, Button, RecordCard, TopBar } from '../components/ui';
 import type { AppDataState, DailyRecord } from '../domain/models';
 import type { createAppActions, FoodLogEditInput } from '../services/appActions';
-import { calculateEnergyTarget, summarizeFoodIntake } from '../services/energyTargets';
+import { calculateDynamicCalibration, calculateEnergyTarget, summarizeFoodIntake } from '../services/energyTargets';
 import { styles } from '../styles';
 import type { Screen, Sheet } from '../types';
 
@@ -44,6 +44,10 @@ export function RecordsScreen({
       exerciseCaloriesKcal: exerciseCalories,
     }),
     [appState.profile, exerciseCalories, intake.caloriesKcal],
+  );
+  const calibration = useMemo(
+    () => calculateDynamicCalibration({ profile: appState.profile, records: appState.records }),
+    [appState.profile, appState.records],
   );
 
   const runAction = async (label: string, action: () => Promise<void>) => {
@@ -123,6 +127,16 @@ export function RecordsScreen({
               setPanel('mood');
             }}
           />
+        </View>
+        <View style={styles.coachCard}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.h2}>{calibration.title}</Text>
+            <Text style={styles.aiTag}>AI</Text>
+          </View>
+          <Text style={styles.muted}>{calibration.message}</Text>
+          <Text style={styles.runtimeInfo}>
+            {`饮食 ${calibration.foodDays} 天 · 体重趋势 ${calibration.weightDays} 天 · 置信度 ${calibration.confidence.toFixed(2)}`}
+          </Text>
         </View>
         {status ? <Text style={styles.formStatus}>{status}</Text> : null}
         {appState.records.map((record) => (

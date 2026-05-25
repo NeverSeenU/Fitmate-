@@ -24,6 +24,24 @@ This is the formal task queue for the main Codex conversation and subagent team.
 - Scope: login/register, chat send, food upload, confirm/edit/discard, manual food record, check-in, subscription restore, profile editing.
 - Done when: each flow is tested in Expo Go against the local backend and failures are logged as backlog items.
 
+### P2-2: Settings, Account, Legal, And Privacy Completion
+- Owner: Product/PM Lead / Frontend Lead / Backend Lead
+- Files: `src/screens/SheetScreens.tsx`, `src/services/appActions.ts`, `backend/app/api/*`, legal docs
+- Scope: restore purchases from real App Store / Play Store receipts, subscription management, email/phone editing, health/safety profile, language/theme/notifications, personalization, data export, legal Terms, Privacy Policy, Safety Disclaimer, help center, bug reporting, logout, account deletion confirmation.
+- Done when: every Settings row either opens a complete screen or shows a clear disabled/planned state; legal text is product-specific and reviewed before release; privacy export/delete flows are backed by server jobs.
+
+### P2-3: Dynamic Energy Calibration
+- Owner: AI/Vision Lead / Product Lead / QA Lead
+- Files: `src/services/energyTargets.ts`, `src/screens/RecordsScreen.tsx`, backend records endpoints
+- Scope: compare expected weight trend against actual 7/14/21-day data from food logs, workout logs, and weight check-ins.
+- Done when: Records shows a coaching recommendation to keep, lower, or raise daily targets with confidence and data sufficiency status.
+
+### P2-4: Conversation UX Parity
+- Owner: Frontend Lead
+- Files: `src/overlays/ChatOverlays.tsx`, `src/services/appActions.ts`, `src/state/persistence.ts`
+- Scope: ChatGPT-like conversation drawer with title-only rows, search, delete/rename, pinned conversations, and backend-side message sync.
+- Done when: old conversations remain available locally and remotely, can be searched, renamed, deleted, and restored after reinstall/login.
+
 ## Priority 3: Product Expansion
 
 ### P3-12: AI-Generated Card Parameter Extraction

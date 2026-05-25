@@ -866,6 +866,19 @@ export const styles = StyleSheet.create({
     padding: compactPhone ? 10 : 12,
     gap: 7,
   },
+  coachCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(200,255,61,0.22)',
+    backgroundColor: '#1f2419',
+    padding: compactPhone ? 10 : 12,
+    gap: 8,
+  },
+  aiTag: {
+    color: colors.lime,
+    fontSize: size(12),
+    fontWeight: '900',
+  },
   recordActions: {
     flexDirection: 'row',
     gap: 8,

@@ -1,4 +1,4 @@
-import { calculateEnergyTarget, summarizeFoodIntake } from '../services/energyTargets';
+import { calculateDynamicCalibration, calculateEnergyTarget, summarizeFoodIntake } from '../services/energyTargets';
 import type { DailyRecord, UserProfile } from '../domain/models';
 
 export function runEnergyTargetTests() {
@@ -49,6 +49,36 @@ export function runEnergyTargetTests() {
   assert(rolling.caloriesKcal === 600, 'daily intake must refresh from the first food record after the previous 24-hour window');
   const expired = summarizeFoodIntake(rollingRecords, new Date('2026-05-22T10:00:00.000Z'));
   assert(expired.caloriesKcal === 0, 'daily intake must reset after 24 hours if no new food starts a new window');
+
+  const insufficient = calculateDynamicCalibration({
+    profile,
+    records: rollingRecords,
+    now: new Date('2026-05-24T12:00:00.000Z'),
+  });
+  assert(insufficient.status === 'insufficient_data', 'calibration must wait for enough weight and food history');
+
+  const calibrationRecords: DailyRecord[] = [
+    ...Array.from({ length: 14 }).map((_, index) => ({
+      id: `food-${index}`,
+      kind: 'food' as const,
+      title: 'Logged food',
+      status: 'done',
+      text: '',
+      done: true,
+      caloriesKcal: 1880,
+      recordedAt: new Date(Date.UTC(2026, 4, 1 + index, 18)).toISOString(),
+    })),
+    { id: 'weight-start', kind: 'weight', title: 'Weight', status: 'done', text: '', done: true, weightKg: 75, recordedAt: '2026-05-01T08:00:00.000Z' },
+    { id: 'weight-end', kind: 'weight', title: 'Weight', status: 'done', text: '', done: true, weightKg: 74.8, recordedAt: '2026-05-15T08:00:00.000Z' },
+  ];
+  const calibration = calculateDynamicCalibration({
+    profile,
+    records: calibrationRecords,
+    now: new Date('2026-05-16T12:00:00.000Z'),
+  });
+  assert(calibration.status === 'lower_target', 'slow fat-loss trend should recommend a lower target');
+  assert(calibration.adjustmentCalories === -150, 'slow trend should use a conservative 150 kcal decrease');
+  assert(calibration.foodDays === 14, 'calibration should count logged food days');
 }
 
 function assert(condition: boolean, message: string) {

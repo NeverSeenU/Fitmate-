@@ -1311,7 +1311,7 @@ function syncCurrentThreadMessages(state: AppDataState, addedMessages: ChatMessa
     found = true;
     return {
       ...thread,
-      title: shouldReplaceThreadTitle(thread.title) && titleCandidate ? titleCandidate : thread.title,
+      title: (shouldReplaceThreadTitle(thread.title) || (thread.messages?.length ?? 0) === 0) && titleCandidate ? titleCandidate : thread.title,
       subtitle: threadSubtitleFromMessages(state.chatMessages, thread.subtitle),
       updatedAt,
       messages: state.chatMessages,

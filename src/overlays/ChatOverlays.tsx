@@ -106,7 +106,6 @@ export function ThreadDrawer({
             }}
           >
             <Text style={styles.bodyStrong}>{thread.title}</Text>
-            <Text style={styles.muted}>{thread.subtitle}</Text>
           </Pressable>
         ))}
         <View style={styles.drawerFlex} />

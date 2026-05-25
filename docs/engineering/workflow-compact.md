@@ -1,6 +1,6 @@
 # FitMate Development Workflow Compact
 
-Date: 2026-05-22
+Date: 2026-05-24
 
 ## Project Goal
 
@@ -43,31 +43,43 @@ The main conversation owns product and technical direction. Subagents take bound
 - Records macro cards use explicit labels/icons and colored progress bars instead of placeholder text.
 - Chat now supports real local conversation history: each thread stores its own messages, switching threads restores that thread, and the first user message can become the local chat title.
 - Local persistence saves conversations, active thread id, and active thread messages so old chats survive app restarts.
+- Chat drawer now shows title-only conversation rows, closer to ChatGPT mobile. Food/general subtitles are not displayed.
+- Dynamic calibration MVP is implemented in `energyTargets`: FitMate compares food logs and weight trend, then recommends keep/lower/raise target or waits for more data.
+- Records now shows a small AI coaching calibration card with food-day count, weight-trend days, confidence, and recommendation.
 
 ## Not Done Yet
 
-- Dynamic 2-3 week calibration from weight trend, food logs, workout logs, and expected deficit.
+- Dynamic calibration backend persistence and richer 21-day trend UI.
 - Better workout calorie estimation and explicit exercise credit source.
 - Onboarding flow that forces the required energy inputs: sex, age, height, weight, goal, activity level.
 - Apple Health / iPhone files / photo library deeper integration.
 - Soul.md companion identity and safety rules for the emotional coach persona.
 - Backend-side long-term chat message sync; current implementation keeps full local conversation history in AsyncStorage.
 - Better AI uncertainty flow: ask separate question bubbles, update the existing card after answer, avoid premature confirm state.
+- Settings completion: real purchase restore, subscription management, email/phone editing, language/theme/notifications, personalization, data export, legal Terms, Privacy Policy, Safety Disclaimer, help center, bug report, logout, and destructive-account confirmation.
 - Visual polish pass across Records, Chat, Profile, and card density after more true-device screenshots.
 
 ## Next Recommended Build Step
 
-Build the dynamic calibration foundation:
+Finish Settings and legal/account flows:
 
-1. Add weekly trend data selectors for confirmed food calories, weight check-ins, workout logs, and average body weight.
-2. Add a calibration service that compares expected weight change against actual 7/14/21-day trend.
-3. Output a recommendation object:
-   - keep target
-   - lower daily target by 100-150 kcal
-   - raise daily target by 100-150 kcal
-   - increase daily steps/training consistency
-   - warn about insufficient data or water-weight noise
-4. Show the recommendation in Records as a small coaching card, not inside the main calorie ring.
+1. Replace mock restore receipts with real App Store / Play Store receipt restore boundaries.
+2. Add full screens for Terms, Privacy Policy, Safety Disclaimer, data export, logout, and account deletion confirmation.
+3. Mark non-MVP rows clearly when not implemented yet; no silent dead buttons.
+4. Add smoke tests for every Settings row.
+
+After Settings, continue dynamic calibration v2: weekly trend chart, exercise-credit source, and backend-synced calibration history.
+
+## Whole-App Audit Snapshot
+
+- Chat: local multi-conversation history works; still needs search, rename/delete, pinned chats, and backend message sync.
+- Food vision: real provider path works; still needs stronger uncertainty UX and better portion correction loops.
+- Files: body report/menu/workout-plan extraction exists; still needs iPhone Files channel polish and richer document previews.
+- Records: food/workout/weight/mood cards work; still needs weekly trend chart, calibration history, and workout-calorie source clarity.
+- Profile/onboarding: profile has required energy inputs; onboarding still needs to force sex/age/height/weight/goal/activity before real use.
+- Settings: many rows are still placeholders; purchase restore is currently a dev restore path, not real store-account purchase verification.
+- Legal/privacy: API boundaries exist for privacy/delete; user-facing Terms, Privacy Policy, Safety Disclaimer, data export, and deletion confirmation are not release-ready.
+- Subscription: entitlement UI exists; real StoreKit/Play Billing checkout, restore, and server notification verification remain open.
 
 ## UI Direction
 

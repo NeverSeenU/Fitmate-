@@ -31,6 +31,24 @@ export type EnergyTarget = {
   goalMode: GoalMode;
 };
 
+export type DynamicCalibrationInput = {
+  profile: UserProfile;
+  records: DailyRecord[];
+  now?: Date;
+};
+
+export type DynamicCalibration = {
+  status: 'insufficient_data' | 'keep_target' | 'lower_target' | 'raise_target';
+  title: string;
+  message: string;
+  adjustmentCalories: number;
+  confidence: number;
+  foodDays: number;
+  weightDays: number;
+  actualWeeklyWeightChangeKg?: number;
+  expectedWeeklyWeightChangeKg?: number;
+};
+
 export function calculateEnergyTarget({
   profile,
   foodCaloriesKcal,
@@ -152,6 +170,87 @@ function inferGoalMode(goalLabel: string): GoalMode {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+export function calculateDynamicCalibration({
+  profile,
+  records,
+  now = new Date(),
+}: DynamicCalibrationInput): DynamicCalibration {
+  const cutoff = new Date(now.getTime() - (21 * DAY_MS));
+  const weights = records
+    .filter((record) => (record.kind === 'weight' || record.weightKg !== undefined) && record.weightKg !== undefined)
+    .map((record) => ({ value: record.weightKg ?? 0, time: recordTime(record) }))
+    .filter((item): item is { value: number; time: Date } => (
+      item.time instanceof Date && item.time >= cutoff && item.time <= now
+    ))
+    .sort((a, b) => a.time.getTime() - b.time.getTime());
+  const foodByDay = new Map<string, number>();
+  records
+    .filter((record) => record.kind === 'food' && record.done && record.caloriesKcal !== undefined)
+    .forEach((record) => {
+      const time = recordTime(record);
+      if (!time || time < cutoff || time > now) return;
+      const key = time.toISOString().slice(0, 10);
+      foodByDay.set(key, (foodByDay.get(key) ?? 0) + (record.caloriesKcal ?? 0));
+    });
+  const first = weights[0];
+  const last = weights[weights.length - 1];
+  const weightDays = first && last ? Math.round((last.time.getTime() - first.time.getTime()) / DAY_MS) : 0;
+  const foodDays = foodByDay.size;
+  if (!first || !last || weightDays < 10 || foodDays < 7) {
+    return {
+      status: 'insufficient_data',
+      title: '动态校准准备中',
+      message: '需要至少 10 天体重趋势和 7 天饮食记录，FitMate 才会调整每日目标。',
+      adjustmentCalories: 0,
+      confidence: 0.35,
+      foodDays,
+      weightDays,
+    };
+  }
+  const baseEnergy = calculateEnergyTarget({ profile, foodCaloriesKcal: 0 });
+  const averageFoodCalories = [...foodByDay.values()].reduce((total, value) => total + value, 0) / foodDays;
+  const actualWeeklyWeightChangeKg = ((last.value - first.value) / weightDays) * 7;
+  const expectedWeeklyWeightChangeKg = ((averageFoodCalories - baseEnergy.tdeeCalories) * 7) / 7700;
+  const gap = actualWeeklyWeightChangeKg - expectedWeeklyWeightChangeKg;
+  if (baseEnergy.goalMode === 'fat_loss' && gap > 0.18) {
+    return {
+      status: 'lower_target',
+      title: '建议下调目标',
+      message: '过去趋势比预期下降慢。先把每日目标下调 150 kcal，继续观察 7 天。',
+      adjustmentCalories: -150,
+      confidence: 0.72,
+      foodDays,
+      weightDays,
+      actualWeeklyWeightChangeKg,
+      expectedWeeklyWeightChangeKg,
+    };
+  }
+  if (baseEnergy.goalMode === 'fat_loss' && gap < -0.45) {
+    return {
+      status: 'raise_target',
+      title: '建议略微加餐',
+      message: '体重下降快于预期。为保护训练表现和情绪稳定，可把每日目标上调 100 kcal。',
+      adjustmentCalories: 100,
+      confidence: 0.68,
+      foodDays,
+      weightDays,
+      actualWeeklyWeightChangeKg,
+      expectedWeeklyWeightChangeKg,
+    };
+  }
+  return {
+    status: 'keep_target',
+    title: '目标暂时保持',
+    message: '体重趋势和记录摄入基本匹配。继续保持当前目标，数据更多后再校准。',
+    adjustmentCalories: 0,
+    confidence: 0.7,
+    foodDays,
+    weightDays,
+    actualWeeklyWeightChangeKg,
+    expectedWeeklyWeightChangeKg,
+  };
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
