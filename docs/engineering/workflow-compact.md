@@ -31,6 +31,9 @@ The main conversation owns product and technical direction. Subagents take bound
 - `Soul.md` now includes trust, uncertainty, emotional recovery, and hard-moment behavior rules.
 - AI Chat now has one-tap recovery prompts: eating too much, restarting after a gap, next meal, and scale anxiety.
 - Recovery prompt tests ensure those shortcuts stay focused on real fat-loss pain and concrete next actions.
+- Backend text chat now applies deterministic recovery Soul replies for overeating panic, record gaps, next-meal planning, and scale anxiety instead of the generic contract mock.
+- Backend text chat now sends high-risk compensation language through safety routing before nutrition advice.
+- Chat-created safety events now keep the source user message id for auditability.
 - Chat drawer "New chat" now directly creates a blank conversation. The template selection bottom sheet was removed.
 - Settings P2-2 first pass is implemented: rows open account/info/legal/privacy/help/detail sheets instead of being dead buttons.
 - Settings destructive actions now require a confirmation dialog before deleting photos/records or account data.
@@ -61,8 +64,8 @@ The main conversation owns product and technical direction. Subagents take bound
 
 ## Not Done Yet
 
-- Backend chat prompts do not yet load/enforce `Soul.md`.
-- Emotional risk routing still needs tests for overeating panic, guilt, restriction, purging, scale anxiety, missed records, and unsafe overtraining.
+- Live provider prompt assembly does not yet load/enforce `Soul.md`; only deterministic backend recovery paths are wired.
+- Emotional risk routing still needs broader tests for guilt, purging, unsafe overtraining, medical-risk language, and repeated high-risk patterns.
 - Recovery shortcuts currently send text prompts; they do not yet create a structured recovery card or state machine.
 - Settings P2-2 still needs real App Store / Play Store purchase restore, real logout, email/phone editing, data export, backend account deletion verification, and release-reviewed legal copy.
 - Dynamic calibration backend persistence and richer 21-day trend UI.
@@ -77,11 +80,11 @@ The main conversation owns product and technical direction. Subagents take bound
 
 ## Next Recommended Build Step
 
-Wire Soul into the actual AI path:
+Move Soul from deterministic backend paths into the live AI path:
 
-1. Add backend prompt assembly that includes `Soul.md` or a compiled Soul policy.
-2. Add tests for shame/guilt/restriction/craving/scale-panic inputs.
-3. Route high-risk restriction, purging, self-harm, and medical-risk messages through safety before nutrition optimization.
+1. Add backend prompt assembly that includes `Soul.md` or a compiled Soul policy for real provider text responses.
+2. Add structured recovery cards/state for the four recovery shortcut paths.
+3. Expand tests for shame, guilt, purging, unsafe overtraining, medical risk, and repeated restriction patterns.
 4. Make photo/file failure responses preserve the user's input and offer retry, describe manually, or save for later.
 
 After that, return to P2-2 trust-center Settings: purchase restore, data export, legal copy, privacy controls, logout, and backend-verified account deletion.

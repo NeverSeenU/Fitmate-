@@ -7,6 +7,7 @@ from app.main import app
 from app.repositories.sqlalchemy.auth import SqlAlchemyAuthRepository
 from app.repositories.sqlalchemy.usage import SqlAlchemyUsageCounterRepository
 from app.services.chat_service import ChatService, InMemoryChatStore, TextChatUnavailableError
+from app.services.safety_service import InMemorySafetyEventStore, SafetyService
 
 
 class FakeTextFoodRouter:
@@ -178,6 +179,58 @@ def test_text_food_ai_router_can_create_food_card_without_contract_mocks() -> No
     assert response["message"]["message_type"] == "food_analysis"
     assert response["food_analysis"]["meal_name"] == "AI chicken rice"
     assert response["food_analysis"]["model_provider"] == "xiaomi"
+
+
+def test_recovery_soul_handles_overeating_and_scale_panic_without_generic_mock() -> None:
+    service = ChatService(store=InMemoryChatStore())
+    thread = service.create_thread(user_id="user-1", title="Recovery", kind="general")
+
+    overeating = service.send_text_message(
+        user_id="user-1",
+        thread_id=thread["id"],
+        text="我刚刚吃多了，有点慌。请不要羞辱我，帮我判断现在最安全的下一步和下一餐怎么补救。",
+        context=None,
+    )
+    scale = service.send_text_message(
+        user_id="user-1",
+        thread_id=thread["id"],
+        text="今天体重上去了，我有点焦虑。请先帮我判断可能原因，再给一个不极端的下一步。",
+        context=None,
+    )
+
+    assert overeating is not None
+    assert scale is not None
+    assert "一餐" in overeating["message"]["content_text"]
+    assert "不要" in overeating["message"]["content_text"]
+    assert "下一餐" in overeating["message"]["content_text"]
+    assert "水分" in scale["message"]["content_text"]
+    assert "3-7" in scale["message"]["content_text"]
+    assert scale["message"]["message_type"] == "text"
+
+
+def test_high_risk_diet_compensation_routes_to_safety_reply_and_logs_event() -> None:
+    safety_store = InMemorySafetyEventStore()
+    service = ChatService(
+        store=InMemoryChatStore(),
+        safety_service_dependency=SafetyService(store=safety_store),
+    )
+    thread = service.create_thread(user_id="user-1", title="Safety", kind="general")
+
+    response = service.send_text_message(
+        user_id="user-1",
+        thread_id=thread["id"],
+        text="我今天吃爆了，明天不吃饭补回来可以吗？",
+        context=None,
+    )
+
+    assert response is not None
+    assert response["message"]["message_type"] == "safety"
+    assert "不是补救" in response["message"]["content_text"]
+    assert "正常吃" in response["message"]["content_text"]
+    assert response["safety"]["risk_type"] == "extreme_restriction"
+    assert len(safety_store.list_events()) == 1
+    messages = service.store.list_messages(thread["id"])
+    assert safety_store.list_events()[0].source_message_id == messages[0].id
 
 
 def test_food_text_message_returns_editable_food_analysis_card() -> None:

@@ -6,6 +6,7 @@ from typing import Any
 import uuid
 
 from app.ai.router import TextFoodAnalysisRouter
+from app.services.safety_service import SafetyService
 from app.services.usage_service import usage_service
 
 
@@ -84,11 +85,13 @@ class ChatService:
         allow_contract_mocks: bool = True,
         usage_service_dependency=None,
         text_food_analysis_router: TextFoodAnalysisRouter | None = None,
+        safety_service_dependency: SafetyService | None = None,
     ) -> None:
         self.store = store or InMemoryChatStore()
         self.allow_contract_mocks = allow_contract_mocks
         self.usage_service = usage_service_dependency or usage_service
         self.text_food_analysis_router = text_food_analysis_router
+        self.safety_service = safety_service_dependency
 
     def create_thread(self, user_id: str, title: str, kind: str) -> dict:
         return self._thread_response(self.store.create_thread(user_id, title, kind))
@@ -112,13 +115,15 @@ class ChatService:
         thread = self.store.get_thread(user_id, thread_id)
         if thread is None:
             return None
-        if not self.allow_contract_mocks and self.text_food_analysis_router is None:
+        safety_candidate = self._safety_candidate(text)
+        if not safety_candidate and not self.allow_contract_mocks and self.text_food_analysis_router is None:
             raise TextChatUnavailableError("text_chat_provider_not_configured")
         self.usage_service.ensure_allowed(user_id, "chat")
-        food_analysis = self._text_food_analysis(user_id, text)
-        if not self.allow_contract_mocks and food_analysis is None:
+        soul_reply = None if safety_candidate else self._recovery_soul_response(text)
+        food_analysis = None if safety_candidate else self._text_food_analysis(user_id, text)
+        if not self.allow_contract_mocks and food_analysis is None and soul_reply is None and not safety_candidate:
             raise TextChatUnavailableError("text_chat_provider_not_configured")
-        self.store.add_message(
+        user_message = self.store.add_message(
             StoredMessage(
                 id=str(uuid.uuid4()),
                 thread_id=thread_id,
@@ -129,28 +134,113 @@ class ChatService:
                 structured_json={"context": context or {}},
             )
         )
+        safety_result = (
+            self._safety_result(user_id=user_id, text=text, source_message_id=user_message.id)
+            if safety_candidate
+            else None
+        )
         assistant_message = self.store.add_message(
             StoredMessage(
                 id=str(uuid.uuid4()),
                 thread_id=thread_id,
                 user_id=user_id,
                 role="assistant",
-                message_type="food_analysis" if food_analysis else "text",
+                message_type="safety" if safety_result else "food_analysis" if food_analysis else "text",
                 content_text=(
+                    self._safety_redirect_response(safety_result)
+                    if safety_result
+                    else
                     "我先把这顿生成一张可编辑食物卡片。你确认热量和份量后，再写入今日记录。"
                     if food_analysis
-                    else self._mock_ai_response(text)
+                    else soul_reply or self._mock_ai_response(text)
                 ),
-                structured_json={"food_analysis": food_analysis} if food_analysis else None,
+                structured_json=(
+                    {"safety": safety_result}
+                    if safety_result
+                    else {"food_analysis": food_analysis} if food_analysis else None
+                ),
                 model_provider="mock",
-                model_name="fitmate-text-food-card" if food_analysis else "fitmate-contract-mock",
+                model_name=(
+                    "fitmate-safety-soul"
+                    if safety_result
+                    else "fitmate-text-food-card" if food_analysis else "fitmate-recovery-soul" if soul_reply else "fitmate-contract-mock"
+                ),
             )
         )
         response = {"message": self._message_response(assistant_message), "created_records": []}
+        if safety_result:
+            response["safety"] = safety_result
         if food_analysis:
             response["food_analysis"] = food_analysis
         self.usage_service.increment(user_id, "chat")
         return response
+
+    def _safety_candidate(self, text: str) -> bool:
+        if self.safety_service is not None:
+            return self.safety_service._risk(text)["risk_type"] != "none"
+        return any(term in text for term in ["不吃饭", "不吃", "只喝水", "断食", "催吐", "泻药", "吐掉"])
+
+    def _safety_result(self, user_id: str, text: str, source_message_id: str | None = None) -> dict | None:
+        if self.safety_service is not None:
+            result = self.safety_service.classify(
+                user_id=user_id,
+                text=text,
+                source_message_id=source_message_id,
+            )
+            return result if result["risk_type"] != "none" else None
+        if self._safety_candidate(text):
+            return {
+                "risk_type": "extreme_restriction",
+                "severity": "medium",
+                "action_taken": "supportive_safety_redirect",
+                "event_id": None,
+            }
+        return None
+
+    def _safety_redirect_response(self, safety_result: dict | None) -> str:
+        risk_type = (safety_result or {}).get("risk_type")
+        if risk_type == "purging_or_laxative":
+            return (
+                "先停一下。催吐、泻药或把食物吐掉不是补救，会伤害身体，也会让下一次失控风险更高。"
+                "现在只做安全下一步：喝水，坐下休息，下一餐正常吃一点蛋白质和主食。"
+                "如果这种冲动反复出现，建议找医生、营养师或心理专业人士一起处理。"
+            )
+        if risk_type == "self_harm":
+            return (
+                "我先不继续聊减脂。你现在的安全比体重更重要。请立刻联系身边可信的人，"
+                "或联系当地紧急服务/危机热线。现在先离开危险物品，待在有人能看见你的地方。"
+            )
+        return (
+            "不行，这不是补救，是给下一次暴食和更大压力铺路。今天需要的是稳定，不是惩罚。"
+            "明天正常吃，蛋白质够，少油少糖，多走路，别玩极端操作。"
+        )
+
+    def _recovery_soul_response(self, text: str) -> str | None:
+        if any(term in text for term in ["吃多了", "吃爆", "补救", "不要羞辱"]):
+            return (
+                "先别把这一餐升级成整周失败。你现在最重要的不是惩罚自己，而是让接下来的 12-24 小时稳定下来。"
+                "今天先做三件事：喝水，今晚别再追加零食，下一餐蛋白质优先、主食减半但不要不吃。"
+                "如果你愿意，告诉我刚才大概吃了什么，我帮你估一个范围，然后安排下一餐。"
+            )
+        if any(term in text for term in ["断档", "没好好记录", "重新开始"]):
+            return (
+                "不用补交作业，也不用把前几天全算清楚。断档后最容易失败的点，就是觉得必须从头整理。"
+                "我们只从现在这一餐开始。你今天只需要完成一个小动作：拍下一餐，或者用一句话告诉我吃了什么。"
+                "先把记录重新接上，比追求完美更重要。"
+            )
+        if any(term in text for term in ["下一餐", "怎么吃", "饱腹"]):
+            return (
+                "下一餐先按稳住饱腹感来，不要只盯热量。建议结构：一掌心蛋白质、半拳到一拳主食、两拳蔬菜，少油酱。"
+                "如果你今天训练过，主食不要完全砍掉；如果今天没怎么动，主食就取半拳。"
+                "最好的选择不是吃得越少越好，而是吃完 3-4 小时不崩。"
+            )
+        if any(term in text for term in ["体重", "焦虑", "上去", "涨"]):
+            return (
+                "先不要用一天体重给自己判刑。体重突然上去，常见原因是水分、盐分、碳水、训练炎症、睡眠和经期，"
+                "不等于脂肪突然增加。今天不要补偿性挨饿。正常吃，水喝够，走路，明早同一时间再称。"
+                "我们看 3-7 天趋势，不看一天情绪。"
+            )
+        return None
 
     def _mock_ai_response(self, text: str) -> str:
         if "甜" in text or "饿" in text:

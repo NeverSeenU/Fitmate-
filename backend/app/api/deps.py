@@ -80,6 +80,7 @@ def get_chat_service(db: DbSession) -> ChatService:
             if settings.text_food_ai_analysis_enabled
             else None
         ),
+        safety_service_dependency=get_safety_service(db),
     )
 
 
