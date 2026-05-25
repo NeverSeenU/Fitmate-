@@ -18,7 +18,7 @@ This is the formal task queue for the main Codex conversation and subagent team.
 
 ### P1-1: Soul And Trust Constitution
 - Owner: Product/PM Lead / AI/Vision Lead / QA Lead
-- Files: `Soul.md`, `docs/engineering/red-team-response.md`, backend prompt/risk routing, mobile card/error copy
+- Files: `Soul.md`, `docs/product/souls/default-recovery-companion.md`, `docs/engineering/red-team-response.md`, backend prompt/risk routing, mobile card/error copy
 - Scope: convert the companion identity into enforceable rules for AI wording, card states, follow-up placement, failure copy, privacy copy, and safety escalation.
 - Done when: shame/guilt/craving/restriction/scale-panic prompts produce emotionally safe responses; AI cards show draft/confirmed/edited state and uncertainty clearly; product copy follows `Soul.md`.
 

@@ -27,6 +27,7 @@ The main conversation owns product and technical direction. Subagents take bound
 
 - Red-team response shifted FitMate away from "broad AI fitness app" toward "non-shaming fat-loss recovery companion."
 - `docs/product/fat-loss-pain-map.md` documents the real hard moments developers and FitMate AI must design for.
+- `docs/product/souls/default-recovery-companion.md` defines the default main AI Soul and example responses for the four recovery shortcuts.
 - `Soul.md` now includes trust, uncertainty, emotional recovery, and hard-moment behavior rules.
 - AI Chat now has one-tap recovery prompts: eating too much, restarting after a gap, next meal, and scale anxiety.
 - Recovery prompt tests ensure those shortcuts stay focused on real fat-loss pain and concrete next actions.

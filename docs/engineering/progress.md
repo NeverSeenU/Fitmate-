@@ -7,6 +7,7 @@
 
 ## What's Been Done
 - `docs/product/fat-loss-pain-map.md` now explains the hardest real fat-loss moments: overeating panic, record gaps, scale anxiety, cravings, post-workout hunger, social meal uncertainty, and AI trust loss.
+- `docs/product/souls/default-recovery-companion.md` now defines the default main AI Soul with response examples for the recovery shortcuts.
 - `Soul.md` now treats those moments as first-class product behavior, not generic motivation copy.
 - AI Chat now shows four low-friction recovery shortcuts when the composer is empty: eating too much, restarting after a gap, next meal, and scale anxiety.
 - Recovery shortcuts send concrete prompts that ask FitMate for one safe next step instead of generic chat.
