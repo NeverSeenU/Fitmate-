@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native';
 import { LoginScreen, RegisterScreen, ForgotScreen, OnboardingScreen, type AuthCredentials } from './screens/AuthScreens';
 import { ChatScreen } from './screens/ChatScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
-import { ProfileSheet, SettingsSheet, SubscriptionSheet } from './screens/SheetScreens';
+import { ProfileSheet, SettingsInfoSheet, SettingsSheet, SubscriptionSheet } from './screens/SheetScreens';
 import { initialAppState } from './state/appState';
 import { createFitMateServices } from './services/apiClient';
 import { createAppActions } from './services/appActions';
@@ -169,7 +169,7 @@ export default function App() {
   };
 
   const backFromSheet = () => {
-    if (sheet === 'profile') {
+    if (sheet === 'profile' || isSettingsInfoSheet(sheet)) {
       setSheet('settings');
       return;
     }
@@ -216,8 +216,13 @@ export default function App() {
       {sheet === 'subscription' && <SubscriptionSheet close={backFromSheet} appState={appState} actions={actions} />}
       {sheet === 'settings' && <SettingsSheet close={backFromSheet} openSheet={setSheet} appState={appState} actions={actions} />}
       {sheet === 'profile' && <ProfileSheet close={backFromSheet} appState={appState} actions={actions} />}
+      {isSettingsInfoSheet(sheet) && <SettingsInfoSheet close={backFromSheet} sheet={sheet} appState={appState} />}
     </SafeAreaView>
   );
+}
+
+function isSettingsInfoSheet(sheet: Sheet): sheet is Exclude<Sheet, 'subscription' | 'settings' | 'profile' | null> {
+  return Boolean(sheet && sheet !== 'subscription' && sheet !== 'settings' && sheet !== 'profile');
 }
 
 function isSessionFresh(session: AuthSession) {

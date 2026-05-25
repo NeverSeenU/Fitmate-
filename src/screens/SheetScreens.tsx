@@ -7,6 +7,9 @@ import { ACTIVITY_LEVELS } from '../services/energyTargets';
 import { styles } from '../styles';
 import type { Sheet } from '../types';
 
+type SettingsInfoSheetId = Exclude<Sheet, 'subscription' | 'settings' | 'profile' | null>;
+type DangerAction = 'deletePhotos' | 'deleteAccount';
+
 export function SubscriptionSheet({
   close,
   appState,
@@ -69,6 +72,7 @@ export function SettingsSheet({
   actions: ReturnType<typeof createAppActions>;
 }) {
   const [status, setStatus] = useState('');
+  const [confirmAction, setConfirmAction] = useState<DangerAction | null>(null);
   const { profile, entitlements } = appState;
   const currentPlan = appState.plans.find((plan) => plan.tier === entitlements.tier);
 
@@ -80,6 +84,28 @@ export function SettingsSheet({
     } catch (error) {
       setStatus(error instanceof Error ? error.message : '恢复购买失败');
     }
+  };
+
+  const runDangerAction = async () => {
+    if (!confirmAction) return;
+    const nextAction = confirmAction;
+    setConfirmAction(null);
+    setStatus(nextAction === 'deletePhotos' ? '正在删除照片和记录...' : '正在删除账号...');
+    try {
+      if (nextAction === 'deletePhotos') {
+        await actions.deletePhotos();
+        setStatus('照片和记录已删除');
+      } else {
+        await actions.deleteAccount();
+        setStatus('账号删除请求已执行');
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '操作失败');
+    }
+  };
+
+  const showComingSoon = (label: string) => {
+    setStatus(`${label} 会在账号模块接入后连接真实服务，当前已加入 P2-2 建设范围。`);
   };
 
   return (
@@ -98,34 +124,77 @@ export function SettingsSheet({
         {status ? <Text style={styles.formStatus}>{status}</Text> : null}
 
         <Text style={styles.sectionLabel}>账号</Text>
-        <SettingsRow icon="@" label="电子邮件" value={profile.email} />
-        <SettingsRow icon="#" label="电话号码" value={profile.phone} />
-        <SettingsRow icon="+" label="订阅" value={`${currentPlan?.title ?? 'Free'} ${currentPlan?.price ?? '¥0'}`} />
+        <SettingsRow icon="@" label="电子邮件" value={profile.email} onPress={() => openSheet('accountInfo')} />
+        <SettingsRow icon="#" label="电话号码" value={profile.phone} onPress={() => openSheet('accountInfo')} />
+        <SettingsRow icon="+" label="订阅" value={`${currentPlan?.title ?? 'Free'} ${currentPlan?.price ?? '¥0'}`} onPress={() => openSheet('subscription')} />
         <SettingsRow icon="R" label="恢复购买" onPress={() => void restore()} />
 
         <Text style={styles.sectionLabel}>身体资料</Text>
         <SettingsRow icon="O" label="用户资料" value="身高、体重、目标、偏好" onPress={() => openSheet('profile')} />
-        <SettingsRow icon="H" label="健康与安全信息" value="隐私数据" />
+        <SettingsRow icon="H" label="健康与安全信息" value="隐私数据" onPress={() => openSheet('healthSafety')} />
 
         <Text style={styles.sectionLabel}>应用</Text>
-        <SettingsRow icon="G" label="应用语言" value="中文" />
-        <SettingsRow icon="D" label="外观" value="深色" />
-        <SettingsRow icon="N" label="通知提醒" value="可配置" />
-        <SettingsRow icon="P" label="个性化" value="饮食偏好和语气" />
+        <SettingsRow icon="G" label="应用语言" value="中文" onPress={() => openSheet('appLanguage')} />
+        <SettingsRow icon="D" label="外观" value="深色" onPress={() => openSheet('appearance')} />
+        <SettingsRow icon="N" label="通知提醒" value="可配置" onPress={() => openSheet('notifications')} />
+        <SettingsRow icon="P" label="个性化" value="饮食偏好和语气" onPress={() => openSheet('personalization')} />
 
         <Text style={styles.sectionLabel}>隐私和安全</Text>
-        <SettingsRow icon="[]" label="数据控制" value="照片、记录和记忆" />
-        <SettingsRow icon="X" label="删除照片和记录" onPress={() => void actions.deletePhotos()} />
-        <SettingsRow icon="!" label="安全免责声明" />
+        <SettingsRow icon="[]" label="数据控制" value="照片、记录和记忆" onPress={() => openSheet('dataControl')} />
+        <SettingsRow icon="X" label="删除照片和记录" onPress={() => setConfirmAction('deletePhotos')} />
+        <SettingsRow icon="!" label="安全免责声明" onPress={() => openSheet('safetyDisclaimer')} />
 
         <Text style={styles.sectionLabel}>关于</Text>
-        <SettingsRow icon="?" label="帮助中心" />
-        <SettingsRow icon="B" label="报告错误" />
-        <SettingsRow icon="S" label="使用条款" />
-        <SettingsRow icon="L" label="隐私政策" />
-        <SettingsRow icon="i" label="iOS 版 FitMate AI" value="0.1.0" />
-        <SettingsRow icon="<" label="退出登录" />
-        <SettingsRow icon="-" label="删除账号" danger onPress={() => void actions.deleteAccount()} />
+        <SettingsRow icon="?" label="帮助中心" onPress={() => openSheet('helpCenter')} />
+        <SettingsRow icon="B" label="报告错误" onPress={() => openSheet('bugReport')} />
+        <SettingsRow icon="S" label="使用条款" onPress={() => openSheet('terms')} />
+        <SettingsRow icon="L" label="隐私政策" onPress={() => openSheet('privacyPolicy')} />
+        <SettingsRow icon="i" label="iOS 版 FitMate AI" value="0.1.0" onPress={() => openSheet('appVersion')} />
+        <SettingsRow icon="<" label="退出登录" onPress={() => showComingSoon('退出登录')} />
+        <SettingsRow icon="-" label="删除账号" danger onPress={() => setConfirmAction('deleteAccount')} />
+      </ScrollView>
+      {confirmAction ? (
+        <View style={styles.confirmBackdrop}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>{confirmAction === 'deletePhotos' ? '确认删除照片和记录？' : '确认删除账号？'}</Text>
+            <Text style={styles.confirmText}>
+              {confirmAction === 'deletePhotos'
+                ? '这个操作会清理当前设备中的照片识别结果、记录和相关缓存。'
+                : '这个操作会清理当前账号数据。正式发布前还会接入后端二次验证。'}
+            </Text>
+            <View style={styles.confirmActions}>
+              <Button label="取消" variant="secondary" onPress={() => setConfirmAction(null)} style={styles.actionButton} />
+              <Button label={confirmAction === 'deletePhotos' ? '确认删除' : '删除账号'} onPress={() => void runDangerAction()} style={styles.actionButton} />
+            </View>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+export function SettingsInfoSheet({
+  close,
+  sheet,
+  appState,
+}: {
+  close: () => void;
+  sheet: SettingsInfoSheetId;
+  appState: AppDataState;
+}) {
+  const page = settingsInfoPage(sheet, appState);
+  return (
+    <View style={styles.sheet}>
+      <TopBar title={page.title} subtitle={page.subtitle} right="X" onRight={close} />
+      <ScrollView contentContainerStyle={styles.content}>
+        {page.sections.map((section) => (
+          <View key={section.title} style={styles.privacyCard}>
+            <Text style={styles.h2}>{section.title}</Text>
+            {section.lines.map((line) => (
+              <Text key={line} style={styles.muted}>{line}</Text>
+            ))}
+          </View>
+        ))}
       </ScrollView>
     </View>
   );
@@ -334,6 +403,112 @@ function activityLevelValue(value: string) {
   if (lower.includes('light') || lower.includes('1') || lower.includes('2') || lower.includes('3')) return 'lightly_active';
   if (lower.includes('sedentary')) return 'sedentary';
   return 'lightly_active';
+}
+
+function settingsInfoPage(sheet: SettingsInfoSheetId, appState: AppDataState) {
+  const { profile, entitlements } = appState;
+  const currentPlan = appState.plans.find((plan) => plan.tier === entitlements.tier);
+  const pages: Record<SettingsInfoSheetId, { title: string; subtitle: string; sections: Array<{ title: string; lines: string[] }> }> = {
+    accountInfo: {
+      title: '账号信息',
+      subtitle: '登录身份和订阅状态',
+      sections: [
+        { title: '联系方式', lines: [`邮箱：${profile.email}`, `电话：${profile.phone || '未填写'}`] },
+        { title: '订阅', lines: [`当前方案：${currentPlan?.title ?? 'Free'} ${currentPlan?.price ?? '¥0'}`, `模型优先级：${entitlements.preferredVisionProvider}`] },
+      ],
+    },
+    healthSafety: {
+      title: '健康与安全信息',
+      subtitle: '用于个性化建议的敏感资料',
+      sections: [
+        { title: '当前资料', lines: [`年龄 ${profile.age}，身高 ${profile.heightCm} cm，体重 ${profile.weightKg} kg`, `目标：${profile.goalLabel}`, `风险提示：${profile.healthRiskNote}`] },
+        { title: '使用边界', lines: ['FitMate 用这些信息估算热量、蛋白目标和训练恢复建议，不替代医生、营养师或心理治疗。'] },
+      ],
+    },
+    appLanguage: {
+      title: '应用语言',
+      subtitle: '当前使用中文',
+      sections: [
+        { title: '语言', lines: ['当前界面和 AI 回复优先使用中文。后续会接入中英文切换和跟随系统语言。'] },
+      ],
+    },
+    appearance: {
+      title: '外观',
+      subtitle: '深色高级教练风格',
+      sections: [
+        { title: '主题', lines: ['当前固定为深色模式，方便照片记录、夜间训练和手机真机测试。浅色模式列入后续 P2。'] },
+      ],
+    },
+    notifications: {
+      title: '通知提醒',
+      subtitle: '打卡、复盘和恢复提醒',
+      sections: [
+        { title: '计划中', lines: ['将支持体重打卡、喝水、训练后补蛋白、晚间总结和连续记录提醒。'] },
+      ],
+    },
+    personalization: {
+      title: '个性化',
+      subtitle: '饮食偏好、语气和记忆',
+      sections: [
+        { title: '当前偏好', lines: [`饮食偏好：${profile.dietPreference}`, `目标：${profile.goalLabel}`] },
+        { title: '下一步', lines: ['会把 Soul.md 角色规则、食物偏好、训练习惯和历史反馈合并到 AI 回复中。'] },
+      ],
+    },
+    dataControl: {
+      title: '数据控制',
+      subtitle: '照片、记录、聊天和记忆',
+      sections: [
+        { title: '当前存储', lines: ['聊天线程、Records 和用户资料会保存在本地；已登录时也会同步到后端。'] },
+        { title: '后续能力', lines: ['导出数据、清空聊天、删除照片缓存、删除账号会逐步接入后端确认流程。'] },
+      ],
+    },
+    safetyDisclaimer: {
+      title: '安全免责声明',
+      subtitle: 'FitMate 不是医疗诊断',
+      sections: [
+        { title: '重要说明', lines: ['FitMate 提供健身、饮食和情绪支持建议，不提供医疗诊断。严重不适、进食障碍、怀孕、慢性病或药物相关问题请咨询专业人士。'] },
+        { title: '紧急情况', lines: ['如果出现自伤风险、胸痛、昏厥、严重过敏或其他紧急状况，请立即联系当地急救服务。'] },
+      ],
+    },
+    helpCenter: {
+      title: '帮助中心',
+      subtitle: '核心使用方式',
+      sections: [
+        { title: 'AI Chat', lines: ['可以发送文字、食物照片、文件和运动记录。照片或文件会生成待确认卡片，确认后写入 Records。'] },
+        { title: 'Records', lines: ['记录页汇总今日摄入、营养进度、体重、运动和晚间总结。'] },
+      ],
+    },
+    bugReport: {
+      title: '报告错误',
+      subtitle: '给开发团队的有效反馈',
+      sections: [
+        { title: '请提供', lines: ['截图、发生时间、你点了什么、预期结果和实际结果。后续会接入应用内提交 issue。'] },
+      ],
+    },
+    terms: {
+      title: '使用条款',
+      subtitle: '开发版占位条款',
+      sections: [
+        { title: '开发阶段', lines: ['当前条款用于内部测试，不是正式上线法律文本。正式发布前需要补齐账户、订阅、AI 输出责任和退款规则。'] },
+      ],
+    },
+    privacyPolicy: {
+      title: '隐私政策',
+      subtitle: '开发版隐私说明',
+      sections: [
+        { title: '数据用途', lines: ['照片、文件、体重、饮食和训练记录只用于生成个性化分析、每日目标和历史趋势。'] },
+        { title: '正式发布前', lines: ['需要明确第三方 AI provider、数据保留周期、删除流程、导出流程和地区合规文本。'] },
+      ],
+    },
+    appVersion: {
+      title: 'FitMate AI',
+      subtitle: 'iOS 开发版 0.1.0',
+      sections: [
+        { title: '版本', lines: ['当前为 Expo Go / 本地后端开发版本。核心目标是 AI 健身减肥心灵朋友。'] },
+      ],
+    },
+  };
+  return pages[sheet];
 }
 
 function numberOr(fallback: number, value: string) {

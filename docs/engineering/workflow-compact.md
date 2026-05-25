@@ -23,6 +23,10 @@ The main conversation owns product and technical direction. Subagents take bound
 
 ## Completed Recently
 
+- Chat drawer "New chat" now directly creates a blank conversation. The template selection bottom sheet was removed.
+- Settings P2-2 first pass is implemented: rows open account/info/legal/privacy/help/detail sheets instead of being dead buttons.
+- Settings destructive actions now require a confirmation dialog before deleting photos/records or account data.
+- Settings logout now shows a clear planned-state message until real auth logout is wired.
 - Real AI food photo analysis via Xiaomi/Qwen-compatible vision provider.
 - iPhone/Android image handling including HEIC-oriented provider path.
 - Photo attachment preview before sending.
@@ -49,6 +53,7 @@ The main conversation owns product and technical direction. Subagents take bound
 
 ## Not Done Yet
 
+- Settings P2-2 still needs real App Store / Play Store purchase restore, real logout, email/phone editing, data export, backend account deletion verification, and release-reviewed legal copy.
 - Dynamic calibration backend persistence and richer 21-day trend UI.
 - Better workout calorie estimation and explicit exercise credit source.
 - Onboarding flow that forces the required energy inputs: sex, age, height, weight, goal, activity level.
@@ -61,14 +66,14 @@ The main conversation owns product and technical direction. Subagents take bound
 
 ## Next Recommended Build Step
 
-Finish Settings and legal/account flows:
+Continue P2-2 from placeholder screens to production-grade account/legal flows:
 
 1. Replace mock restore receipts with real App Store / Play Store receipt restore boundaries.
-2. Add full screens for Terms, Privacy Policy, Safety Disclaimer, data export, logout, and account deletion confirmation.
-3. Mark non-MVP rows clearly when not implemented yet; no silent dead buttons.
+2. Add editable email/phone/account screens and real logout.
+3. Add data export and backend-verified account deletion.
 4. Add smoke tests for every Settings row.
 
-After Settings, continue dynamic calibration v2: weekly trend chart, exercise-credit source, and backend-synced calibration history.
+After that, continue P2-4 conversation management: search, rename, delete, pinned conversations, and backend-synced chat history.
 
 ## Whole-App Audit Snapshot
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Keyboard, KeyboardAvoidingView, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { BottomTabs, Button, ChatBubble, ChatHeader, FoodAnalysisCard } from '../components/ui';
 import type { AppDataState, ChatMessage, FoodAnalysis } from '../domain/models';
-import { AttachmentPanel, NewChatPanel, ThreadDrawer } from '../overlays/ChatOverlays';
+import { AttachmentPanel, ThreadDrawer } from '../overlays/ChatOverlays';
 import type { createAppActions, FoodLogEditInput } from '../services/appActions';
 import { formatFileSize, pickFitMateFile, type PickedFile } from '../services/filePicker';
 import { pickFoodPhoto, type PickedPhoto, type PhotoPickerSource } from '../services/photoPicker';
@@ -29,7 +29,6 @@ export function ChatScreen({
 }) {
   const [panel, setPanel] = useState<ChatPanel>(null);
   const [utilityPanel, setUtilityPanel] = useState<'weight' | 'workout' | null>(null);
-  const [panelBack, setPanelBack] = useState<ChatPanel>(null);
   const [composerText, setComposerText] = useState('');
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [status, setStatus] = useState('');
@@ -56,7 +55,6 @@ export function ChatScreen({
   useEffect(() => {
     if (returnPanel) {
       setPanel(returnPanel);
-      setPanelBack(null);
       clearReturnPanel();
     }
   }, [returnPanel, clearReturnPanel]);
@@ -69,16 +67,6 @@ export function ChatScreen({
     const showSub = Keyboard.addListener('keyboardDidShow', scrollLatest);
     return () => showSub.remove();
   }, [appState.chatMessages.length, status]);
-
-  const closePanel = () => {
-    if (panelBack) {
-      const back = panelBack;
-      setPanelBack(null);
-      setPanel(back);
-      return;
-    }
-    setPanel(null);
-  };
 
   const runAction = async (message: string, success: string, action: () => Promise<void>) => {
     setBusy(true);
@@ -349,16 +337,14 @@ export function ChatScreen({
         <ThreadDrawer
           close={() => {
             setPanel(null);
-            setPanelBack(null);
           }}
           openUser={() => {
             setPanel(null);
-            setPanelBack(null);
             openSheet('settings', 'threads');
           }}
           openNewChat={() => {
-            setPanelBack('threads');
-            setPanel('new');
+            void actions.createThread('\u65b0\u5bf9\u8bdd', 'general');
+            setPanel(null);
           }}
           profile={appState.profile}
           threads={appState.threads}
@@ -366,7 +352,6 @@ export function ChatScreen({
           selectThread={actions.selectThread}
         />
       )}
-      {panel === 'new' && <NewChatPanel close={closePanel} createThread={actions.createThread} />}
       {utilityPanel === 'weight' ? (
         <UtilitySheet title="体重打卡" subtitle="记录今天的体重和备注" onClose={() => setUtilityPanel(null)}>
           <NumberField label="今日体重 kg" value={weightForm.weightKg} onChangeText={(value) => setWeightForm({ ...weightForm, weightKg: value })} />

@@ -8,6 +8,23 @@ export type Screen =
   | 'subscription'
   | 'settings';
 
-export type Sheet = 'subscription' | 'settings' | 'profile' | null;
+export type Sheet =
+  | 'subscription'
+  | 'settings'
+  | 'profile'
+  | 'accountInfo'
+  | 'healthSafety'
+  | 'appLanguage'
+  | 'appearance'
+  | 'notifications'
+  | 'personalization'
+  | 'dataControl'
+  | 'safetyDisclaimer'
+  | 'helpCenter'
+  | 'bugReport'
+  | 'terms'
+  | 'privacyPolicy'
+  | 'appVersion'
+  | null;
 
-export type ChatPanel = 'attach' | 'new' | 'threads' | null;
+export type ChatPanel = 'attach' | 'threads' | null;

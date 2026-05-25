@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Button } from '../components/ui';
 import type { ConversationThread, UserProfile } from '../domain/models';
 import { styles } from '../styles';
 
@@ -31,31 +30,6 @@ export function AttachmentPanel({
         <PanelAction label="食物记录" hint="手动输入食物和份量" onPress={startFoodRecord} />
         <PanelAction label="体重打卡" hint="同步到记录页" onPress={createCheckin} />
       </View>
-    </BottomPanel>
-  );
-}
-
-export function NewChatPanel({
-  close,
-  createThread,
-}: {
-  close: () => void;
-  createThread?: (title: string, kind?: string) => Promise<void>;
-}) {
-  const openThread = (title: string, kind: string) => {
-    void createThread?.(title, kind);
-    close();
-  };
-
-  return (
-    <BottomPanel close={close} title="新对话">
-      <View style={styles.panelGrid}>
-        <PanelAction label="今日饮食分析" hint="照片、份量、下一餐策略" onPress={() => openThread('今日饮食分析', 'food')} />
-        <PanelAction label="训练后恢复" hint="补蛋白、饥饿、睡眠" onPress={() => openThread('训练后恢复', 'workout')} />
-        <PanelAction label="嘴馋崩溃支持" hint="先稳情绪再给替代方案" onPress={() => openThread('嘴馋支持', 'craving')} />
-        <PanelAction label="婚纱塑形计划" hint="阶段目标和每周调整" onPress={() => openThread('婚纱塑形计划', 'plan')} />
-      </View>
-      <Button label="开启空白对话" onPress={() => openThread('新对话', 'general')} />
     </BottomPanel>
   );
 }

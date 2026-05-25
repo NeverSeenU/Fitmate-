@@ -1,11 +1,17 @@
 # Progress: FitMate AI MVP Engineering
 
 ## Current State
-- **Last completed task:** Productionization Task 18 deployment environment checklist
-- **Current task:** Expanded file insight automated verification completed
-- **Next task:** Expo Go real-device verification for expanded file sync
+- **Last completed task:** P2-2 settings first pass and direct new-chat flow
+- **Current task:** Expo Go real-device verification for Settings rows and ChatGPT-style new conversation behavior
+- **Next task:** P2-2 backend-backed account/purchase/legal completion and P2-4 conversation management polish
 
 ## What's Been Done
+- Chat drawer "New chat" now creates a blank conversation directly instead of opening the old template bottom sheet.
+- The old `NewChatPanel` component and `ChatPanel = 'new'` state were removed.
+- Settings rows now respond: account info, health/safety, language, appearance, notifications, personalization, data control, safety disclaimer, help, bug report, terms, privacy policy, and app version open detail sheets.
+- Settings destructive actions now show a confirmation dialog before deleting photos/records or account data.
+- Settings logout now shows a clear planned-state message instead of silently doing nothing.
+- `npm.cmd run typecheck`, `npm.cmd test`, and `git diff --check` passed after the P2-2 first pass.
 - Subagent team model now lives in `docs/engineering/team.md` with six fixed roles, file ownership, handoff rules, routing, conflict rules, and integration checklist.
 - `README.md`, `AGENTS.md`, and `docs/engineering/decisions.md` now reference the fixed subagent team model.
 - Project command system started with `README.md`, `AGENTS.md`, `docs/engineering/backlog.md`, `docs/engineering/architecture.md`, `docs/engineering/runbook.md`, and `docs/engineering/decisions.md`.
