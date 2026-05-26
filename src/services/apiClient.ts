@@ -87,7 +87,7 @@ export type FoodPhotoAnalysisResponse = {
     model_provider?: string;
     model_name?: string;
   };
-  assistant_message: unknown;
+  assistant_message?: { id?: string; content_text?: string; message_type?: string; structured_json?: unknown };
 };
 
 export class ApiError extends Error {

@@ -956,11 +956,11 @@ async function testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse() {
               status: 'analysis_only',
               needs_follow_up: false,
               follow_up_question: null,
-              fat_loss_advice: 'Looks like a moderate carb meal.',
+              fat_loss_advice: 'AI bubble reply: this looks like a moderate carb meal, keep the next meal protein-first.',
               model_provider: 'xiaomi',
               model_name: 'mimo-v2-omni',
             },
-            assistant_message: { id: 'assistant-photo' },
+            assistant_message: { id: 'assistant-photo', content_text: 'AI bubble reply: this looks like a moderate carb meal, keep the next meal protein-first.' },
           };
         },
         async createLog() { return {}; },
@@ -992,9 +992,10 @@ async function testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse() {
 
   assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///pasta.jpg' && message.text.includes('这是一人份')), 'successful photo analysis must keep the user image bubble');
   assert(state.activeFoodAnalysis?.sourceImageUri === 'file:///pasta.jpg', 'food card must retain original image URI for follow-up AI reanalysis');
-  assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('Pasta plate')), 'successful photo analysis must append assistant feedback');
+  assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('AI bubble reply')), 'successful photo analysis must append the backend AI reply as a chat bubble');
+  assert(state.activeFoodAnalysis?.advice.includes('AI bubble reply') === false, 'food card must not contain the AI chat reply');
   const firstCardIndex = state.chatMessages.findIndex((message) => message.foodAnalysis?.title === 'Pasta plate');
-  const firstReplyIndex = state.chatMessages.findIndex((message) => message.text.includes('Pasta plate'));
+  const firstReplyIndex = state.chatMessages.findIndex((message) => message.text.includes('AI bubble reply'));
   assert(firstCardIndex >= 0, 'successful photo analysis must insert the food card into the chat timeline');
   assert(firstCardIndex < firstReplyIndex, 'food card must appear before assistant follow-up text');
 

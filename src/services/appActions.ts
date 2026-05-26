@@ -139,7 +139,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         },
       ];
       if (response.food_analysis) {
-        const mapped = toFoodAnalysis({ food_analysis: response.food_analysis, assistant_message: response.assistant_message ?? null });
+        const mapped = toFoodAnalysis({ food_analysis: response.food_analysis, assistant_message: response.assistant_message });
         const state = getState();
         setState({
           ...state,
@@ -186,11 +186,13 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       const existingMessages = state.chatMessages.some((message) => message.id === userPhotoMessage.id)
         ? state.chatMessages
         : [...state.chatMessages, userPhotoMessage];
+      const assistantReply = analysis.assistant_message?.content_text?.trim()
+        || `${mapped.title} 已完成估算：${mapped.calories} kcal，蛋白 ${mapped.protein}。请确认、编辑份量或丢弃。`;
       const assistantMessages: ChatMessage[] = [
         {
-          id: `assistant-photo-${Date.now()}`,
+          id: analysis.assistant_message?.id ?? `assistant-photo-${Date.now()}`,
           role: 'assistant',
-          text: `${mapped.title} 已完成估算：${mapped.calories} kcal，蛋白 ${mapped.protein}。请确认、编辑份量或丢弃。`,
+          text: assistantReply,
         },
       ];
       if (mapped.needsFollowUp && mapped.followUpQuestion) {
@@ -1033,8 +1035,15 @@ function toFoodAnalysis(response: FoodPhotoAnalysisResponse, source?: {
     carbsG: rangeMidpoint(analysis.carbs_g_range),
     fatG: rangeMidpoint(analysis.fat_g_range),
     detail: detectedItems.join(', '),
-    advice: analysis.fat_loss_advice || '已按图片估算营养区间，请确认份量后记录。',
+    advice: foodCardAdvice(analysis),
   };
+}
+
+function foodCardAdvice(analysis: FoodPhotoAnalysisResponse['food_analysis']) {
+  if (analysis.needs_follow_up && analysis.follow_up_question) {
+    return '需要补充份量后再确认写入。';
+  }
+  return '营养估算已生成，请确认、编辑份量或丢弃。';
 }
 
 function toFileInsight(response: FileUploadResponse): FileInsight | undefined {
