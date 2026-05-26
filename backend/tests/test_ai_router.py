@@ -1,4 +1,4 @@
-from app.ai.router import FileInsightRouter, FoodVisionRouter, TextFoodAnalysisRouter, WorkoutAnalysisRouter
+from app.ai.router import ChatReplyRouter, FileInsightRouter, FoodVisionRouter, TextFoodAnalysisRouter, WorkoutAnalysisRouter
 from app.repositories.sqlalchemy.model_calls import StoredAiModelCall
 
 
@@ -52,6 +52,13 @@ class FakeProvider:
         if isinstance(response, Exception):
             raise response
         return response
+
+    def generate_chat_reply(self, text: str, conversation_context: list[dict] | None = None) -> str:
+        self.calls += 1
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return str(response)
 
 
 class InMemoryModelCallRepository:
@@ -385,3 +392,24 @@ def test_text_food_analysis_router_falls_back_when_primary_schema_is_invalid() -
     assert result["meal_name"] == "latte"
     assert result["model_provider"] == "qwen"
     assert [call.status for call in model_calls.calls] == ["error", "success"]
+
+
+def test_chat_reply_router_uses_primary_provider_and_logs_usage() -> None:
+    xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", ["先稳住，这一餐不是整周失败。下一餐正常吃。"])
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [])
+    model_calls = InMemoryModelCallRepository()
+    router = ChatReplyRouter(
+        primary_provider=xiaomi,
+        fallback_provider=qwen,
+        model_call_repository=model_calls,
+    )
+
+    result = router.generate_reply("我吃多了，很慌", user_id="user-1", conversation_context=[])
+
+    assert result is not None
+    assert result["content_text"].startswith("先稳住")
+    assert result["model_provider"] == "xiaomi"
+    assert result["model_name"] == "mimo-v2-omni"
+    assert qwen.calls == 0
+    assert model_calls.calls[0].purpose == "chat_reply"
+    assert model_calls.calls[0].status == "success"

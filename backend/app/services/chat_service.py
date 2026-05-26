@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 import uuid
 
-from app.ai.router import TextFoodAnalysisRouter
+from app.ai.router import ChatReplyRouter, TextFoodAnalysisRouter
 from app.services.safety_service import SafetyService
 from app.services.usage_service import usage_service
 
@@ -85,12 +85,14 @@ class ChatService:
         allow_contract_mocks: bool = True,
         usage_service_dependency=None,
         text_food_analysis_router: TextFoodAnalysisRouter | None = None,
+        chat_reply_router: ChatReplyRouter | None = None,
         safety_service_dependency: SafetyService | None = None,
     ) -> None:
         self.store = store or InMemoryChatStore()
         self.allow_contract_mocks = allow_contract_mocks
         self.usage_service = usage_service_dependency or usage_service
         self.text_food_analysis_router = text_food_analysis_router
+        self.chat_reply_router = chat_reply_router
         self.safety_service = safety_service_dependency
 
     def create_thread(self, user_id: str, title: str, kind: str) -> dict:
@@ -119,7 +121,8 @@ class ChatService:
         if not safety_candidate and not self.allow_contract_mocks and self.text_food_analysis_router is None:
             raise TextChatUnavailableError("text_chat_provider_not_configured")
         self.usage_service.ensure_allowed(user_id, "chat")
-        soul_reply = None if safety_candidate else self._recovery_soul_response(text)
+        ai_reply = None if safety_candidate else self._ai_chat_reply(user_id=user_id, thread_id=thread_id, text=text)
+        soul_reply = None if safety_candidate or ai_reply else self._recovery_soul_response(text)
         food_analysis = None if safety_candidate else self._text_food_analysis(user_id, text)
         if not self.allow_contract_mocks and food_analysis is None and soul_reply is None and not safety_candidate:
             raise TextChatUnavailableError("text_chat_provider_not_configured")
@@ -152,18 +155,20 @@ class ChatService:
                     else
                     "我先把这顿生成一张可编辑食物卡片。你确认热量和份量后，再写入今日记录。"
                     if food_analysis
-                    else soul_reply or self._mock_ai_response(text)
+                    else (ai_reply or {}).get("content_text") or soul_reply or self._mock_ai_response(text)
                 ),
                 structured_json=(
                     {"safety": safety_result}
                     if safety_result
                     else {"food_analysis": food_analysis} if food_analysis else None
                 ),
-                model_provider="mock",
+                model_provider=(ai_reply or {}).get("model_provider") or "mock",
                 model_name=(
                     "fitmate-safety-soul"
                     if safety_result
-                    else "fitmate-text-food-card" if food_analysis else "fitmate-recovery-soul" if soul_reply else "fitmate-contract-mock"
+                    else "fitmate-text-food-card"
+                    if food_analysis
+                    else (ai_reply or {}).get("model_name") or ("fitmate-recovery-soul" if soul_reply else "fitmate-contract-mock")
                 ),
             )
         )
@@ -174,6 +179,22 @@ class ChatService:
             response["food_analysis"] = food_analysis
         self.usage_service.increment(user_id, "chat")
         return response
+
+    def _ai_chat_reply(self, user_id: str, thread_id: str, text: str) -> dict | None:
+        if self.chat_reply_router is None:
+            return None
+        return self.chat_reply_router.generate_reply(
+            text=text,
+            user_id=user_id,
+            conversation_context=self._conversation_context(thread_id),
+        )
+
+    def _conversation_context(self, thread_id: str) -> list[dict]:
+        return [
+            {"role": message.role, "content": message.content_text}
+            for message in self.store.list_messages(thread_id)
+            if message.role in {"user", "assistant"} and message.content_text
+        ]
 
     def _safety_candidate(self, text: str) -> bool:
         if self.safety_service is not None:

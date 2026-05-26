@@ -23,6 +23,7 @@ class Settings:
     file_ai_extraction_enabled: bool = False
     workout_ai_analysis_enabled: bool = False
     text_food_ai_analysis_enabled: bool = False
+    chat_ai_reply_enabled: bool = False
     auth_secret_key: str = "fitmate-local-dev-secret"
     admin_secret: str = "fitmate-local-admin-secret"
     access_token_minutes: int = 60 * 24 * 7
@@ -57,6 +58,7 @@ def get_settings() -> Settings:
         file_ai_extraction_enabled=os.getenv("FILE_AI_EXTRACTION_ENABLED", "false").lower() == "true",
         workout_ai_analysis_enabled=os.getenv("WORKOUT_AI_ANALYSIS_ENABLED", "false").lower() == "true",
         text_food_ai_analysis_enabled=os.getenv("TEXT_FOOD_AI_ANALYSIS_ENABLED", "false").lower() == "true",
+        chat_ai_reply_enabled=os.getenv("CHAT_AI_REPLY_ENABLED", "false").lower() == "true",
         auth_secret_key=os.getenv("AUTH_SECRET_KEY", Settings.auth_secret_key),
         admin_secret=os.getenv("ADMIN_SECRET", Settings.admin_secret),
         access_token_minutes=int(

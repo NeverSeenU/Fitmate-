@@ -37,6 +37,9 @@ class FileInsightProvider(VisionProvider, Protocol):
     def analyze_workout_text(self, text: str) -> object:
         ...
 
+    def generate_chat_reply(self, text: str, conversation_context: list[dict] | None = None) -> str:
+        ...
+
 
 class ModelCallRepository(Protocol):
     def create(self, call: StoredAiModelCall) -> StoredAiModelCall:
@@ -273,6 +276,76 @@ class TextFoodAnalysisRouter:
                 latency_ms=latency_ms,
                 estimated_cost_cents=2 if status == "success" else None,
                 error_code=error_code,
+            )
+        )
+
+    def _latency_ms(self, started: float) -> int:
+        return max(0, int((time.perf_counter() - started) * 1000))
+
+
+class ChatReplyRouter:
+    def __init__(
+        self,
+        primary_provider: FileInsightProvider | None = None,
+        fallback_provider: FileInsightProvider | None = None,
+        model_call_repository: ModelCallRepository | None = None,
+    ) -> None:
+        self.primary_provider = primary_provider or XiaomiVisionProvider()
+        self.fallback_provider = fallback_provider or QwenVisionProvider()
+        self.model_call_repository = model_call_repository
+
+    def generate_reply(
+        self,
+        text: str,
+        user_id: str | None = None,
+        conversation_context: list[dict] | None = None,
+    ) -> dict | None:
+        for provider in (self.primary_provider, self.fallback_provider):
+            result = self._try_provider_once(provider, text, user_id, conversation_context)
+            if result is not None:
+                return result
+        return None
+
+    def _try_provider_once(
+        self,
+        provider: FileInsightProvider,
+        text: str,
+        user_id: str | None,
+        conversation_context: list[dict] | None,
+    ) -> dict | None:
+        started = time.perf_counter()
+        try:
+            reply = provider.generate_chat_reply(text=text, conversation_context=conversation_context)
+        except (RuntimeError, TimeoutError, ValueError):
+            self._record_model_call(provider, user_id, "chat_reply", "error", self._latency_ms(started))
+            return None
+        self._record_model_call(provider, user_id, "chat_reply", "success", self._latency_ms(started))
+        return {
+            "content_text": reply,
+            "model_provider": provider.provider_name,
+            "model_name": provider.model_name,
+        }
+
+    def _record_model_call(
+        self,
+        provider: FileInsightProvider,
+        user_id: str | None,
+        purpose: str,
+        status: str,
+        latency_ms: int,
+    ) -> None:
+        if self.model_call_repository is None:
+            return
+        self.model_call_repository.create(
+            StoredAiModelCall(
+                id=str(uuid.uuid4()),
+                user_id=user_id,
+                provider=provider.provider_name,
+                model_name=provider.model_name,
+                purpose=purpose,
+                status=status,
+                latency_ms=latency_ms,
+                estimated_cost_cents=2 if status == "success" else None,
             )
         )
 

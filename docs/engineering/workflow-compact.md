@@ -34,6 +34,9 @@ The main conversation owns product and technical direction. Subagents take bound
 - Backend text chat now applies deterministic recovery Soul replies for overeating panic, record gaps, next-meal planning, and scale anxiety instead of the generic contract mock.
 - Backend text chat now sends high-risk compensation language through safety routing before nutrition advice.
 - Chat-created safety events now keep the source user message id for auditability.
+- Food photo AI natural-language replies now appear as assistant chat bubbles; the food card keeps only structured estimate guidance.
+- Optional live text-chat provider routing is available behind `CHAT_AI_REPLY_ENABLED`, using Xiaomi first and Qwen fallback with the default Recovery Soul prompt.
+- Chat provider calls are logged with model-call purpose `chat_reply`.
 - Chat drawer "New chat" now directly creates a blank conversation. The template selection bottom sheet was removed.
 - Settings P2-2 first pass is implemented: rows open account/info/legal/privacy/help/detail sheets instead of being dead buttons.
 - Settings destructive actions now require a confirmation dialog before deleting photos/records or account data.
@@ -64,7 +67,7 @@ The main conversation owns product and technical direction. Subagents take bound
 
 ## Not Done Yet
 
-- Live provider prompt assembly does not yet load/enforce `Soul.md`; only deterministic backend recovery paths are wired.
+- Live provider prompt assembly now has a compiled default Recovery Soul prompt for ordinary text chat when `CHAT_AI_REPLY_ENABLED=true`; it still does not dynamically load `Soul.md` from disk or support user-selectable Souls.
 - Emotional risk routing still needs broader tests for guilt, purging, unsafe overtraining, medical-risk language, and repeated high-risk patterns.
 - Recovery shortcuts currently send text prompts; they do not yet create a structured recovery card or state machine.
 - Settings P2-2 still needs real App Store / Play Store purchase restore, real logout, email/phone editing, data export, backend account deletion verification, and release-reviewed legal copy.
@@ -80,11 +83,11 @@ The main conversation owns product and technical direction. Subagents take bound
 
 ## Next Recommended Build Step
 
-Move Soul from deterministic backend paths into the live AI path:
+Add structured recovery UX on top of the Soul path:
 
-1. Add backend prompt assembly that includes `Soul.md` or a compiled Soul policy for real provider text responses.
-2. Add structured recovery cards/state for the four recovery shortcut paths.
-3. Expand tests for shame, guilt, purging, unsafe overtraining, medical risk, and repeated restriction patterns.
+1. Add structured recovery cards/state for the four recovery shortcut paths.
+2. Expand tests for shame, guilt, purging, unsafe overtraining, medical risk, and repeated restriction patterns.
+3. Dynamically compile/load `Soul.md` plus future user-selected Soul modes instead of hardcoded provider prompt text.
 4. Make photo/file failure responses preserve the user's input and offer retry, describe manually, or save for later.
 
 After that, return to P2-2 trust-center Settings: purchase restore, data export, legal copy, privacy controls, logout, and backend-verified account deletion.

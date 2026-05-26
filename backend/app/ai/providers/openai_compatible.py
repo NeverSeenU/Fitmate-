@@ -65,6 +65,14 @@ WORKOUT_USER_PROMPT = (
     "workout_type must be one of running, strength, cardio_plus_strength, mixed, mobility, sports. "
     "intensity must be low, medium, or high."
 )
+CHAT_RECOVERY_SOUL_PROMPT = (
+    "You are FitMate AI, a non-shaming fat-loss recovery companion. "
+    "Reply in Simplified Chinese by default. Your job is not to shame, punish, or optimize the user into extremes. "
+    "First steady the user's emotion, then explain the likely body/behavior mechanism in plain language, then give one small next step. "
+    "Never recommend skipping meals, purging, laxatives, extreme fasting, or compensatory overtraining. "
+    "For overeating panic, treat it as one meal, not a failed week. For scale anxiety, explain water, salt, carbs, sleep, training inflammation, and 3-7 day trends. "
+    "For missed records, restart from the next meal without requiring perfect backfill. Keep responses concise and mobile-friendly."
+)
 
 
 class JsonTransport(Protocol):
@@ -231,6 +239,30 @@ class OpenAICompatibleVisionProvider:
         )
         return self._extract_json_content(response)
 
+    def generate_chat_reply(self, text: str, conversation_context: list[dict] | None = None) -> str:
+        if not self.api_key:
+            raise RuntimeError(self.not_configured_error)
+
+        messages = [{"role": "system", "content": CHAT_RECOVERY_SOUL_PROMPT}]
+        for message in (conversation_context or [])[-8:]:
+            role = message.get("role")
+            content = message.get("content")
+            if role in {"user", "assistant"} and isinstance(content, str) and content.strip():
+                messages.append({"role": role, "content": content[:2000]})
+        messages.append({"role": "user", "content": text[:4000]})
+        payload = {
+            "model": self.model_name,
+            "messages": messages,
+            "temperature": 0.35,
+        }
+        response = self.transport.post_json(
+            url=f"{self.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            payload=payload,
+            timeout_seconds=self.timeout_seconds,
+        )
+        return self._extract_text_content(response)
+
     def _user_text(self, user_note: str | None) -> str:
         if not user_note:
             return USER_PROMPT
@@ -249,3 +281,12 @@ class OpenAICompatibleVisionProvider:
             return json.loads(content)
         except json.JSONDecodeError as exc:
             raise ValueError("provider_returned_invalid_json") from exc
+
+    def _extract_text_content(self, response: dict) -> str:
+        try:
+            content = response["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise ValueError("provider_response_missing_content") from exc
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("provider_response_content_invalid")
+        return content.strip()

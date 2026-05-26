@@ -1,9 +1,9 @@
 # Progress: FitMate AI MVP Engineering
 
 ## Current State
-- **Last completed task:** Backend recovery Soul and safety routing for text chat
-- **Current task:** Expo Go real-device verification for recovery Soul replies and safety redirects
-- **Next task:** Move recovery Soul from deterministic backend paths into live provider prompt assembly and structured recovery cards
+- **Last completed task:** Food AI replies as chat bubbles plus live Recovery Soul provider routing
+- **Current task:** Expo Go real-device verification for photo reply bubbles and optional `CHAT_AI_REPLY_ENABLED=true`
+- **Next task:** Structured recovery cards/state for the four recovery shortcut paths
 
 ## What's Been Done
 - `docs/product/fat-loss-pain-map.md` now explains the hardest real fat-loss moments: overeating panic, record gaps, scale anxiety, cravings, post-workout hunger, social meal uncertainty, and AI trust loss.
@@ -16,6 +16,11 @@
 - Safety events created from chat now preserve the source user message id, so future review and escalation can trace the exact user input.
 - Runtime chat dependencies now inject the safety service into `ChatService`.
 - `python -m pytest backend\tests -q`, `npm.cmd test`, and `npm.cmd run typecheck` passed after backend recovery Soul routing.
+- Food photo AI natural-language replies now render as assistant chat bubbles instead of being written into the food card advice area.
+- Food cards now keep a short structured estimate prompt while AI conversational text stays in the timeline bubble.
+- Optional live text-chat provider routing now exists behind `CHAT_AI_REPLY_ENABLED`; it uses Xiaomi first, Qwen fallback, and includes the default non-shaming Recovery Soul prompt.
+- Chat reply provider calls now log model usage with purpose `chat_reply`.
+- `python -m pytest backend\tests -q`, `npm.cmd test`, and `npm.cmd run typecheck` passed after the photo bubble and live chat reply routing work.
 - Logic tests now lock the recovery shortcuts to real fat-loss pain moments and short mobile labels.
 - `npm.cmd test` and `npm.cmd run typecheck` passed after the recovery direction work.
 - Chat drawer "New chat" now creates a blank conversation directly instead of opening the old template bottom sheet.

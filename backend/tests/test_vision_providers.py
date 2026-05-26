@@ -140,6 +140,23 @@ def test_xiaomi_provider_sends_openai_compatible_workout_analysis_request(monkey
     assert "Workout note:" in request["payload"]["messages"][1]["content"]
 
 
+def test_xiaomi_provider_sends_recovery_soul_chat_prompt(monkeypatch) -> None:
+    monkeypatch.setenv("XIAOMI_API_KEY", "xiaomi-key")
+    monkeypatch.setenv("XIAOMI_BASE_URL", "https://mimo.example/v1")
+    transport = FakeTransport(response_payload=chat_response("先稳住，这一餐不是整周失败。"))
+    provider = XiaomiVisionProvider(transport=transport)
+
+    result = provider.generate_chat_reply("我吃多了，很慌", conversation_context=[{"role": "user", "content": "昨天断档了"}])
+
+    request = transport.requests[0]
+    assert result == "先稳住，这一餐不是整周失败。"
+    assert request["url"] == "https://mimo.example/v1/chat/completions"
+    assert "non-shaming fat-loss recovery companion" in request["payload"]["messages"][0]["content"]
+    assert "Never recommend skipping meals" in request["payload"]["messages"][0]["content"]
+    assert request["payload"]["messages"][-1]["content"] == "我吃多了，很慌"
+    assert "response_format" not in request["payload"]
+
+
 def test_qwen_provider_reads_dashscope_env_and_parses_json_content(monkeypatch) -> None:
     monkeypatch.setenv("DASHSCOPE_API_KEY", "qwen-key")
     monkeypatch.setenv("DASHSCOPE_BASE_URL", "https://dashscope.example/compatible-mode/v1")

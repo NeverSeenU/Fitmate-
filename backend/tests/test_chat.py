@@ -30,6 +30,19 @@ class FakeTextFoodRouter:
         }
 
 
+class FakeChatReplyRouter:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def generate_reply(self, text: str, user_id: str | None = None, conversation_context: list[dict] | None = None) -> dict:
+        self.calls.append({"text": text, "user_id": user_id, "conversation_context": conversation_context or []})
+        return {
+            "content_text": "先稳住，这一餐不是整周失败。下一餐正常吃。",
+            "model_provider": "xiaomi",
+            "model_name": "mimo-v2-omni",
+        }
+
+
 client = TestClient(app)
 
 
@@ -231,6 +244,26 @@ def test_high_risk_diet_compensation_routes_to_safety_reply_and_logs_event() -> 
     assert len(safety_store.list_events()) == 1
     messages = service.store.list_messages(thread["id"])
     assert safety_store.list_events()[0].source_message_id == messages[0].id
+
+
+def test_chat_reply_router_can_generate_recovery_soul_bubble() -> None:
+    chat_reply_router = FakeChatReplyRouter()
+    service = ChatService(store=InMemoryChatStore(), chat_reply_router=chat_reply_router)
+    thread = service.create_thread(user_id="user-1", title="Recovery", kind="general")
+
+    response = service.send_text_message(
+        user_id="user-1",
+        thread_id=thread["id"],
+        text="我刚刚吃多了，有点慌。",
+        context=None,
+    )
+
+    assert response is not None
+    assert response["message"]["message_type"] == "text"
+    assert response["message"]["content_text"].startswith("先稳住")
+    assert response["message"]["model_provider"] == "xiaomi"
+    assert response["message"]["model_name"] == "mimo-v2-omni"
+    assert chat_reply_router.calls[0]["text"] == "我刚刚吃多了，有点慌。"
 
 
 def test_food_text_message_returns_editable_food_analysis_card() -> None:
