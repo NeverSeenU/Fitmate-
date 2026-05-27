@@ -982,7 +982,7 @@ async function testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse() {
     },
   });
 
-  await actions.analyzeFoodPhoto({
+  const firstAnalysis = actions.analyzeFoodPhoto({
     threadId: 'food-today',
     imageUri: 'file:///pasta.jpg',
     filename: 'pasta.jpg',
@@ -990,7 +990,11 @@ async function testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse() {
     userNote: '这是一人份',
   });
 
+  assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///pasta.jpg' && message.text.includes('这是一人份')), 'photo analysis must immediately show the user image bubble before backend reply');
+  await firstAnalysis;
+
   assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///pasta.jpg' && message.text.includes('这是一人份')), 'successful photo analysis must keep the user image bubble');
+  assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///pasta.jpg' && !message.text.includes('pasta.jpg') && message.imageFilename === undefined), 'user photo bubble must not expose internal image filenames');
   assert(state.activeFoodAnalysis?.sourceImageUri === 'file:///pasta.jpg', 'food card must retain original image URI for follow-up AI reanalysis');
   assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('AI bubble reply')), 'successful photo analysis must append the backend AI reply as a chat bubble');
   assert(state.activeFoodAnalysis?.advice.includes('AI bubble reply') === false, 'food card must not contain the AI chat reply');
@@ -1163,8 +1167,8 @@ async function testPhotoUploadShowsUserBubbleEvenWhenAnalysisFails() {
   }
 
   assert(failed, 'photo analysis failure must still surface to caller');
-  assert(state.chatMessages.some((message) => message.role === 'user' && message.text.includes('meal.jpg') && message.text.includes('意大利面')), 'failed photo uploads must still show the user photo bubble with typed context');
-  assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///meal.jpg' && message.imageFilename === 'meal.jpg'), 'failed photo uploads must keep the image preview data on the user bubble');
+  assert(state.chatMessages.some((message) => message.role === 'user' && !message.text.includes('meal.jpg') && message.text.includes('意大利面')), 'failed photo uploads must still show the user photo bubble with typed context but no internal filename');
+  assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///meal.jpg' && message.imageFilename === undefined), 'failed photo uploads must keep the image preview data on the user bubble without showing the filename');
 }
 
 async function testBackendFileUploadCreatesStructuredInsightMessage() {

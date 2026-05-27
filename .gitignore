@@ -30,6 +30,7 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 .runtime-logs/
+.runtime/
 docs/work-records/*.jsonl
 .pytest_cache/
 backend/.pytest_cache/

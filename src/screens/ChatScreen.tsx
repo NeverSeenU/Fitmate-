@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Keyboard, KeyboardAvoidingView, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Image, Keyboard, KeyboardAvoidingView, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { BottomTabs, Button, ChatBubble, ChatHeader, FoodAnalysisCard } from '../components/ui';
 import type { AppDataState, ChatMessage, FoodAnalysis } from '../domain/models';
 import { AttachmentPanel, ThreadDrawer } from '../overlays/ChatOverlays';
 import { RECOVERY_PROMPTS, type RecoveryPrompt } from '../product/recoveryPrompts';
 import type { createAppActions, FoodLogEditInput } from '../services/appActions';
 import { formatFileSize, pickFitMateFile, type PickedFile } from '../services/filePicker';
-import { pickFoodPhoto, type PickedPhoto, type PhotoPickerSource } from '../services/photoPicker';
+import { pickFoodPhotos, type PickedPhoto, type PhotoPickerSource } from '../services/photoPicker';
 import { styles } from '../styles';
 import type { ChatPanel, Screen, Sheet } from '../types';
 import { deviceWidth } from '../theme';
@@ -83,14 +83,15 @@ export function ChatScreen({
   };
 
   const analyzePickedPhoto = async (source: PhotoPickerSource) => {
-    const photo = await pickFoodPhoto(source);
-    if (!photo) {
+    const limit = source === 'camera' ? 1 : photoAttachmentLimit(appState.entitlements.tier);
+    const photos = await pickFoodPhotos(source, limit);
+    if (!photos.length) {
       setStatus('已取消选择照片');
       return;
     }
-    setPendingAttachment({ kind: 'photo', ...photo });
+    setPendingAttachment({ kind: 'photos', photos });
     setPanel(null);
-    setStatus('照片已添加，可以输入问题后一起发送给 AI');
+    setStatus(photos.length > 1 ? `${photos.length} 张照片已添加，可以输入问题后一起发送给 AI` : '照片已添加，可以输入问题后一起发送给 AI');
   };
 
   const sendComposerText = () => {
@@ -102,12 +103,12 @@ export function ChatScreen({
     }
     const busyText = attachment?.kind === 'file'
       ? '正在上传并分析文件...'
-      : attachment?.kind === 'photo'
+      : attachment?.kind === 'photos'
         ? '正在上传并分析照片...'
         : '正在发送...';
     const successText = attachment?.kind === 'file'
       ? '文件已上传并生成识别卡片'
-      : attachment?.kind === 'photo'
+      : attachment?.kind === 'photos'
         ? '照片分析完成，请确认、编辑或丢弃'
         : '消息已发送';
     setComposerText('');
@@ -115,14 +116,16 @@ export function ChatScreen({
     void runAction(busyText, successText, async () => {
       if (attachment?.kind === 'file') {
         await actions.attachFile(attachment, text);
-      } else if (attachment?.kind === 'photo') {
-        await actions.analyzeFoodPhoto({
-          threadId: activeThreadId,
-          imageUri: attachment.imageUri,
-          filename: attachment.filename,
-          mimeType: attachment.mimeType,
-          userNote: text,
-        });
+      } else if (attachment?.kind === 'photos') {
+        for (const photo of attachment.photos) {
+          await actions.analyzeFoodPhoto({
+            threadId: activeThreadId,
+            imageUri: photo.imageUri,
+            filename: photo.filename,
+            mimeType: photo.mimeType,
+            userNote: text,
+          });
+        }
         setFoodEditorOpen(false);
       } else if (text) {
         await actions.sendText(activeThreadId, text);
@@ -300,9 +303,11 @@ export function ChatScreen({
           ) : null}
           {pendingAttachment ? (
             <View style={styles.pendingAttachment}>
-              <View style={styles.pendingAttachmentBadge}>
-                <Text style={styles.pendingAttachmentType}>{attachmentTypeLabel(pendingAttachment)}</Text>
-              </View>
+              {pendingAttachment.kind === 'photos' ? <PhotoAttachmentPreview photos={pendingAttachment.photos} /> : (
+                <View style={styles.pendingAttachmentBadge}>
+                  <Text style={styles.pendingAttachmentType}>{attachmentTypeLabel(pendingAttachment)}</Text>
+                </View>
+              )}
               <View style={styles.pendingAttachmentMeta}>
                 <Text style={styles.pendingAttachmentName} numberOfLines={2}>{attachmentName(pendingAttachment)}</Text>
                 <Text style={styles.pendingAttachmentSize}>{attachmentSubtitle(pendingAttachment)}</Text>
@@ -474,7 +479,28 @@ type FoodEditorForm = {
 
 type PendingAttachment =
   | ({ kind: 'file' } & PickedFile)
-  | ({ kind: 'photo' } & PickedPhoto);
+  | { kind: 'photos'; photos: PickedPhoto[] };
+
+function PhotoAttachmentPreview({ photos }: { photos: PickedPhoto[] }) {
+  const visiblePhotos = photos.slice(0, 3);
+  return (
+    <View style={styles.pendingPhotoStack}>
+      {visiblePhotos.map((photo, index) => (
+        <Image
+          key={`${photo.imageUri}-${index}`}
+          source={{ uri: photo.imageUri }}
+          style={[styles.pendingPhotoThumb, index > 0 ? styles.pendingPhotoOverlap : null]}
+          resizeMode="cover"
+        />
+      ))}
+      {photos.length > visiblePhotos.length ? (
+        <View style={[styles.pendingPhotoThumb, styles.pendingPhotoOverlap, styles.pendingPhotoMore]}>
+          <Text style={styles.pendingAttachmentType}>+{photos.length - visiblePhotos.length}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 function FoodEditorPage({
   form,
@@ -651,15 +677,18 @@ function parseLeadingNumber(value?: string) {
 }
 
 function attachmentName(attachment: PendingAttachment) {
-  return attachment.kind === 'file' ? attachment.name : attachment.filename;
+  if (attachment.kind === 'file') {
+    return attachment.name;
+  }
+  return attachment.photos.length > 1 ? `${attachment.photos.length} 张照片` : '照片';
 }
 
 function attachmentSubtitle(attachment: PendingAttachment) {
-  return attachment.kind === 'file' ? formatFileSize(attachment.sizeBytes) : attachment.mimeType;
+  return attachment.kind === 'file' ? formatFileSize(attachment.sizeBytes) : '发送后由 AI 识别食物和份量';
 }
 
 function attachmentTypeLabel(attachment: PendingAttachment) {
-  if (attachment.kind === 'photo') {
+  if (attachment.kind !== 'file') {
     return 'IMG';
   }
   const extension = attachment.name.split('.').pop()?.toUpperCase();
@@ -670,4 +699,8 @@ function attachmentTypeLabel(attachment: PendingAttachment) {
     return 'IMG';
   }
   return 'FILE';
+}
+
+function photoAttachmentLimit(tier: AppDataState['entitlements']['tier']) {
+  return tier === 'free' ? 1 : 5;
 }

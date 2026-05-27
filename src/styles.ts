@@ -587,6 +587,28 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  pendingPhotoStack: {
+    width: 64,
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pendingPhotoThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: '#111',
+  },
+  pendingPhotoOverlap: {
+    marginLeft: -38,
+  },
+  pendingPhotoMore: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f7f7f2',
+  },
   pendingAttachmentType: {
     color: '#555',
     fontSize: size(12),

@@ -298,16 +298,14 @@ export function ChatBubble({
       {imageUri ? (
         <Pressable style={styles.chatImageFrame} onPress={() => setImageOpen(true)}>
           <Image source={{ uri: imageUri }} style={styles.chatImage} resizeMode="cover" />
-          {imageFilename ? <Text style={styles.chatImageCaption} numberOfLines={1}>{imageFilename}</Text> : null}
         </Pressable>
       ) : null}
-      <Text style={styles.body}>{text}</Text>
+      {text ? <Text style={styles.body}>{text}</Text> : null}
       {!user && fileInsight ? <FileInsightCard insight={fileInsight} onSync={() => onSyncFileInsight?.(id)} /> : null}
       {imageUri ? (
         <Modal visible={imageOpen} transparent animationType="fade" onRequestClose={() => setImageOpen(false)}>
           <Pressable style={styles.imagePreviewBackdrop} onPress={() => setImageOpen(false)}>
             <Image source={{ uri: imageUri }} style={styles.imagePreviewFull} resizeMode="contain" />
-            {imageFilename ? <Text style={styles.imagePreviewCaption}>{imageFilename}</Text> : null}
           </Pressable>
         </Modal>
       ) : null}

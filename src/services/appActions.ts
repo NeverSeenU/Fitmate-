@@ -156,11 +156,8 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       const userPhotoMessage: ChatMessage = {
         id: `user-photo-${Date.now()}`,
         role: 'user',
-        text: input.userNote?.trim()
-          ? `照片：${input.filename}\n\n${input.userNote.trim()}`
-          : `照片：${input.filename}`,
+        text: input.userNote?.trim() || '',
         imageUri: input.imageUri,
-        imageFilename: input.filename,
       };
       addMessages(getState, setState, [userPhotoMessage]);
       await yieldToUi();
