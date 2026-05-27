@@ -1,4 +1,4 @@
-import { createBackendApi, createFitMateServices, type ApiRequestRecord } from '../services/apiClient';
+import { createBackendApi, createFitMateServices, type ApiRequestRecord, type PhotoUploadInput } from '../services/apiClient';
 import { createAppActions } from '../services/appActions';
 import { COLD_START_PROMPTS, LOW_CONTEXT_PROMPTS, RECOVERY_PROMPTS, promptsForState, recoveryPromptText } from '../product/recoveryPrompts';
 import { loadAppDataFromBackend } from '../services/appBackend';
@@ -1060,7 +1060,7 @@ async function testFoodFollowUpAnswerUpdatesExistingCard() {
         },
       },
       food: {
-        async analyzePhoto(input) {
+        async analyzePhoto(input: PhotoUploadInput) {
           calls.push(`analyzePhoto:${input.filename}:${input.userNote?.includes('酱料吃完了') ? 'has-answer' : 'missing-answer'}`);
           return {
             food_analysis: {
@@ -1403,6 +1403,187 @@ async function testSendTextShowsUserMessageBeforeBackendReply() {
   assert(state.chatMessages.filter((message) => message.role === 'user').length === 1, 'sendText must not duplicate the user bubble');
 }
 
+async function testSendTextPreservesUserBubbleDuringBackendThreadMigration() {
+  const staleState: AppDataState = {
+    ...initialAppState,
+    activeThreadId: 'food-today',
+    threads: [{ id: 'food-today', title: '新对话', subtitle: 'general', messages: [] }],
+    chatMessages: [],
+  };
+  let state = staleState;
+  let returnStaleState = false;
+  const calls: string[] = [];
+  const actions = createAppActions({
+    api: {
+      chat: {
+        async createThread() {
+          returnStaleState = true;
+          return { id: '11111111-1111-4111-8111-111111111111', title: 'FitMate chat', kind: 'general' };
+        },
+        async sendTextMessage(payload: { threadId: string; text: string }) {
+          calls.push(payload.text);
+          return {
+            assistant_message: { id: 'assistant-migrated', content_text: 'backend reply' },
+          };
+        },
+      },
+    } as unknown as NonNullable<Parameters<typeof createAppActions>[0]['api']>,
+    getState: () => (returnStaleState ? staleState : state),
+    setState: (next: AppDataState) => {
+      state = next;
+      returnStaleState = false;
+    },
+  });
+
+  await actions.sendText('food-today', 'hidden full prompt', '下一餐');
+
+  assert(calls.includes('hidden full prompt'), 'quick prompt must send the full hidden prompt to the backend');
+  assert(state.chatMessages.some((message) => message.role === 'user' && message.text === '下一餐'), 'quick prompt must show a user-facing label bubble');
+  assert(!state.chatMessages.some((message) => message.role === 'user' && message.text === 'hidden full prompt'), 'quick prompt bubble must not expose the hidden backend prompt');
+  assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text === 'backend reply'), 'backend reply must still append after thread migration');
+}
+
+async function testAnalyzeFoodPhotosCreatesOneMultiImageUserBubble() {
+  let state: AppDataState = {
+    ...initialAppState,
+    activeThreadId: 'food-today',
+    threads: [{ id: 'food-today', title: '新对话', subtitle: 'general', messages: [] }],
+    chatMessages: [],
+    records: [],
+    activeFoodAnalysis: null,
+  };
+  const analyzed: string[] = [];
+  const actions = createAppActions({
+    api: {
+      chat: {
+        async createThread() {
+          return { id: '11111111-1111-4111-8111-111111111111', title: 'Food photo', kind: 'food' };
+        },
+        async sendTextMessage() {
+          return {};
+        },
+      },
+      food: {
+        async analyzePhoto(input: PhotoUploadInput) {
+          analyzed.push(`${input.filename}:${input.userNote?.includes('第 2/2') ? 'second' : 'first'}`);
+          const isSecond = input.filename.includes('salad');
+          return {
+            food_analysis: {
+              food_log_id: null,
+              meal_name: isSecond ? '沙拉' : '牛肉汉堡',
+              detected_items: isSecond ? ['salad', 'egg'] : ['burger', 'beef patty'],
+              calories_range_kcal: isSecond ? [280, 420] : [650, 850],
+              protein_g_range: isSecond ? [12, 20] : [30, 42],
+              carbs_g_range: isSecond ? [18, 30] : [45, 60],
+              fat_g_range: isSecond ? [10, 20] : [25, 38],
+              confidence: isSecond ? 0.76 : 0.72,
+              status: 'analysis_only',
+              needs_follow_up: false,
+              follow_up_question: null,
+              model_provider: 'xiaomi',
+              model_name: 'mimo-v2-omni',
+            },
+            assistant_message: {
+              id: `assistant-${input.filename}`,
+              content_text: isSecond ? '沙拉已单独分析。' : '汉堡已单独分析。',
+            },
+          };
+        },
+        async createLog() { return {}; },
+        async confirmLog() { return {}; },
+        async patchLog() { return {}; },
+        async discardLog() { return {}; },
+        async deleteLog() { return {}; },
+      },
+    } as unknown as NonNullable<Parameters<typeof createAppActions>[0]['api']>,
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  const pending = actions.analyzeFoodPhotos([
+    { threadId: 'food-today', imageUri: 'file:///burger.jpg', filename: 'burger.jpg', mimeType: 'image/jpeg', userNote: '帮我分别估算' },
+    { threadId: 'food-today', imageUri: 'file:///salad.jpg', filename: 'salad.jpg', mimeType: 'image/jpeg', userNote: '帮我分别估算' },
+  ]);
+
+  assert(state.chatMessages.length === 1, 'multi-photo upload must immediately create one user bubble');
+  assert(state.chatMessages[0].images?.length === 2, 'multi-photo user bubble must contain all selected images');
+  assert(state.chatMessages[0].text === '帮我分别估算', 'multi-photo user bubble must preserve the typed user question once');
+  await pending;
+
+  assert(analyzed.length === 2 && analyzed[1].endsWith('second'), 'multi-photo analysis must send each image to AI with its own position context');
+  assert(state.chatMessages.filter((message) => message.role === 'user').length === 1, 'multi-photo analysis must not duplicate user bubbles');
+  const foodCards = state.chatMessages.filter((message) => message.foodAnalysis);
+  assert(foodCards.length === 2, 'different food photos must append separate food cards');
+  assert(foodCards.some((message) => message.foodAnalysis?.title === '牛肉汉堡'), 'first photo should produce its own food card');
+  assert(foodCards.some((message) => message.foodAnalysis?.title === '沙拉'), 'second photo should produce its own food card');
+}
+
+async function testAnalyzeFoodPhotosGroupsMatchingFoodCards() {
+  let state: AppDataState = {
+    ...initialAppState,
+    activeThreadId: 'food-today',
+    threads: [{ id: 'food-today', title: '新对话', subtitle: 'general', messages: [] }],
+    chatMessages: [],
+    records: [],
+    activeFoodAnalysis: null,
+  };
+  const actions = createAppActions({
+    api: {
+      chat: {
+        async createThread() {
+          return { id: '11111111-1111-4111-8111-111111111111', title: 'Food photo', kind: 'food' };
+        },
+        async sendTextMessage() {
+          return {};
+        },
+      },
+      food: {
+        async analyzePhoto() {
+          return {
+            food_analysis: {
+              food_log_id: null,
+              meal_name: '三文鱼茶泡饭',
+              detected_items: ['salmon', 'rice', 'tea broth'],
+              calories_range_kcal: [450, 620],
+              protein_g_range: [25, 38],
+              carbs_g_range: [48, 65],
+              fat_g_range: [12, 22],
+              confidence: 0.78,
+              status: 'analysis_only',
+              needs_follow_up: false,
+              follow_up_question: null,
+              model_provider: 'xiaomi',
+              model_name: 'mimo-v2-omni',
+            },
+            assistant_message: { id: `assistant-same-${Date.now()}`, content_text: '同一道食物角度图。' },
+          };
+        },
+        async createLog() { return {}; },
+        async confirmLog() { return {}; },
+        async patchLog() { return {}; },
+        async discardLog() { return {}; },
+        async deleteLog() { return {}; },
+      },
+    } as unknown as NonNullable<Parameters<typeof createAppActions>[0]['api']>,
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  await actions.analyzeFoodPhotos([
+    { threadId: 'food-today', imageUri: 'file:///salmon-front.jpg', filename: 'salmon-front.jpg', mimeType: 'image/jpeg' },
+    { threadId: 'food-today', imageUri: 'file:///salmon-side.jpg', filename: 'salmon-side.jpg', mimeType: 'image/jpeg' },
+  ]);
+
+  assert(state.chatMessages.filter((message) => message.role === 'user').length === 1, 'same-food multi-photo upload must still keep one user bubble');
+  const foodCards = state.chatMessages.filter((message) => message.foodAnalysis);
+  assert(foodCards.length === 1, 'same-food photo analyses should be grouped into one food card when AI returns the same meal title');
+  assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('合并成一张')), 'same-food grouping should be visible to the user');
+}
+
 async function testConversationThreadsKeepIndependentLocalHistory() {
   let state: AppDataState = {
     ...initialAppState,
@@ -1499,6 +1680,9 @@ async function run() {
   await testFileInsightSyncRequiresUserActionAndCreatesWeightCheckin();
   await testExpandedFileInsightSyncCreatesMenuAndWorkoutRecords();
   await testSendTextShowsUserMessageBeforeBackendReply();
+  await testSendTextPreservesUserBubbleDuringBackendThreadMigration();
+  await testAnalyzeFoodPhotosCreatesOneMultiImageUserBubble();
+  await testAnalyzeFoodPhotosGroupsMatchingFoodCards();
   await testConversationThreadsKeepIndependentLocalHistory();
   testRecoveryPromptsTargetRealFatLossPain();
   testQuickPromptsAreContextAwareAndHonest();

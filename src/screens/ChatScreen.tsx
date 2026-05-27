@@ -118,15 +118,13 @@ export function ChatScreen({
       if (attachment?.kind === 'file') {
         await actions.attachFile(attachment, text);
       } else if (attachment?.kind === 'photos') {
-        for (const photo of attachment.photos) {
-          await actions.analyzeFoodPhoto({
+        await actions.analyzeFoodPhotos(attachment.photos.map((photo) => ({
             threadId: activeThreadId,
             imageUri: photo.imageUri,
             filename: photo.filename,
             mimeType: photo.mimeType,
             userNote: text,
-          });
-        }
+          })));
         setFoodEditorOpen(false);
       } else if (text) {
         await actions.sendText(activeThreadId, text);
@@ -143,7 +141,7 @@ export function ChatScreen({
     setComposerText('');
     setPendingAttachment(null);
     void runAction('正在让 FitMate 帮你稳住...', 'FitMate 已给出下一步', async () => {
-      await actions.sendText(activeThreadId, prompt.message);
+      await actions.sendText(activeThreadId, prompt.message, prompt.label);
     });
   };
 
@@ -429,6 +427,7 @@ function renderChatTimeline({
         user={message.role === 'user'}
         imageUri={message.imageUri}
         imageFilename={message.imageFilename}
+        images={message.images}
         fileInsight={message.fileInsight}
         onSyncFileInsight={syncFileInsight}
       />

@@ -395,6 +395,26 @@ export const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#202020',
   },
+  chatImageGrid: {
+    width: narrowPhone ? 218 : 246,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  chatImageTile: {
+    width: narrowPhone ? 104 : 118,
+    height: narrowPhone ? 104 : 118,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#202020',
+  },
+  chatImageThumb: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 10,
+    backgroundColor: '#202020',
+  },
   chatImageCaption: {
     color: colors.muted,
     fontSize: size(11),

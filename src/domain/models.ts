@@ -67,8 +67,15 @@ export type ChatMessage = {
   text: string;
   imageUri?: string;
   imageFilename?: string;
+  images?: ChatMessageImage[];
   fileInsight?: FileInsight;
   foodAnalysis?: FoodAnalysis;
+};
+
+export type ChatMessageImage = {
+  uri: string;
+  filename?: string;
+  mimeType?: string;
 };
 
 export type FileInsight = {

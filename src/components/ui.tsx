@@ -1,7 +1,7 @@
 import { Image, Modal, Pressable, Text, TextInput, View } from 'react-native';
 import { useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import type { FileInsight, FoodAnalysis, SubscriptionTier } from '../domain/models';
+import type { ChatMessageImage, FileInsight, FoodAnalysis, SubscriptionTier } from '../domain/models';
 import type { Screen } from '../types';
 import { styles } from '../styles';
 
@@ -281,6 +281,7 @@ export function ChatBubble({
   user,
   imageUri,
   imageFilename,
+  images,
   fileInsight,
   onSyncFileInsight,
 }: {
@@ -289,23 +290,37 @@ export function ChatBubble({
   user?: boolean;
   imageUri?: string;
   imageFilename?: string;
+  images?: ChatMessageImage[];
   fileInsight?: FileInsight;
   onSyncFileInsight?: (messageId: string) => void;
 }) {
-  const [imageOpen, setImageOpen] = useState(false);
+  const normalizedImages = images?.length ? images : imageUri ? [{ uri: imageUri, filename: imageFilename }] : [];
+  const [openImageUri, setOpenImageUri] = useState<string | null>(null);
   return (
     <View style={[styles.bubble, user ? styles.userBubble : styles.aiBubble]}>
-      {imageUri ? (
-        <Pressable style={styles.chatImageFrame} onPress={() => setImageOpen(true)}>
-          <Image source={{ uri: imageUri }} style={styles.chatImage} resizeMode="cover" />
-        </Pressable>
+      {normalizedImages.length ? (
+        <View style={normalizedImages.length === 1 ? styles.chatImageFrame : styles.chatImageGrid}>
+          {normalizedImages.map((image, index) => (
+            <Pressable
+              key={`${image.uri}-${index}`}
+              style={normalizedImages.length === 1 ? undefined : styles.chatImageTile}
+              onPress={() => setOpenImageUri(image.uri)}
+            >
+              <Image
+                source={{ uri: image.uri }}
+                style={normalizedImages.length === 1 ? styles.chatImage : styles.chatImageThumb}
+                resizeMode="cover"
+              />
+            </Pressable>
+          ))}
+        </View>
       ) : null}
       {text ? <Text style={styles.body}>{text}</Text> : null}
       {!user && fileInsight ? <FileInsightCard insight={fileInsight} onSync={() => onSyncFileInsight?.(id)} /> : null}
-      {imageUri ? (
-        <Modal visible={imageOpen} transparent animationType="fade" onRequestClose={() => setImageOpen(false)}>
-          <Pressable style={styles.imagePreviewBackdrop} onPress={() => setImageOpen(false)}>
-            <Image source={{ uri: imageUri }} style={styles.imagePreviewFull} resizeMode="contain" />
+      {openImageUri ? (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setOpenImageUri(null)}>
+          <Pressable style={styles.imagePreviewBackdrop} onPress={() => setOpenImageUri(null)}>
+            <Image source={{ uri: openImageUri }} style={styles.imagePreviewFull} resizeMode="contain" />
           </Pressable>
         </Modal>
       ) : null}

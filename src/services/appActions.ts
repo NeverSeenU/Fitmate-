@@ -104,11 +104,11 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       });
     },
 
-    async sendText(threadId: string, text: string) {
+    async sendText(threadId: string, text: string, displayText = text) {
       if (!text.trim()) {
         return;
       }
-      const userMessage: ChatMessage = { id: `user-${Date.now()}`, role: 'user', text };
+      const userMessage: ChatMessage = { id: `user-${Date.now()}`, role: 'user', text: displayText.trim() || text };
       if (!api) {
         addMessages(getState, setState, [
           userMessage,
@@ -124,7 +124,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
       const backendThreadId = await ensureBackendThread(api, getState, setState, threadId, {
         title: 'FitMate chat',
         kind: 'general',
-      });
+      }, [userMessage]);
       const response = await api.chat.sendTextMessage({ threadId: backendThreadId, text }) as {
         message?: { id?: string; content_text?: string };
         user_message?: { id?: string; content_text?: string };
@@ -167,7 +167,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           threadId: await ensureBackendThread(api, getState, setState, input.threadId, {
             title: 'Food photo',
             kind: 'food',
-          }),
+          }, [userPhotoMessage]),
         }
         : input;
       const analysis = api
@@ -207,6 +207,103 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           : upsertFoodRecord(state.records, mapped, mapped.status),
         chatMessages: [...existingMessages, toFoodAnalysisMessage(mapped), ...assistantMessages],
       });
+    },
+
+    async analyzeFoodPhotos(inputs: PhotoUploadInput[]) {
+      const photos = inputs.filter((input) => input.imageUri);
+      if (!photos.length) {
+        return;
+      }
+      if (photos.length === 1) {
+        const [photo] = photos;
+        const userPhotoMessage: ChatMessage = {
+          id: `user-photo-${Date.now()}`,
+          role: 'user',
+          text: photo.userNote?.trim() || '',
+          imageUri: photo.imageUri,
+        };
+        addMessages(getState, setState, [userPhotoMessage]);
+        await yieldToUi();
+        const backendInput = api
+          ? {
+            ...photo,
+            threadId: await ensureBackendThread(api, getState, setState, photo.threadId, {
+              title: 'Food photo',
+              kind: 'food',
+            }, [userPhotoMessage]),
+          }
+          : photo;
+        const analysis = api
+          ? await api.food.analyzePhoto(backendInput)
+          : mockFoodPhotoResponse(backendInput.filename);
+        appendFoodPhotoAnalysis(getState, setState, analysis, {
+          imageUri: photo.imageUri,
+          filename: photo.filename,
+          mimeType: photo.mimeType,
+          userNote: photo.userNote ?? undefined,
+        }, userPhotoMessage);
+        return;
+      }
+      const firstNote = photos.find((photo) => photo.userNote?.trim())?.userNote?.trim() ?? '';
+      const userPhotoMessage: ChatMessage = {
+        id: `user-photos-${Date.now()}`,
+        role: 'user',
+        text: firstNote,
+        images: photos.map((photo) => ({
+          uri: photo.imageUri,
+          filename: photo.filename,
+          mimeType: photo.mimeType,
+        })),
+      };
+      addMessages(getState, setState, [userPhotoMessage]);
+      await yieldToUi();
+      const backendThreadId = api
+        ? await ensureBackendThread(api, getState, setState, photos[0].threadId, {
+          title: 'Food photo',
+          kind: 'food',
+        }, [userPhotoMessage])
+        : photos[0].threadId;
+      const results: Array<{
+        response: FoodPhotoAnalysisResponse;
+        source: {
+          imageUri: string;
+          filename: string;
+          mimeType: string;
+          userNote: string;
+        };
+      }> = [];
+      for (let index = 0; index < photos.length; index += 1) {
+        const photo = photos[index];
+        const userNote = buildMultiPhotoUserNote(firstNote, index, photos.length);
+        const backendInput = {
+          ...photo,
+          threadId: backendThreadId,
+          userNote,
+        };
+        const analysis = api
+          ? await api.food.analyzePhoto(backendInput)
+          : mockFoodPhotoResponse(backendInput.filename);
+        results.push({
+          response: analysis,
+          source: {
+            imageUri: photo.imageUri,
+            filename: photo.filename,
+            mimeType: photo.mimeType,
+            userNote,
+          },
+        });
+      }
+      appendGroupedFoodPhotoAnalyses(getState, setState, results.map((item, index) => {
+        const mapped = toFoodAnalysis(item.response, item.source);
+        return {
+          response: item.response,
+          analysis: item.response.food_analysis.food_log_id ? mapped : {
+            ...mapped,
+            id: `${mapped.id}-${index + 1}`,
+          },
+          source: item.source,
+        };
+      }));
     },
 
     async createManualFoodLog() {
@@ -799,6 +896,151 @@ function appendMissingMessages(
   return next;
 }
 
+function appendFoodPhotoAnalysis(
+  getState: () => AppDataState,
+  setState: (state: AppDataState) => void,
+  analysis: FoodPhotoAnalysisResponse,
+  source: {
+    imageUri?: string;
+    filename?: string;
+    mimeType?: string;
+    userNote?: string;
+  },
+  optimisticMessage?: ChatMessage,
+) {
+  const mapped = toFoodAnalysis(analysis, source);
+  const state = getState();
+  const existingMessages = optimisticMessage && !state.chatMessages.some((message) => message.id === optimisticMessage.id)
+    ? [...state.chatMessages, optimisticMessage]
+    : state.chatMessages;
+  const assistantReply = analysis.assistant_message?.content_text?.trim()
+    || `${mapped.title} 已完成估算：${mapped.calories} kcal，蛋白 ${mapped.protein}。请确认、编辑份量或丢弃。`;
+  const assistantMessages: ChatMessage[] = [
+    {
+      id: analysis.assistant_message?.id
+        ? `${analysis.assistant_message.id}-${Date.now()}`
+        : `assistant-photo-${Date.now()}`,
+      role: 'assistant',
+      text: assistantReply,
+    },
+  ];
+  if (mapped.needsFollowUp && mapped.followUpQuestion) {
+    assistantMessages.push({
+      id: `assistant-follow-up-${Date.now()}`,
+      role: 'assistant',
+      text: mapped.followUpQuestion,
+    });
+  }
+  setState({
+    ...state,
+    activeFoodAnalysis: mapped,
+    records: mapped.status === 'analysis_only'
+      ? state.records
+      : upsertFoodRecord(state.records, mapped, mapped.status),
+    chatMessages: [...existingMessages, toFoodAnalysisMessage(mapped), ...assistantMessages],
+  });
+}
+
+function appendGroupedFoodPhotoAnalyses(
+  getState: () => AppDataState,
+  setState: (state: AppDataState) => void,
+  items: Array<{
+    response: FoodPhotoAnalysisResponse;
+    analysis: FoodAnalysis;
+    source: {
+      imageUri?: string;
+      filename?: string;
+      mimeType?: string;
+      userNote?: string;
+    };
+  }>,
+) {
+  const groups: Array<{
+    key: string;
+    analysis: FoodAnalysis;
+    count: number;
+    reply: string;
+  }> = [];
+  for (const item of items) {
+    const key = normalizedFoodGroupKey(item.analysis);
+    const existing = groups.find((group) => group.key === key);
+    if (existing) {
+      existing.count += 1;
+      existing.analysis = mergeSameFoodAnalysis(existing.analysis, item.analysis);
+      continue;
+    }
+    groups.push({
+      key,
+      analysis: item.analysis,
+      count: 1,
+      reply: item.response.assistant_message?.content_text?.trim()
+        || `${item.analysis.title} 已完成估算：${item.analysis.calories} kcal，蛋白 ${item.analysis.protein}。请确认、编辑份量或丢弃。`,
+    });
+  }
+  const state = getState();
+  const chatMessages = [...state.chatMessages];
+  let activeFoodAnalysis = state.activeFoodAnalysis;
+  let records = state.records;
+  groups.forEach((group) => {
+    activeFoodAnalysis = group.analysis;
+    records = group.analysis.status === 'analysis_only'
+      ? records
+      : upsertFoodRecord(records, group.analysis, group.analysis.status);
+    chatMessages.push(toFoodAnalysisMessage(group.analysis));
+    chatMessages.push({
+      id: `assistant-photo-${group.analysis.id}-${Date.now()}`,
+      role: 'assistant',
+      text: group.count > 1
+        ? `我把 ${group.count} 张看起来属于同一食物的照片合并成一张 ${group.analysis.title} 卡片。请确认、编辑份量或丢弃。`
+        : group.reply,
+    });
+    if (group.analysis.needsFollowUp && group.analysis.followUpQuestion) {
+      chatMessages.push({
+        id: `assistant-follow-up-${group.analysis.id}-${Date.now()}`,
+        role: 'assistant',
+        text: group.analysis.followUpQuestion,
+      });
+    }
+  });
+  setState({
+    ...state,
+    activeFoodAnalysis,
+    records,
+    chatMessages,
+  });
+}
+
+function normalizedFoodGroupKey(analysis: FoodAnalysis) {
+  const title = analysis.title
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+  if (title) {
+    return title;
+  }
+  return (analysis.detectedItems ?? []).join('|').toLowerCase();
+}
+
+function mergeSameFoodAnalysis(base: FoodAnalysis, next: FoodAnalysis): FoodAnalysis {
+  const detectedItems = Array.from(new Set([...(base.detectedItems ?? []), ...(next.detectedItems ?? [])]));
+  return {
+    ...base,
+    confidence: Math.max(base.confidence, next.confidence),
+    needsFollowUp: Boolean(base.needsFollowUp || next.needsFollowUp),
+    followUpQuestion: base.followUpQuestion ?? next.followUpQuestion,
+    detectedItems,
+    detail: detectedItems.length ? detectedItems.join(', ') : base.detail,
+  };
+}
+
+function buildMultiPhotoUserNote(userNote: string, index: number, total: number) {
+  const context = [
+    `这是用户一次发送的第 ${index + 1}/${total} 张食物照片。`,
+    '请先独立识别这张照片里的食物；如果它明显和其他照片是同一道菜或同一餐的一部分，仍然在标题和 detected_items 中说清楚。不要把不同照片的食物混在同一张卡里。',
+    userNote ? `用户补充：${userNote}` : null,
+  ].filter(Boolean);
+  return context.join('\n');
+}
+
 function toFoodAnalysisMessage(analysis: FoodAnalysis): ChatMessage {
   return {
     id: `food-card-${analysis.id}-${Date.now()}`,
@@ -1371,6 +1613,7 @@ async function ensureBackendThread(
   setState: (state: AppDataState) => void,
   currentThreadId: string | undefined,
   fallback: { title: string; kind: string },
+  preserveMessages: ChatMessage[] = [],
 ) {
   if (currentThreadId && isBackendThreadId(currentThreadId)) {
     return currentThreadId;
@@ -1378,11 +1621,12 @@ async function ensureBackendThread(
   const created = await api.chat.createThread({ title: fallback.title, kind: fallback.kind }) as { id?: string; title?: string; kind?: string };
   const threadId = created.id ?? `thread-${Date.now()}`;
   const state = getState();
+  const messages = appendMissingMessages(state.chatMessages, preserveMessages);
   addThread(getState, setState, {
     id: threadId,
     title: created.title ?? fallback.title,
     subtitle: created.kind ?? fallback.kind,
-    messages: state.chatMessages,
+    messages,
   });
   return threadId;
 }
