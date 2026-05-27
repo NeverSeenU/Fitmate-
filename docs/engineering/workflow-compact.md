@@ -31,6 +31,9 @@ The main conversation owns product and technical direction. Subagents take bound
 - `Soul.md` now includes trust, uncertainty, emotional recovery, and hard-moment behavior rules.
 - AI Chat now has one-tap recovery prompts: eating too much, restarting after a gap, next meal, and scale anxiety.
 - Recovery prompt tests ensure those shortcuts stay focused on real fat-loss pain and concrete next actions.
+- AI Chat quick prompts are now state-aware. Cold-start users see onboarding-oriented prompts, low-context users see meal-estimation/restart prompts, and old-user recovery prompts appear only when records or user language justify them.
+- Backend account hydration no longer treats prototype demo messages/records as real context when the backend has no threads or records.
+- Context honesty is a hard rule: AI can only cite known facts. If training, food logs, weight trend, preferences, or goals are missing, FitMate must say that briefly and ask one small question instead of pretending to know.
 - Backend text chat now applies deterministic recovery Soul replies for overeating panic, record gaps, next-meal planning, and scale anxiety instead of the generic contract mock.
 - Backend text chat now sends high-risk compensation language through safety routing before nutrition advice.
 - Chat-created safety events now keep the source user message id for auditability.
@@ -70,6 +73,7 @@ The main conversation owns product and technical direction. Subagents take bound
 - Live provider prompt assembly now has a compiled default Recovery Soul prompt for ordinary text chat when `CHAT_AI_REPLY_ENABLED=true`; it still does not dynamically load `Soul.md` from disk or support user-selectable Souls.
 - Emotional risk routing still needs broader tests for guilt, purging, unsafe overtraining, medical-risk language, and repeated high-risk patterns.
 - Recovery shortcuts currently send text prompts; they do not yet create a structured recovery card or state machine.
+- Cold-start quick prompts still need a real 30-second onboarding capture flow instead of only sending chat prompts.
 - Settings P2-2 still needs real App Store / Play Store purchase restore, real logout, email/phone editing, data export, backend account deletion verification, and release-reviewed legal copy.
 - Dynamic calibration backend persistence and richer 21-day trend UI.
 - Better workout calorie estimation and explicit exercise credit source.
@@ -83,12 +87,12 @@ The main conversation owns product and technical direction. Subagents take bound
 
 ## Next Recommended Build Step
 
-Add structured recovery UX on top of the Soul path:
+Build the 30-second context capture before expanding recovery UX:
 
-1. Add structured recovery cards/state for the four recovery shortcut paths.
-2. Expand tests for shame, guilt, purging, unsafe overtraining, medical risk, and repeated restriction patterns.
-3. Dynamically compile/load `Soul.md` plus future user-selected Soul modes instead of hardcoded provider prompt text.
-4. Make photo/file failure responses preserve the user's input and offer retry, describe manually, or save for later.
+1. Add a short onboarding card for goal, sex, age, height, weight, activity level, preferences, tone, and whether the user trained today.
+2. Pass a structured Known/Missing context block into chat/photo/file provider calls.
+3. Add structured recovery cards/state for the four recovery shortcut paths.
+4. Expand tests for shame, guilt, purging, unsafe overtraining, medical risk, and repeated restriction patterns.
 
 After that, return to P2-2 trust-center Settings: purchase restore, data export, legal copy, privacy controls, logout, and backend-verified account deletion.
 

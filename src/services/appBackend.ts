@@ -54,8 +54,8 @@ export async function loadAppDataFromBackend(
     entitlements: subscription.entitlements,
     threads: mappedThreads,
     activeThreadId,
-    chatMessages: activeThread?.messages ?? (activeThreadId === fallback.activeThreadId ? fallback.chatMessages : []),
-    activeFoodAnalysis: mapActiveFoodAnalysis(records, fallback),
+    chatMessages: activeThread?.messages ?? [],
+    activeFoodAnalysis: mapActiveFoodAnalysis(records),
     dailySummary: mapDailySummary(records, fallback),
     records: mapRecords(records, fallback),
   };
@@ -63,12 +63,9 @@ export async function loadAppDataFromBackend(
 
 function mapActiveFoodAnalysis(
   records: Awaited<ReturnType<BackendApiForAppData['records']['today']>>,
-  fallback: AppDataState,
 ): FoodAnalysis | null {
   const pending = (records.food_logs ?? []).find((log) => stringValue(log.status) === 'pending' || stringValue(log.status) === 'edited');
-  if (!pending) {
-    return fallback.activeFoodAnalysis;
-  }
+  if (!pending) return null;
   return {
     id: stringValue(pending.id) ?? `food-${Date.now()}`,
     title: stringValue(pending.meal_name) ?? '食物记录',
@@ -111,7 +108,7 @@ function mapProfile(me: Awaited<ReturnType<BackendApiForAppData['profile']['getM
 function mapThreads(threads: { threads?: Array<Record<string, unknown>> }, fallback: AppDataState) {
   const items = threads.threads ?? [];
   if (items.length === 0) {
-    return fallback.threads;
+    return [{ id: fallback.activeThreadId || 'food-today', title: '新对话', subtitle: 'general', messages: [] }];
   }
   return items.map((item) => ({
     id: stringValue(item.id) ?? 'thread',
@@ -198,7 +195,7 @@ function mapRecords(
     };
   });
   const nextRecords = [...foodRecords, ...workoutRecords, ...checkinRecords];
-  return nextRecords.length ? nextRecords : fallback.records;
+  return nextRecords;
 }
 
 function foodRecordText(log: Record<string, unknown>) {

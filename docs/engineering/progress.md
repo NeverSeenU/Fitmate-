@@ -1,9 +1,9 @@
 # Progress: FitMate AI MVP Engineering
 
 ## Current State
-- **Last completed task:** Food AI replies as chat bubbles plus live Recovery Soul provider routing
-- **Current task:** Expo Go real-device verification for photo reply bubbles and optional `CHAT_AI_REPLY_ENABLED=true`
-- **Next task:** Structured recovery cards/state for the four recovery shortcut paths
+- **Last completed task:** Context-honest quick prompts and cold-start state cleanup
+- **Current task:** Expo Go real-device verification for state-aware quick prompt rows
+- **Next task:** 30-second onboarding capture for goal/body/activity/preferences/tone
 
 ## What's Been Done
 - `docs/product/fat-loss-pain-map.md` now explains the hardest real fat-loss moments: overeating panic, record gaps, scale anxiety, cravings, post-workout hunger, social meal uncertainty, and AI trust loss.
@@ -11,6 +11,9 @@
 - `Soul.md` now treats those moments as first-class product behavior, not generic motivation copy.
 - AI Chat now shows four low-friction recovery shortcuts when the composer is empty: eating too much, restarting after a gap, next meal, and scale anxiety.
 - Recovery shortcuts send concrete prompts that ask FitMate for one safe next step instead of generic chat.
+- AI Chat quick prompts are now state-aware: cold-start users see "先认识我 / 拍这一餐 / 我想减脂 / 语气设置"; low-context users see meal-estimation/restart prompts; recovery prompts appear only after relevant records exist.
+- Backend hydration no longer preserves demo chat messages or demo records when a real backend account has no threads or records.
+- Provider and deterministic chat prompts now enforce context honesty: FitMate must not invent training, food logs, or weight trends when those facts are missing.
 - Backend text chat now recognizes the main recovery Soul paths for overeating panic, record gaps, next-meal planning, and scale anxiety instead of falling through to the generic contract mock.
 - Backend text chat now routes high-risk compensation language through safety responses before food/nutrition optimization.
 - Safety events created from chat now preserve the source user message id, so future review and escalation can trace the exact user input.

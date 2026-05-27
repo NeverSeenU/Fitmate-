@@ -1,6 +1,6 @@
 import { createBackendApi, createFitMateServices, type ApiRequestRecord } from '../services/apiClient';
 import { createAppActions } from '../services/appActions';
-import { RECOVERY_PROMPTS, recoveryPromptText } from '../product/recoveryPrompts';
+import { COLD_START_PROMPTS, LOW_CONTEXT_PROMPTS, RECOVERY_PROMPTS, promptsForState, recoveryPromptText } from '../product/recoveryPrompts';
 import { loadAppDataFromBackend } from '../services/appBackend';
 import { createRuntimeConfig } from '../config/env';
 import { createAiVisionService, type FoodVisionInput, type VisionProvider } from '../services/aiVision';
@@ -479,6 +479,8 @@ async function testBackendAppDataHydratesLiveRecordsShape() {
   assert(state.dailySummary.proteinFloor === '114g', 'live records protein must hydrate from top-level field');
   assert(state.dailySummary.weightKg === 71.2, 'live records weight must hydrate from top-level field');
   assert(state.dailySummary.hungerScore === '4/10', 'live records hunger must hydrate from top-level field');
+  assert(state.records.length === 0, 'backend cold-start hydration must not keep demo records as real context');
+  assert(state.chatMessages.length === 0, 'backend cold-start hydration must not keep demo chat messages as real context');
 }
 
 async function testAppActionsCallBackendMutationsAndUpdateState() {
@@ -1444,6 +1446,29 @@ function testRecoveryPromptsTargetRealFatLossPain() {
   assert(recoveryPromptText('scale_panic').includes('体重'), 'scale-panic recovery should address weight anxiety directly');
 }
 
+function testQuickPromptsAreContextAwareAndHonest() {
+  const coldState: AppDataState = { ...initialAppState, records: [], chatMessages: [], activeFoodAnalysis: null };
+  const coldLabels = promptsForState(coldState).map((prompt) => prompt.label).join(',');
+  assert(coldLabels === COLD_START_PROMPTS.map((prompt) => prompt.label).join(','), 'cold start should ask to learn the user before showing recovery buttons');
+  assert(!coldLabels.includes('吃多了') && !coldLabels.includes('断档了'), 'cold start must not show old-user recovery shortcuts');
+
+  const lowContextState: AppDataState = {
+    ...coldState,
+    chatMessages: [{ id: 'user-1', role: 'user', text: '这餐能吃吗' }],
+  };
+  const lowLabels = promptsForState(lowContextState).map((prompt) => prompt.label).join(',');
+  assert(lowLabels === LOW_CONTEXT_PROMPTS.map((prompt) => prompt.label).join(','), 'low-context users should get meal judgment and restart prompts');
+
+  const loggedState: AppDataState = {
+    ...coldState,
+    records: [{ id: 'food-1', kind: 'food', title: 'Lunch', status: '已记录', text: '500 kcal' }],
+  };
+  const loggedLabels = promptsForState(loggedState).map((prompt) => prompt.label).join(',');
+  assert(loggedLabels.includes('吃多了') && loggedLabels.includes('下一餐'), 'logged users should get recovery prompts only after records exist');
+  assert(!loggedLabels.includes('体重焦虑'), 'weight anxiety shortcut should require weight context or user weight language');
+  assert(recoveryPromptText('next_meal').includes('如果没有'), 'next-meal prompt must not assume today records exist');
+}
+
 async function run() {
   runEnergyTargetTests();
   await testSubscriptionEntitlements();
@@ -1476,6 +1501,7 @@ async function run() {
   await testSendTextShowsUserMessageBeforeBackendReply();
   await testConversationThreadsKeepIndependentLocalHistory();
   testRecoveryPromptsTargetRealFatLossPain();
+  testQuickPromptsAreContextAwareAndHonest();
 }
 
 void run();

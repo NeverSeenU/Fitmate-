@@ -3,7 +3,7 @@ import { Image, Keyboard, KeyboardAvoidingView, PanResponder, Platform, Pressabl
 import { BottomTabs, Button, ChatBubble, ChatHeader, FoodAnalysisCard } from '../components/ui';
 import type { AppDataState, ChatMessage, FoodAnalysis } from '../domain/models';
 import { AttachmentPanel, ThreadDrawer } from '../overlays/ChatOverlays';
-import { RECOVERY_PROMPTS, type RecoveryPrompt } from '../product/recoveryPrompts';
+import { promptsForState, type RecoveryPrompt } from '../product/recoveryPrompts';
 import type { createAppActions, FoodLogEditInput } from '../services/appActions';
 import { formatFileSize, pickFitMateFile, type PickedFile } from '../services/filePicker';
 import { pickFoodPhotos, type PickedPhoto, type PhotoPickerSource } from '../services/photoPicker';
@@ -40,6 +40,7 @@ export function ChatScreen({
   const [weightForm, setWeightForm] = useState({ weightKg: appState.profile.weightKg.toFixed(1), notes: '' });
   const [workoutForm, setWorkoutForm] = useState({ detail: '' });
   const activeThreadId = appState.activeThreadId || appState.threads[0]?.id || 'food-today';
+  const quickPrompts = promptsForState(appState);
   const scrollRef = useRef<ScrollView | null>(null);
   const swipeResponder = useRef(
     PanResponder.create({
@@ -135,6 +136,10 @@ export function ChatScreen({
 
   const sendRecoveryPrompt = (prompt: RecoveryPrompt) => {
     if (busy) return;
+    if (prompt.action === 'camera') {
+      void analyzePickedPhoto('camera');
+      return;
+    }
     setComposerText('');
     setPendingAttachment(null);
     void runAction('正在让 FitMate 帮你稳住...', 'FitMate 已给出下一步', async () => {
@@ -290,7 +295,7 @@ export function ChatScreen({
         <View style={styles.composer}>
           {!pendingAttachment && !composerText.trim() ? (
             <View style={styles.quickRow}>
-              {RECOVERY_PROMPTS.map((prompt) => (
+              {quickPrompts.map((prompt) => (
                 <Pressable
                   key={prompt.id}
                   style={[styles.smallButton, busy && styles.disabledButton]}
