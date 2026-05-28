@@ -27,6 +27,23 @@ USER_PROMPT = (
     "fat_loss_advice. fat_loss_advice should be coaching guidance only after the visible "
     "food estimate; if the estimate is too uncertain, say that user input is needed first."
 )
+MULTI_PHOTO_SYSTEM_PROMPT = (
+    "You are FitMate AI's multi-photo food analyst. Return valid JSON only. "
+    "You may receive photos of the same food from different angles, or different foods in one upload. "
+    "Group photos that are clearly the same food or same dish, and keep different foods as separate analyses. "
+    "Reply in Simplified Chinese by default."
+)
+MULTI_PHOTO_USER_PROMPT = (
+    "Analyze these food photos for a fat-loss coaching app. Return JSON with fields: food_analyses and groups. "
+    "food_analyses must be a list of food analysis objects. Each food analysis object must include: "
+    "meal_name, detected_items, calories_range_kcal, protein_g_range, carbs_g_range, fat_g_range, "
+    "confidence, needs_follow_up, follow_up_question, fat_loss_advice, supportive_reply, safety_flags. "
+    "groups must be a list of objects with group_id, analysis_indexes, meal_name. "
+    "Use zero-based analysis_indexes. If two photos are the same dish, return one analysis and one group "
+    "whose analysis_indexes points to that analysis; explain visible portion clues in detected_items. "
+    "If photos show different dishes, return one analysis per dish. Do not merge different foods into one card. "
+    "Ask concise follow-up questions only when portion, oil, sauce, shared serving, or leftovers are unclear."
+)
 TEXT_FOOD_SYSTEM_PROMPT = (
     "You are FitMate AI's text food-log nutrition analyst. Return valid JSON only. "
     "Use ranges and uncertainty. Do not invent exact portion sizes. Reply in Simplified Chinese by default."
@@ -173,6 +190,39 @@ class OpenAICompatibleVisionProvider:
         )
         return self._extract_json_content(response)
 
+    def analyze_food_photos(self, photos: list[dict], user_note: str | None = None) -> object:
+        if not self.api_key:
+            raise RuntimeError(self.not_configured_error)
+        if not photos:
+            raise ValueError("photos_required")
+
+        user_content = [{"type": "text", "text": self._multi_photo_user_text(photos, user_note)}]
+        for photo in photos[:5]:
+            image_bytes = photo["image_bytes"]
+            content_type = photo.get("image_content_type") or "image/jpeg"
+            user_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{content_type};base64,{base64.b64encode(image_bytes).decode('ascii')}",
+                },
+            })
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": MULTI_PHOTO_SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.2,
+        }
+        response = self.transport.post_json(
+            url=f"{self.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            payload=payload,
+            timeout_seconds=self.timeout_seconds,
+        )
+        return self._extract_json_content(response)
+
     def analyze_food_text(self, text: str) -> object:
         if not self.api_key:
             raise RuntimeError(self.not_configured_error)
@@ -273,6 +323,14 @@ class OpenAICompatibleVisionProvider:
         if not user_note:
             return USER_PROMPT
         return f"{USER_PROMPT}\n\nUser note: {user_note}"
+
+    def _multi_photo_user_text(self, photos: list[dict], user_note: str | None) -> str:
+        photo_lines = [
+            f"Photo {index}: filename={photo.get('image_filename') or f'photo-{index + 1}.jpg'}"
+            for index, photo in enumerate(photos[:5])
+        ]
+        note = (user_note or "").strip() or "None"
+        return f"{MULTI_PHOTO_USER_PROMPT}\n\nUser note: {note}\nPhotos:\n" + "\n".join(photo_lines)
 
     def _extract_json_content(self, response: dict) -> object:
         try:

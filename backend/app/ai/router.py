@@ -12,6 +12,7 @@ from app.ai.schema import (
     FoodVisionSchemaError,
     WorkoutAnalysisSchemaError,
     validate_file_insights,
+    validate_food_batch_analysis,
     validate_food_analysis,
     validate_workout_analysis,
 )
@@ -24,6 +25,9 @@ class VisionProvider(Protocol):
     model_name: str
 
     def analyze_food_photo(self, image_bytes: bytes, user_note: str | None = None) -> object:
+        ...
+
+    def analyze_food_photos(self, photos: list[dict], user_note: str | None = None) -> object:
         ...
 
 
@@ -103,6 +107,40 @@ class FoodVisionRouter:
             raise FoodVisionUnavailableError("all_vision_providers_failed")
         return fallback_result
 
+    def analyze_food_photos(
+        self,
+        photos: list[dict],
+        user_note: str | None = None,
+        user_id: str | None = None,
+    ) -> dict:
+        primary_result = self._try_batch_provider_once(self.primary_provider, photos, user_note, user_id, purpose="food_photo_batch")
+        if primary_result is not None:
+            return primary_result
+
+        fallback_result = self._try_batch_provider_once(self.fallback_provider, photos, user_note, user_id, purpose="fallback")
+        if fallback_result is not None:
+            return fallback_result
+
+        food_analyses = [
+            self.analyze_food_photo(
+                image_bytes=photo["image_bytes"],
+                user_note=self._single_photo_note(user_note, index, len(photos)),
+                user_id=user_id,
+            )
+            for index, photo in enumerate(photos)
+        ]
+        return {
+            "food_analyses": food_analyses,
+            "groups": [
+                {
+                    "group_id": str(item.get("meal_name") or f"meal-{index + 1}"),
+                    "analysis_indexes": [index],
+                    "meal_name": str(item.get("meal_name") or "餐食"),
+                }
+                for index, item in enumerate(food_analyses)
+            ],
+        }
+
     def _try_provider_with_retry(
         self,
         provider: VisionProvider,
@@ -180,6 +218,75 @@ class FoodVisionRouter:
             estimated_cost_cents=self._estimated_cost_cents(provider.provider_name, purpose),
         )
         return result
+
+    def _try_batch_provider_once(
+        self,
+        provider: VisionProvider,
+        photos: list[dict],
+        user_note: str | None,
+        user_id: str | None,
+        purpose: str,
+    ) -> dict | None:
+        started = time.perf_counter()
+        try:
+            raw = provider.analyze_food_photos(photos=photos, user_note=user_note)
+            result = validate_food_batch_analysis(raw)
+        except FoodVisionSchemaError as exc:
+            logger.warning(
+                "food vision batch provider schema error provider=%s model=%s purpose=%s error=%s",
+                provider.provider_name,
+                provider.model_name,
+                purpose,
+                exc,
+            )
+            self._record_model_call(
+                provider=provider,
+                user_id=user_id,
+                purpose=purpose,
+                status="error",
+                latency_ms=self._latency_ms(started),
+                error_code="schema_error",
+            )
+            return None
+        except (AttributeError, RuntimeError, TimeoutError, ValueError) as exc:
+            logger.warning(
+                "food vision batch provider error provider=%s model=%s purpose=%s error=%s",
+                provider.provider_name,
+                provider.model_name,
+                purpose,
+                str(exc) or exc.__class__.__name__,
+            )
+            self._record_model_call(
+                provider=provider,
+                user_id=user_id,
+                purpose=purpose,
+                status="error",
+                latency_ms=self._latency_ms(started),
+                error_code=str(exc) or exc.__class__.__name__,
+            )
+            return None
+
+        for item in result["food_analyses"]:
+            item["model_provider"] = provider.provider_name
+            item["model_name"] = provider.model_name
+        self._record_model_call(
+            provider=provider,
+            user_id=user_id,
+            purpose=purpose,
+            status="success",
+            latency_ms=self._latency_ms(started),
+            estimated_cost_cents=self._estimated_cost_cents(provider.provider_name, purpose),
+        )
+        return result
+
+    def _single_photo_note(self, user_note: str | None, index: int, total: int) -> str:
+        parts = [
+            f"这是用户一次发送的第 {index + 1}/{total} 张食物照片。",
+            "请先独立识别这张图。如果它明显和其他图是同一道食物或同一餐的一部分，在 meal_name 和 detected_items 中说清楚；不要把不同照片的食物混在同一张卡里。",
+        ]
+        if user_note:
+            parts.append(f"用户补充：{user_note}")
+        return "\n".join(parts)
 
     def _record_model_call(
         self,

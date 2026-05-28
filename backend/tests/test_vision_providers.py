@@ -74,6 +74,31 @@ def test_xiaomi_provider_sends_openai_compatible_multimodal_request(monkeypatch)
     assert user_content[1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
 
 
+def test_xiaomi_provider_sends_multi_photo_structured_request(monkeypatch) -> None:
+    monkeypatch.setenv("XIAOMI_API_KEY", "xiaomi-key")
+    monkeypatch.setenv("XIAOMI_BASE_URL", "https://mimo.example/v1")
+    monkeypatch.setenv("XIAOMI_MODEL_NAME", "mimo-v2-omni-test")
+    transport = FakeTransport(response_payload=chat_response({
+        "food_analyses": [VALID_ANALYSIS | {"meal_name": "burger"}],
+        "groups": [{"group_id": "burger", "analysis_indexes": [0, 1], "meal_name": "burger"}],
+    }))
+    provider = XiaomiVisionProvider(transport=transport)
+
+    result = provider.analyze_food_photos([
+        {"image_bytes": b"image-one", "image_filename": "front.jpg", "image_content_type": "image/jpeg"},
+        {"image_bytes": b"image-two", "image_filename": "side.jpg", "image_content_type": "image/jpeg"},
+    ], user_note="same meal?")
+
+    request = transport.requests[0]
+    user_content = request["payload"]["messages"][1]["content"]
+    assert result["groups"][0]["analysis_indexes"] == [0, 1]
+    assert request["payload"]["model"] == "mimo-v2-omni-test"
+    assert user_content[0]["type"] == "text"
+    assert "same meal?" in user_content[0]["text"]
+    assert "food_analyses" in user_content[0]["text"]
+    assert [part["type"] for part in user_content[1:]] == ["image_url", "image_url"]
+
+
 def test_xiaomi_provider_sends_openai_compatible_file_extraction_request(monkeypatch) -> None:
     monkeypatch.setenv("XIAOMI_API_KEY", "xiaomi-key")
     monkeypatch.setenv("XIAOMI_BASE_URL", "https://mimo.example/v1")

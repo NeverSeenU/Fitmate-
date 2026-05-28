@@ -182,28 +182,100 @@ class FoodService:
         if thread is None:
             return None
 
+        for _ in photos:
+            self.usage_service.ensure_allowed(user_id, "food_photo")
+        stored_images = [
+            self.storage.put(
+                key=self._object_key(user_id, photo["image_filename"]),
+                content=photo["image_bytes"],
+                content_type=photo["image_content_type"],
+            )
+            for photo in photos
+        ]
+        try:
+            batch = vision_router.analyze_food_photos(
+                photos=photos,
+                user_note=user_note,
+                user_id=user_id,
+            )
+        except Exception:
+            for stored_image in stored_images:
+                self.storage.delete(stored_image.object_key)
+            raise
+
+        image_message = self.chat_service.store.add_message(
+            StoredMessage(
+                id=str(uuid.uuid4()),
+                thread_id=thread_id,
+                user_id=user_id,
+                role="user",
+                message_type="image_batch",
+                content_text=user_note,
+                image_object_key=stored_images[0].object_key if stored_images else None,
+                structured_json={
+                    "images": [
+                        {
+                            "image_object_key": stored_image.object_key,
+                            "content_type": stored_image.content_type,
+                            "size_bytes": stored_image.size_bytes,
+                        }
+                        for stored_image in stored_images
+                    ],
+                },
+            )
+        )
+        subscription = self.subscription_service.get_current(user_id)
+        should_auto_record = bool(subscription["entitlements"]["automatic_recording"])
+
         food_analyses = []
         assistant_messages = []
-        for index, photo in enumerate(photos):
-            photo_note = self._batch_photo_note(user_note, index, len(photos))
-            result = self.analyze_photo(
-                user_id=user_id,
-                thread_id=thread_id,
-                image_bytes=photo["image_bytes"],
-                image_filename=photo["image_filename"],
-                image_content_type=photo["image_content_type"],
-                user_note=photo_note,
-                vision_router=vision_router,
+        for analysis_index, analysis in enumerate(batch["food_analyses"]):
+            group = self._group_for_analysis(batch.get("groups", []), analysis_index)
+            image_index = group["analysis_indexes"][0] if group and group["analysis_indexes"] else min(analysis_index, len(stored_images) - 1)
+            food_log = None
+            if should_auto_record:
+                food_log = self.store.create(
+                    StoredFoodLog(
+                        id=str(uuid.uuid4()),
+                        user_id=user_id,
+                        source_message_id=image_message.id,
+                        image_object_key=stored_images[image_index].object_key if stored_images else None,
+                        meal_name=analysis["meal_name"],
+                        calories_range_kcal=analysis["calories_range_kcal"],
+                        protein_g_range=analysis["protein_g_range"],
+                        carbs_g_range=analysis["carbs_g_range"],
+                        fat_g_range=analysis["fat_g_range"],
+                        confidence=float(analysis["confidence"]),
+                        status="pending",
+                        needs_follow_up=bool(analysis["needs_follow_up"]),
+                        follow_up_question=analysis["follow_up_question"],
+                        model_provider=analysis.get("model_provider"),
+                        model_name=analysis.get("model_name"),
+                    )
+                )
+
+            assistant_message = self.chat_service.store.add_message(
+                StoredMessage(
+                    id=str(uuid.uuid4()),
+                    thread_id=thread_id,
+                    user_id=user_id,
+                    role="assistant",
+                    message_type="food_analysis",
+                    content_text=analysis["supportive_reply"],
+                    structured_json={"food_analysis": analysis, "group": group},
+                    model_provider=analysis.get("model_provider"),
+                    model_name=analysis.get("model_name"),
+                )
             )
-            if result is None:
-                return None
-            food_analyses.append(result["food_analysis"])
-            assistant_messages.append(result["assistant_message"])
+            food_analyses.append(self._analysis_response(analysis, food_log))
+            assistant_messages.append(self.chat_service._message_response(assistant_message))
+        for _ in photos:
+            self.usage_service.increment(user_id, "food_photo")
 
         return {
             "food_analyses": food_analyses,
             "assistant_messages": assistant_messages,
-            "groups": self._analysis_groups(food_analyses),
+            "groups": batch.get("groups") or self._analysis_groups(food_analyses),
         }
 
     def list_logs(self, user_id: str, target_date: date | None = None) -> dict:
@@ -334,6 +406,12 @@ class FoodService:
         if key:
             return key
         return "|".join(str(item).lower() for item in analysis.get("detected_items") or [])
+
+    def _group_for_analysis(self, groups: list[dict], analysis_index: int) -> dict | None:
+        for group in groups:
+            if analysis_index in group.get("analysis_indexes", []):
+                return group
+        return None
 
 
 food_service = FoodService()

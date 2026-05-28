@@ -57,6 +57,29 @@ class GroupingVisionRouter:
         assert user_note is not None and f"第 {self.calls}/2 张" in user_note
         return analysis
 
+    def analyze_food_photos(
+        self,
+        photos: list[dict],
+        user_note: str | None = None,
+        user_id: str | None = None,
+    ) -> dict:
+        self.calls += 1
+        assert len(photos) == 2
+        assert user_note == "帮我分别估算"
+        first = dict(VISION_ANALYSIS)
+        first["meal_name"] = "牛肉汉堡"
+        first["detected_items"] = ["burger"]
+        second = dict(VISION_ANALYSIS)
+        second["meal_name"] = "水果沙拉"
+        second["detected_items"] = ["salad"]
+        return {
+            "food_analyses": [first, second],
+            "groups": [
+                {"group_id": "牛肉汉堡", "analysis_indexes": [0], "meal_name": "牛肉汉堡"},
+                {"group_id": "水果沙拉", "analysis_indexes": [1], "meal_name": "水果沙拉"},
+            ],
+        }
+
 
 class UnavailableVisionRouter:
     def analyze_food_photo(

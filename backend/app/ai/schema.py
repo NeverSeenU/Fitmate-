@@ -94,6 +94,57 @@ def validate_food_analysis(raw: object) -> dict[str, Any]:
     return dict(raw)
 
 
+def validate_food_batch_analysis(raw: object) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise FoodVisionSchemaError("batch_analysis_must_be_object")
+    analyses = raw.get("food_analyses")
+    if not isinstance(analyses, list) or not analyses:
+        raise FoodVisionSchemaError("food_analyses_required")
+    normalized_analyses = [validate_food_analysis(item) for item in analyses[:5]]
+    groups = raw.get("groups")
+    normalized_groups = _coerce_food_groups(groups, len(normalized_analyses))
+    if not normalized_groups:
+        normalized_groups = [
+            {
+                "group_id": str(item.get("meal_name") or f"meal-{index + 1}"),
+                "analysis_indexes": [index],
+                "meal_name": str(item.get("meal_name") or "餐食"),
+            }
+            for index, item in enumerate(normalized_analyses)
+        ]
+    return {
+        "food_analyses": normalized_analyses,
+        "groups": normalized_groups,
+    }
+
+
+def _coerce_food_groups(value: object, analysis_count: int) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    groups: list[dict[str, Any]] = []
+    for index, group in enumerate(value[:analysis_count]):
+        if not isinstance(group, dict):
+            continue
+        raw_indexes = group.get("analysis_indexes")
+        if not isinstance(raw_indexes, list):
+            continue
+        indexes = [
+            int(item)
+            for item in raw_indexes
+            if isinstance(item, int) and not isinstance(item, bool) and 0 <= item < analysis_count
+        ]
+        if not indexes:
+            continue
+        meal_name = group.get("meal_name")
+        group_id = group.get("group_id") or meal_name or f"group-{index + 1}"
+        groups.append({
+            "group_id": str(group_id),
+            "analysis_indexes": sorted(set(indexes)),
+            "meal_name": str(meal_name or group_id),
+        })
+    return groups
+
+
 def _coerce_numeric_range(value: object) -> object:
     if isinstance(value, str):
         numbers = re.findall(r"\d+(?:\.\d+)?", value.replace("–", "-").replace("—", "-"))

@@ -32,6 +32,13 @@ class FakeProvider:
             raise response
         return response
 
+    def analyze_food_photos(self, photos: list[dict], user_note: str | None = None) -> object:
+        self.calls += 1
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
     def analyze_food_text(self, text: str) -> object:
         self.calls += 1
         response = self.responses.pop(0)
@@ -242,6 +249,32 @@ def test_food_vision_router_can_force_qwen_provider(monkeypatch) -> None:
     assert router.primary_provider.provider_name == "qwen"
     assert router.fallback_provider.provider_name == "qwen"
     assert router.low_confidence_threshold == 0.0
+
+
+def test_food_vision_router_uses_batch_provider_for_multi_photo_grouping() -> None:
+    xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [{
+        "food_analyses": [
+            VALID_ANALYSIS | {"meal_name": "burger"},
+            VALID_ANALYSIS | {"meal_name": "ramen"},
+        ],
+        "groups": [
+            {"group_id": "burger", "analysis_indexes": [0], "meal_name": "burger"},
+            {"group_id": "ramen", "analysis_indexes": [1], "meal_name": "ramen"},
+        ],
+    }])
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [])
+    router = FoodVisionRouter(primary_provider=xiaomi, fallback_provider=qwen)
+
+    result = router.analyze_food_photos([
+        {"image_bytes": b"image-one", "image_filename": "burger.jpg", "image_content_type": "image/jpeg"},
+        {"image_bytes": b"image-two", "image_filename": "ramen.jpg", "image_content_type": "image/jpeg"},
+    ], user_note="分别估算")
+
+    assert xiaomi.calls == 1
+    assert qwen.calls == 0
+    assert [item["meal_name"] for item in result["food_analyses"]] == ["burger", "ramen"]
+    assert result["food_analyses"][0]["model_provider"] == "xiaomi"
+    assert result["groups"][1]["analysis_indexes"] == [1]
 
 
 def test_file_insight_router_uses_ai_structured_output_and_logs_usage() -> None:
