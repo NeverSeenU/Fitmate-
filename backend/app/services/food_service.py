@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timezone
 from typing import Any
 import uuid
+import re
 
 from app.services.chat_service import StoredMessage, chat_service
 from app.services.subscription_service import subscription_service
@@ -169,6 +170,42 @@ class FoodService:
             "food_analysis": self._analysis_response(analysis, food_log),
         }
 
+    def analyze_photos(
+        self,
+        user_id: str,
+        thread_id: str,
+        photos: list[dict[str, Any]],
+        user_note: str | None,
+        vision_router: Any,
+    ) -> dict | None:
+        thread = self.chat_service.store.get_thread(user_id, thread_id)
+        if thread is None:
+            return None
+
+        food_analyses = []
+        assistant_messages = []
+        for index, photo in enumerate(photos):
+            photo_note = self._batch_photo_note(user_note, index, len(photos))
+            result = self.analyze_photo(
+                user_id=user_id,
+                thread_id=thread_id,
+                image_bytes=photo["image_bytes"],
+                image_filename=photo["image_filename"],
+                image_content_type=photo["image_content_type"],
+                user_note=photo_note,
+                vision_router=vision_router,
+            )
+            if result is None:
+                return None
+            food_analyses.append(result["food_analysis"])
+            assistant_messages.append(result["assistant_message"])
+
+        return {
+            "food_analyses": food_analyses,
+            "assistant_messages": assistant_messages,
+            "groups": self._analysis_groups(food_analyses),
+        }
+
     def list_logs(self, user_id: str, target_date: date | None = None) -> dict:
         return {
             "food_logs": [
@@ -264,6 +301,39 @@ class FoodService:
     def _object_key(self, user_id: str, filename: str) -> str:
         safe_filename = filename or "food-photo.jpg"
         return f"food-photos/{user_id}/{uuid.uuid4()}-{safe_filename}"
+
+    def _batch_photo_note(self, user_note: str | None, index: int, total: int) -> str:
+        parts = [
+            f"这是用户一次发送的第 {index + 1}/{total} 张食物照片。",
+            "请先独立识别这张图。如果它明显和其他图是同一道食物或同一餐的一部分，在 meal_name 和 detected_items 中说清楚；不要把不同照片的食物混在同一张卡里。",
+        ]
+        if user_note:
+            parts.append(f"用户补充：{user_note}")
+        return "\n".join(parts)
+
+    def _analysis_groups(self, analyses: list[dict]) -> list[dict]:
+        groups: list[dict] = []
+        by_key: dict[str, int] = {}
+        for index, analysis in enumerate(analyses):
+            key = self._analysis_group_key(analysis)
+            group_index = by_key.get(key)
+            if group_index is None:
+                by_key[key] = len(groups)
+                groups.append({
+                    "group_id": key or f"group-{index + 1}",
+                    "analysis_indexes": [index],
+                    "meal_name": analysis.get("meal_name") or "餐食",
+                })
+            else:
+                groups[group_index]["analysis_indexes"].append(index)
+        return groups
+
+    def _analysis_group_key(self, analysis: dict) -> str:
+        title = str(analysis.get("meal_name") or "").lower()
+        key = re.sub(r"[^\w\u4e00-\u9fff]+", "", title)
+        if key:
+            return key
+        return "|".join(str(item).lower() for item in analysis.get("detected_items") or [])
 
 
 food_service = FoodService()

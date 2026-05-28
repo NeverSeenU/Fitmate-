@@ -4,7 +4,6 @@ export type RecoveryPromptId =
   | 'cold_intro'
   | 'cold_photo'
   | 'cold_goal'
-  | 'tone_setup'
   | 'meal_check'
   | 'estimate_meal'
   | 'steady_next_meal'
@@ -37,11 +36,6 @@ export const COLD_START_PROMPTS: RecoveryPrompt[] = [
     id: 'cold_goal',
     label: '我想减脂',
     message: '我想减脂，但你还不了解我的身体资料和生活习惯。请先问我最少的问题，然后再给初始建议。',
-  },
-  {
-    id: 'tone_setup',
-    label: '语气设置',
-    message: '我想设置你的陪伴语气。请给我几个简单选项，比如温柔、直接、毒舌闺蜜，但不要羞辱或鼓励极端减肥。',
   },
 ];
 

@@ -40,6 +40,24 @@ class FakeVisionRouter:
         return dict(VISION_ANALYSIS)
 
 
+class GroupingVisionRouter:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def analyze_food_photo(
+        self,
+        image_bytes: bytes,
+        user_note: str | None = None,
+        user_id: str | None = None,
+    ) -> dict:
+        self.calls += 1
+        analysis = dict(VISION_ANALYSIS)
+        analysis["meal_name"] = "牛肉汉堡" if self.calls == 1 else "水果沙拉"
+        analysis["detected_items"] = ["burger"] if self.calls == 1 else ["salad"]
+        assert user_note is not None and f"第 {self.calls}/2 张" in user_note
+        return analysis
+
+
 class UnavailableVisionRouter:
     def analyze_food_photo(
         self,
@@ -136,6 +154,36 @@ def test_free_user_receives_analysis_without_auto_created_food_log() -> None:
     assert body["assistant_message"]["message_type"] == "food_analysis"
     assert "焦虑" in body["assistant_message"]["content_text"]
     assert usage_for_email(email).food_photo_count == 1
+
+
+def test_multi_photo_endpoint_returns_structured_analyses_and_groups() -> None:
+    email = "multi-photo@example.com"
+    headers = auth_headers(email)
+    thread_id = create_thread(headers)
+    app.dependency_overrides[food_api.get_food_vision_router] = lambda: GroupingVisionRouter()
+
+    try:
+        response = client.post(
+            "/v1/chat/photos",
+            headers=headers,
+            data={"thread_id": thread_id, "user_note": "帮我分别估算"},
+            files=[
+                ("images", ("burger.jpg", b"fake-image", "image/jpeg")),
+                ("images", ("salad.jpg", b"fake-image", "image/jpeg")),
+            ],
+        )
+    finally:
+        app.dependency_overrides[food_api.get_food_vision_router] = lambda: FakeVisionRouter()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["meal_name"] for item in body["food_analyses"]] == ["牛肉汉堡", "水果沙拉"]
+    assert len(body["assistant_messages"]) == 2
+    assert body["groups"] == [
+        {"group_id": "牛肉汉堡", "analysis_indexes": [0], "meal_name": "牛肉汉堡"},
+        {"group_id": "水果沙拉", "analysis_indexes": [1], "meal_name": "水果沙拉"},
+    ]
+    assert usage_for_email(email).food_photo_count == 2
 
 
 def test_photo_rejects_unsupported_upload_type() -> None:

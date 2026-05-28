@@ -1,5 +1,5 @@
 import type { AppDataState, ChatMessage, ConversationThread, Entitlements, FileInsight, FoodAnalysis, SubscriptionTier, UserProfile } from '../domain/models';
-import type { FileUploadResponse, FoodPhotoAnalysisResponse, PhotoUploadInput } from './apiClient';
+import type { FileUploadResponse, FoodPhotoBatchAnalysisResponse, FoodPhotoAnalysisResponse, PhotoUploadInput } from './apiClient';
 import type { PickedFile } from './filePicker';
 
 type AppActionsOptions = {
@@ -29,6 +29,11 @@ type AppActionsApi = {
   };
   food: {
     analyzePhoto(input: PhotoUploadInput): Promise<FoodPhotoAnalysisResponse>;
+    analyzePhotos?(input: {
+      threadId: string;
+      photos: Array<{ imageUri: string; filename: string; mimeType: string }>;
+      userNote?: string | null;
+    }): Promise<FoodPhotoBatchAnalysisResponse>;
     createLog(payload: Record<string, unknown>): Promise<unknown>;
     confirmLog(foodLogId: string): Promise<unknown>;
     patchLog(foodLogId: string, payload: Record<string, unknown>): Promise<unknown>;
@@ -263,36 +268,9 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           kind: 'food',
         }, [userPhotoMessage])
         : photos[0].threadId;
-      const results: Array<{
-        response: FoodPhotoAnalysisResponse;
-        source: {
-          imageUri: string;
-          filename: string;
-          mimeType: string;
-          userNote: string;
-        };
-      }> = [];
-      for (let index = 0; index < photos.length; index += 1) {
-        const photo = photos[index];
-        const userNote = buildMultiPhotoUserNote(firstNote, index, photos.length);
-        const backendInput = {
-          ...photo,
-          threadId: backendThreadId,
-          userNote,
-        };
-        const analysis = api
-          ? await api.food.analyzePhoto(backendInput)
-          : mockFoodPhotoResponse(backendInput.filename);
-        results.push({
-          response: analysis,
-          source: {
-            imageUri: photo.imageUri,
-            filename: photo.filename,
-            mimeType: photo.mimeType,
-            userNote,
-          },
-        });
-      }
+      const results = api?.food.analyzePhotos
+        ? await analyzeFoodPhotoBatch(api, backendThreadId, photos, firstNote)
+        : await analyzeFoodPhotosIndividually(api, backendThreadId, photos, firstNote);
       appendGroupedFoodPhotoAnalyses(getState, setState, results.map((item, index) => {
         const mapped = toFoodAnalysis(item.response, item.source);
         return {
@@ -939,6 +917,77 @@ function appendFoodPhotoAnalysis(
       : upsertFoodRecord(state.records, mapped, mapped.status),
     chatMessages: [...existingMessages, toFoodAnalysisMessage(mapped), ...assistantMessages],
   });
+}
+
+async function analyzeFoodPhotoBatch(
+  api: AppActionsApi,
+  backendThreadId: string,
+  photos: PhotoUploadInput[],
+  firstNote: string,
+) {
+  const response = await api.food.analyzePhotos!({
+    threadId: backendThreadId,
+    userNote: firstNote,
+    photos: photos.map((photo) => ({
+      imageUri: photo.imageUri,
+      filename: photo.filename,
+      mimeType: photo.mimeType,
+    })),
+  });
+  return response.food_analyses.map((analysis, index) => {
+    const photo = photos[index] ?? photos[0];
+    return {
+      response: {
+        food_analysis: analysis,
+        assistant_message: response.assistant_messages?.[index],
+      },
+      source: {
+        imageUri: photo.imageUri,
+        filename: photo.filename,
+        mimeType: photo.mimeType,
+        userNote: buildMultiPhotoUserNote(firstNote, index, photos.length),
+      },
+    };
+  });
+}
+
+async function analyzeFoodPhotosIndividually(
+  api: AppActionsApi | undefined,
+  backendThreadId: string,
+  photos: PhotoUploadInput[],
+  firstNote: string,
+) {
+  const results: Array<{
+    response: FoodPhotoAnalysisResponse;
+    source: {
+      imageUri: string;
+      filename: string;
+      mimeType: string;
+      userNote: string;
+    };
+  }> = [];
+  for (let index = 0; index < photos.length; index += 1) {
+    const photo = photos[index];
+    const userNote = buildMultiPhotoUserNote(firstNote, index, photos.length);
+    const backendInput = {
+      ...photo,
+      threadId: backendThreadId,
+      userNote,
+    };
+    const analysis = api
+      ? await api.food.analyzePhoto(backendInput)
+      : mockFoodPhotoResponse(backendInput.filename);
+    results.push({
+      response: analysis,
+      source: {
+        imageUri: photo.imageUri,
+        filename: photo.filename,
+        mimeType: photo.mimeType,
+        userNote,
+      },
+    });
+  }
+  return results;
 }
 
 function appendGroupedFoodPhotoAnalyses(

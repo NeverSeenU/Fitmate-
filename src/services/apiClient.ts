@@ -43,6 +43,16 @@ export type PhotoUploadInput = {
   userNote?: string | null;
 };
 
+export type PhotoBatchUploadInput = {
+  threadId: string;
+  photos: Array<{
+    imageUri: string;
+    filename: string;
+    mimeType: string;
+  }>;
+  userNote?: string | null;
+};
+
 export type FileUploadInput = {
   threadId: string;
   fileUri: string;
@@ -88,6 +98,12 @@ export type FoodPhotoAnalysisResponse = {
     model_name?: string;
   };
   assistant_message?: { id?: string; content_text?: string; message_type?: string; structured_json?: unknown };
+};
+
+export type FoodPhotoBatchAnalysisResponse = {
+  food_analyses: FoodPhotoAnalysisResponse['food_analysis'][];
+  assistant_messages?: Array<{ id?: string; content_text?: string; message_type?: string; structured_json?: unknown }>;
+  groups?: Array<{ group_id: string; analysis_indexes: number[]; meal_name: string }>;
 };
 
 export class ApiError extends Error {
@@ -159,6 +175,9 @@ export function createBackendApi(options: ApiClientOptions = {}) {
     food: {
       analyzePhoto: (input: PhotoUploadInput) => (
         client.multipart('/chat/photo', createPhotoUploadBody(input)) as Promise<FoodPhotoAnalysisResponse>
+      ),
+      analyzePhotos: (input: PhotoBatchUploadInput) => (
+        client.multipart('/chat/photos', new PhotoBatchUploadBody(input)) as Promise<FoodPhotoBatchAnalysisResponse>
       ),
       listLogs: (date?: string) => client.get(date ? `/food/logs?date=${encodeURIComponent(date)}` : '/food/logs'),
       createLog: (payload: Record<string, unknown>) => client.post('/food/logs', payload),
@@ -296,7 +315,7 @@ class ApiClient {
     return this.request(path, { method: 'DELETE' });
   }
 
-  multipart(path: string, body: PhotoUploadBody | FileUploadBody) {
+  multipart(path: string, body: PhotoUploadBody | PhotoBatchUploadBody | FileUploadBody) {
     return this.request(path, { method: 'POST', body, multipart: true });
   }
 
@@ -381,6 +400,37 @@ function createPhotoUploadBody(input: PhotoUploadInput) {
   return new PhotoUploadBody(input);
 }
 
+class PhotoBatchUploadBody {
+  constructor(private readonly input: PhotoBatchUploadInput) {}
+
+  toFormData() {
+    const data = new FormData();
+    data.append('thread_id', this.input.threadId);
+    if (this.input.userNote) {
+      data.append('user_note', this.input.userNote);
+    }
+    this.input.photos.forEach((photo) => {
+      data.append('images', {
+        uri: photo.imageUri,
+        name: photo.filename,
+        type: photo.mimeType,
+      } as unknown as Blob);
+    });
+    return data;
+  }
+
+  toString() {
+    const params = [
+      `thread_id=${this.input.threadId}`,
+      ...this.input.photos.map((photo) => `images=${photo.filename}`),
+    ];
+    if (this.input.userNote) {
+      params.push(`user_note=${this.input.userNote}`);
+    }
+    return params.join('&');
+  }
+}
+
 class FileUploadBody {
   constructor(private readonly input: FileUploadInput) {}
 
@@ -413,7 +463,9 @@ class FileUploadBody {
 async function defaultFetch(url: string, init: ApiRequestInit): Promise<ApiResponseLike> {
   const requestInit = {
     ...init,
-    body: init.body instanceof PhotoUploadBody || init.body instanceof FileUploadBody ? init.body.toFormData() : init.body,
+    body: init.body instanceof PhotoUploadBody || init.body instanceof PhotoBatchUploadBody || init.body instanceof FileUploadBody
+      ? init.body.toFormData()
+      : init.body,
   };
   const response = await fetch(url, requestInit as RequestInit);
   return response as ApiResponseLike;

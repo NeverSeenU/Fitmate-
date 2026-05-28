@@ -1,5 +1,5 @@
 ﻿import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native';
 import { LoginScreen, RegisterScreen, ForgotScreen, OnboardingScreen, type AuthCredentials } from './screens/AuthScreens';
 import { ChatScreen } from './screens/ChatScreen';
@@ -13,18 +13,26 @@ import { loadFitMateState, saveFitMateState } from './state/persistence';
 import { createAsyncStorageStore } from './storage/localStore';
 import { runtimeConfig } from './config/env';
 import { styles } from './styles';
-import type { AuthSession } from './domain/models';
+import type { AppDataState, AuthSession } from './domain/models';
 import type { ChatPanel, Screen, Sheet } from './types';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('login');
   const [sheet, setSheet] = useState<Sheet>(null);
   const [returnPanel, setReturnPanel] = useState<ChatPanel>(null);
-  const [appState, setAppState] = useState(initialAppState);
+  const [appState, setAppStateValue] = useState(initialAppState);
+  const appStateRef = useRef<AppDataState>(initialAppState);
   const [authenticated, setAuthenticated] = useState(false);
   const [authNotice, setAuthNotice] = useState('');
   const [persistedSession, setPersistedSession] = useState<AuthSession | null>(null);
   const store = useMemo(() => createAsyncStorageStore(), []);
+  const setAppState = useCallback((next: AppDataState | ((state: AppDataState) => AppDataState)) => {
+    setAppStateValue((previous) => {
+      const resolved = typeof next === 'function' ? next(previous) : next;
+      appStateRef.current = resolved;
+      return resolved;
+    });
+  }, []);
   const services = useMemo(
     () => createFitMateServices({
       baseUrl: runtimeConfig.apiBaseUrl,
@@ -46,11 +54,15 @@ export default function App() {
   const actions = useMemo(
     () => createAppActions({
       api: services.api,
-      getState: () => appState,
+      getState: () => appStateRef.current,
       setState: setAppState,
     }),
-    [services, appState],
+    [services, setAppState],
   );
+
+  useEffect(() => {
+    appStateRef.current = appState;
+  }, [appState]);
 
   useEffect(() => {
     let cancelled = false;
