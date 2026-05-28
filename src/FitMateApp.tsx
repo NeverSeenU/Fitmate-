@@ -27,11 +27,9 @@ export default function App() {
   const [persistedSession, setPersistedSession] = useState<AuthSession | null>(null);
   const store = useMemo(() => createAsyncStorageStore(), []);
   const setAppState = useCallback((next: AppDataState | ((state: AppDataState) => AppDataState)) => {
-    setAppStateValue((previous) => {
-      const resolved = typeof next === 'function' ? next(previous) : next;
-      appStateRef.current = resolved;
-      return resolved;
-    });
+    const resolved = typeof next === 'function' ? next(appStateRef.current) : next;
+    appStateRef.current = resolved;
+    setAppStateValue(resolved);
   }, []);
   const services = useMemo(
     () => createFitMateServices({

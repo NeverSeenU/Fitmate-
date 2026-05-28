@@ -84,7 +84,7 @@ export function ChatScreen({
   };
 
   const analyzePickedPhoto = async (source: PhotoPickerSource) => {
-    const limit = source === 'camera' ? 1 : photoAttachmentLimit(appState.entitlements.tier);
+    const limit = source === 'camera' ? 1 : photoAttachmentLimit();
     const photos = await pickFoodPhotos(source, limit);
     if (!photos.length) {
       setStatus('已取消选择照片');
@@ -331,8 +331,9 @@ export function ChatScreen({
               editable={!busy}
               placeholder="询问 FitMate"
               placeholderTextColor="#777"
-              returnKeyType="send"
-              onSubmitEditing={sendComposerText}
+              multiline
+              scrollEnabled
+              textAlignVertical="top"
             />
             <Pressable
               style={[styles.iconButton, busy && styles.disabledButton]}
@@ -705,6 +706,6 @@ function attachmentTypeLabel(attachment: PendingAttachment) {
   return 'FILE';
 }
 
-function photoAttachmentLimit(tier: AppDataState['entitlements']['tier']) {
-  return tier === 'free' ? 1 : 5;
+function photoAttachmentLimit() {
+  return 5;
 }

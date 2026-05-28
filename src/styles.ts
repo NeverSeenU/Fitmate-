@@ -584,7 +584,7 @@ export const styles = StyleSheet.create({
   composerControls: {
     flexDirection: 'row',
     gap: 7,
-    alignItems: 'center',
+    alignItems: 'flex-end',
   },
   pendingAttachment: {
     alignSelf: 'flex-start',
@@ -660,12 +660,16 @@ export const styles = StyleSheet.create({
   composerInput: {
     flex: 1,
     minHeight: compactPhone ? 38 : 42,
+    maxHeight: compactPhone ? 190 : 220,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: '#242424',
-    color: colors.muted,
+    color: colors.text,
     paddingHorizontal: 12,
+    paddingTop: compactPhone ? 8 : 10,
+    paddingBottom: compactPhone ? 8 : 10,
+    lineHeight: compactPhone ? 17 : 20,
   },
   tabs: {
     flexDirection: 'row',
