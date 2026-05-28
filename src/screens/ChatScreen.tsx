@@ -3,7 +3,7 @@ import { Image, Keyboard, KeyboardAvoidingView, PanResponder, Platform, Pressabl
 import { BottomTabs, Button, ChatBubble, ChatHeader, FoodAnalysisCard } from '../components/ui';
 import type { AppDataState, ChatMessage, FoodAnalysis } from '../domain/models';
 import { AttachmentPanel, BottomPanel, ThreadDrawer } from '../overlays/ChatOverlays';
-import { promptsForState, type RecoveryPrompt } from '../product/recoveryPrompts';
+import { promptsForState, recoveryPromptText, type RecoveryPrompt } from '../product/recoveryPrompts';
 import type { createAppActions, FoodLogEditInput } from '../services/appActions';
 import { formatFileSize, pickFitMateFile, type PickedFile } from '../services/filePicker';
 import { pickFoodPhotos, type PickedPhoto, type PhotoPickerSource } from '../services/photoPicker';
@@ -141,7 +141,7 @@ export function ChatScreen({
     setComposerText('');
     setPendingAttachment(null);
     void runAction('正在让 FitMate 帮你稳住...', 'FitMate 已给出下一步', async () => {
-      await actions.sendText(activeThreadId, prompt.message, prompt.label);
+      await actions.sendText(activeThreadId, recoveryPromptText(prompt.id, appState), prompt.label);
     });
   };
 

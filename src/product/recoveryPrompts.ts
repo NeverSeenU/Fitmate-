@@ -66,7 +66,7 @@ export const RECOVERY_PROMPTS: RecoveryPrompt[] = [
   {
     id: 'overeaten',
     label: '吃多了',
-    message: '我刚刚吃多了，有点慌。请不要羞辱我。只能基于已知记录判断；如果你不知道我今天训练或吃了什么，请先承认不知道，再给安全下一步。',
+    message: '我刚刚吃多了，有点慌。请不要羞辱我。请先分析我的今日食物记录，判断我是不是明显吃多了；如果没有今日食物记录，请直接说你还不知道我今天吃了什么，问我是不是吃了但还没上传，或者只是因为焦虑觉得吃多了。不要生成未知餐次或 0 kcal 食物卡片，只给一个安全下一步。',
   },
   {
     id: 'reset',
@@ -113,6 +113,39 @@ export function promptsForState(state: AppDataState) {
   });
 }
 
-export function recoveryPromptText(id: RecoveryPromptId) {
+export function recoveryPromptText(id: RecoveryPromptId, state?: AppDataState) {
+  if (id === 'overeaten' && state) {
+    return overeatenPromptText(state);
+  }
+  return baseRecoveryPromptText(id);
+}
+
+function baseRecoveryPromptText(id: RecoveryPromptId) {
   return [...COLD_START_PROMPTS, ...LOW_CONTEXT_PROMPTS, ...RECOVERY_PROMPTS].find((prompt) => prompt.id === id)?.message ?? '';
+}
+
+function overeatenPromptText(state: AppDataState) {
+  const foodRecords = state.records.filter((record) => record.kind === 'food' && record.status !== '已丢弃');
+  if (!foodRecords.length) {
+    return [
+      '我刚刚觉得自己吃多了，有点慌。请先稳定我的情绪，不要羞辱我。',
+      '你还没有我的今日食物记录，所以不要假装知道我今天吃了什么，也不要生成未知餐次或 0 kcal 食物卡片。',
+      '请问我一个小问题：我是吃了但还没上传，还是只是因为焦虑觉得吃多了？然后给一个安全下一步。',
+    ].join('\n');
+  }
+  const foodSummary = foodRecords.map((record, index) => {
+    const macros = [
+      record.caloriesKcal === undefined ? null : `${record.caloriesKcal} kcal`,
+      record.proteinG === undefined ? null : `蛋白 ${record.proteinG}g`,
+      record.carbsG === undefined ? null : `碳水 ${record.carbsG}g`,
+      record.fatG === undefined ? null : `脂肪 ${record.fatG}g`,
+    ].filter(Boolean).join(' · ');
+    return `${index + 1}. ${record.title}${macros ? `：${macros}` : ''}${record.detail ? `；${record.detail}` : record.text ? `；${record.text}` : ''}`;
+  }).join('\n');
+  return [
+    '我刚刚觉得自己吃多了，有点慌。请不要羞辱我。',
+    '请基于下面的今日食物记录判断我是不是明显吃多了，还是只是短期焦虑/水分/盐分/碳水带来的感觉。',
+    foodSummary,
+    '先直接回答：今天是否需要担心。然后给一个稳定情绪的解释和一个安全下一步。不要建议惩罚性断食、催吐、泻药或补偿性过度运动。',
+  ].join('\n');
 }

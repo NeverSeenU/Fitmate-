@@ -60,6 +60,12 @@ This is the formal task queue for the main Codex conversation and subagent team.
 - Scope: ChatGPT-like conversation drawer with title-only rows, search, delete/rename, pinned conversations, and backend-side message sync.
 - Done when: old conversations remain available locally and remotely, can be searched, renamed, deleted, and restored after reinstall/login.
 
+### P2-5: Bright Premium Visual Direction
+- Owner: Product/PM Lead / Frontend Lead
+- Files: `src/theme.ts`, `src/styles.ts`, `src/screens/*`, design references
+- Scope: explore a lighter, premium, human-feeling visual system that can appeal beyond the current dark fitness look, especially for women users who prefer softer Instagram/Xiaohongshu-style wellness products.
+- Done when: a reviewed design direction exists with palette, typography, card treatment, food photo presentation, and before/after screenshots; implementation waits until core runtime issues are stable.
+
 ## Priority 3: Product Expansion
 
 ### P3-12: AI-Generated Card Parameter Extraction

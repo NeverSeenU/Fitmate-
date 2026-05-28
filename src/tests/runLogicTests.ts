@@ -1732,6 +1732,7 @@ function testRecoveryPromptsTargetRealFatLossPain() {
     assert(prompt.message.includes('下一步') || prompt.message.includes('下一餐'), 'recovery prompts must ask FitMate for a concrete next action');
   }
   assert(recoveryPromptText('overeaten').includes('不要羞辱我'), 'overeating recovery should explicitly protect the user from shame');
+  assert(recoveryPromptText('overeaten').includes('今日食物记录'), 'overeating recovery should ask FitMate to analyze today food records');
   assert(recoveryPromptText('scale_panic').includes('体重'), 'scale-panic recovery should address weight anxiety directly');
 }
 
@@ -1756,6 +1757,26 @@ function testQuickPromptsAreContextAwareAndHonest() {
   assert(loggedLabels.includes('吃多了') && loggedLabels.includes('下一餐'), 'logged users should get recovery prompts only after records exist');
   assert(!loggedLabels.includes('体重焦虑'), 'weight anxiety shortcut should require weight context or user weight language');
   assert(recoveryPromptText('next_meal').includes('如果没有'), 'next-meal prompt must not assume today records exist');
+}
+
+function testOvereatenPromptUsesFoodContextWhenAvailable() {
+  const noFoodState: AppDataState = { ...initialAppState, records: [], chatMessages: [{ id: 'user-1', role: 'user', text: '我有点慌' }], activeFoodAnalysis: null };
+  const noFoodPrompt = recoveryPromptText('overeaten', noFoodState);
+  assert(noFoodPrompt.includes('你还没有我的今日食物记录'), 'overeaten prompt must be honest when no food records exist');
+  assert(noFoodPrompt.includes('吃了但还没上传'), 'overeaten prompt should ask whether the user ate but did not upload');
+  assert(!noFoodPrompt.includes('生成食物卡片'), 'overeaten prompt should not ask for a zero food card without records');
+
+  const loggedState: AppDataState = {
+    ...initialAppState,
+    records: [
+      { id: 'food-1', kind: 'food', title: '三文鱼茶泡饭', status: '已记录', text: '525 kcal · 蛋白 35g · 碳水 48g', caloriesKcal: 525, proteinG: 35, carbsG: 48, fatG: 20 },
+      { id: 'workout-1', kind: 'workout', title: '力量训练', status: '已记录', text: '60 分钟' },
+    ],
+  };
+  const loggedPrompt = recoveryPromptText('overeaten', loggedState);
+  assert(loggedPrompt.includes('三文鱼茶泡饭'), 'overeaten prompt must include today food names when available');
+  assert(loggedPrompt.includes('525 kcal'), 'overeaten prompt must include known calorie context');
+  assert(loggedPrompt.includes('判断我是不是明显吃多了'), 'overeaten prompt should ask for an evidence-based overeating judgment');
 }
 
 async function run() {
@@ -1795,6 +1816,7 @@ async function run() {
   await testConversationThreadsKeepIndependentLocalHistory();
   testRecoveryPromptsTargetRealFatLossPain();
   testQuickPromptsAreContextAwareAndHonest();
+  testOvereatenPromptUsesFoodContextWhenAvailable();
 }
 
 void run();
