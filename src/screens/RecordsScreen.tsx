@@ -208,7 +208,7 @@ export function RecordsScreen({
       ) : null}
       {panel === 'textRecord' ? (
         <EditorSheet title="编辑记录" subtitle="修改这条记录的标题和内容" onClose={() => setPanel(null)}>
-          <TextInput style={styles.input} value={textForm.title} onChangeText={(value) => setTextForm({ ...textForm, title: value })} placeholder="标题" placeholderTextColor="#777" />
+          <TextInput style={styles.input} value={textForm.title} onChangeText={(value) => setTextForm({ ...textForm, title: value })} placeholder="标题" placeholderTextColor="#777" contextMenuHidden={false} />
           <TextArea label="内容" value={textForm.detail} onChangeText={(value) => setTextForm({ ...textForm, detail: value })} placeholder="记录详情" />
           <View style={styles.editorFooter}>
             <Button label="取消" variant="secondary" onPress={() => setPanel(null)} disabled={busy} style={styles.actionButton} />
@@ -275,7 +275,7 @@ function FoodRecordEditor({
   const update = (key: keyof FoodForm, value: string) => setForm({ ...form, [key]: value });
   return (
     <EditorSheet title="编辑食物记录" subtitle="修正营养和详细摄入内容" onClose={onClose}>
-      <TextInput style={styles.input} value={form.title} onChangeText={(value) => update('title', value)} placeholder="食物名称" placeholderTextColor="#777" />
+      <TextInput style={styles.input} value={form.title} onChangeText={(value) => update('title', value)} placeholder="食物名称" placeholderTextColor="#777" contextMenuHidden={false} />
       <View style={styles.formGrid}>
         <NumberField label="热量 kcal" value={form.caloriesKcal} onChangeText={(value) => update('caloriesKcal', value)} />
         <NumberField label="蛋白 g" value={form.proteinG} onChangeText={(value) => update('proteinG', value)} />
@@ -295,7 +295,7 @@ function NumberField({ label, value, onChangeText }: { label: string; value: str
   return (
     <View style={styles.compactField}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput style={styles.input} value={value} onChangeText={onChangeText} keyboardType="numeric" placeholder="0" placeholderTextColor="#777" />
+      <TextInput style={styles.input} value={value} onChangeText={onChangeText} keyboardType="numeric" placeholder="0" placeholderTextColor="#777" contextMenuHidden={false} />
     </View>
   );
 }
@@ -311,6 +311,9 @@ function TextArea({ label, value, onChangeText, placeholder }: { label: string; 
         placeholder={placeholder}
         placeholderTextColor="#777"
         multiline
+        numberOfLines={10}
+        scrollEnabled
+        contextMenuHidden={false}
       />
     </View>
   );

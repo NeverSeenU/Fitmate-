@@ -7,7 +7,7 @@ import { createAiVisionService, type FoodVisionInput, type VisionProvider } from
 import { normalizeFileMimeType, normalizeImageMimeType } from '../services/mimeTypes';
 import { evaluateEntitlement, entitlementsForTier } from '../services/subscription';
 import { initialAppState } from '../state/appState';
-import type { AppDataState } from '../domain/models';
+import type { AppDataState, FoodAnalysis } from '../domain/models';
 import { saveFitMateState, loadFitMateState } from '../state/persistence';
 import { createMemoryStore } from '../storage/localStore';
 import { runEnergyTargetTests } from './energyTargets.test';
@@ -1115,6 +1115,114 @@ async function testFoodFollowUpAnswerUpdatesExistingCard() {
   assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('重新分析')), 'follow-up answer must give visible feedback');
 }
 
+async function testFoodFollowUpAnswerCanUpdateMultiplePendingCards() {
+  const burger: FoodAnalysis = {
+    id: 'burger-card',
+    title: '牛肉汉堡配薯片',
+    status: 'analysis_only',
+    confidence: 0.7,
+    needsFollowUp: true,
+    followUpQuestion: '汉堡是单人份吗？薯片是配料还是额外添加？',
+    calories: '680-820',
+    protein: '48-58g',
+    carbs: '35-48g',
+    fat: '25-35g',
+    caloriesKcal: 750,
+    proteinG: 52,
+    carbsG: 42,
+    fatG: 30,
+    detail: 'burger, chips',
+    advice: '需要补充份量后再确认。',
+    sourceImageUri: 'file:///burger.jpg',
+    sourceFilename: 'burger.jpg',
+    sourceMimeType: 'image/jpeg',
+    sourceUserNote: '两张晚餐',
+  };
+  const ramen: FoodAnalysis = {
+    ...burger,
+    id: 'ramen-card',
+    title: '三文鱼拉面',
+    followUpQuestion: '拉面有没有额外加油或喝完汤？',
+    sourceImageUri: 'file:///ramen.jpg',
+    sourceFilename: 'ramen.jpg',
+    detail: 'salmon ramen',
+  };
+  let state: AppDataState = {
+    ...initialAppState,
+    activeFoodAnalysis: ramen,
+    records: [],
+    chatMessages: [
+      { id: 'food-card-burger', role: 'assistant', text: '', foodAnalysis: burger },
+      { id: 'food-card-ramen', role: 'assistant', text: '', foodAnalysis: ramen },
+    ],
+  };
+  const calls: string[] = [];
+  const actions = createAppActions({
+    api: {
+      chat: {
+        async createThread() {
+          return { id: '11111111-1111-4111-8111-111111111111', title: 'FitMate chat', kind: 'general' };
+        },
+        async sendTextMessage() {
+          calls.push('sendText');
+          return {};
+        },
+      },
+      food: {
+        async analyzePhoto(input: PhotoUploadInput) {
+          calls.push(`${input.filename}:${input.userNote?.includes('牛肉饼270g')}:${input.userNote?.includes('三文鱼是刺身')}`);
+          const isBurger = input.filename === 'burger.jpg';
+          return {
+            food_analysis: {
+              food_log_id: null,
+              meal_name: isBurger ? '牛肉汉堡配薯片（已补充）' : '三文鱼茶泡饭（已补充）',
+              detected_items: isBurger ? ['beef patty', 'chips', 'egg sauce'] : ['salmon sashimi', 'rice', 'soup'],
+              calories_range_kcal: isBurger ? [760, 900] : [450, 620],
+              protein_g_range: isBurger ? [55, 68] : [28, 40],
+              carbs_g_range: isBurger ? [42, 56] : [45, 65],
+              fat_g_range: isBurger ? [34, 48] : [10, 20],
+              confidence: 0.82,
+              status: 'analysis_only',
+              needs_follow_up: false,
+              follow_up_question: null,
+              fat_loss_advice: isBurger ? '已按 270g 牛肉饼和酱料重算。' : '已按刺身和茶泡饭重算。',
+              model_provider: 'xiaomi',
+              model_name: 'mimo-v2-omni',
+            },
+          };
+        },
+        async createLog() { return {}; },
+        async confirmLog() { return {}; },
+        async patchLog() { return {}; },
+        async discardLog() { return {}; },
+        async deleteLog() { return {}; },
+      },
+      profile: { async patchProfile() { return {}; } },
+      records: { async createCheckin() { return {}; }, async patchCheckin() { return {}; }, async deleteCheckin() { return {}; } },
+      workouts: { async analyze() { return {}; }, async createLog() { return {}; }, async confirmLog() { return {}; }, async patchLog() { return {}; } },
+      files: { async upload() { return {} as never; } },
+      subscription: { async restore() { return { entitlements: initialAppState.entitlements }; } },
+      privacy: { async deletePhotos() { return {}; }, async deleteAccount() { return {}; } },
+    },
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  await actions.sendText('food-today', '三文鱼是刺身，茶泡饭没加油；汉堡牛肉饼270g，酱料是蛋黄酱蒜泥和一点糖。');
+
+  assert(!calls.includes('sendText'), 'multi-card follow-up answers should not be sent as generic chat');
+  assert(calls.length === 2, 'one combined follow-up answer must reanalyze every pending card');
+  assert(calls.some((call) => call.startsWith('burger.jpg:true:true')), 'burger reanalysis must receive the full combined answer');
+  assert(calls.some((call) => call.startsWith('ramen.jpg:true:true')), 'ramen reanalysis must receive the full combined answer');
+  const updatedCards = state.chatMessages.filter((message) => message.foodAnalysis);
+  assert(updatedCards.some((message) => message.foodAnalysis?.id === 'burger-card' && message.foodAnalysis.title.includes('已补充') && !message.foodAnalysis.needsFollowUp), 'burger card must be updated in place');
+  assert(updatedCards.some((message) => message.foodAnalysis?.id === 'ramen-card' && message.foodAnalysis.title.includes('已补充') && !message.foodAnalysis.needsFollowUp), 'ramen card must be updated in place');
+  assert(state.records.some((record) => record.id === 'burger-card'), 'burger draft record must be updated');
+  assert(state.records.some((record) => record.id === 'ramen-card'), 'ramen draft record must be updated');
+}
+
 async function testPhotoUploadShowsUserBubbleEvenWhenAnalysisFails() {
   let state: AppDataState = {
     ...initialAppState,
@@ -1675,6 +1783,7 @@ async function run() {
   await testFoodAnalysisUsesDetectedItemsForDetailAndFollowUpForAdvice();
   await testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse();
   await testFoodFollowUpAnswerUpdatesExistingCard();
+  await testFoodFollowUpAnswerCanUpdateMultiplePendingCards();
   await testPhotoUploadShowsUserBubbleEvenWhenAnalysisFails();
   await testBackendFileUploadCreatesStructuredInsightMessage();
   await testFileInsightSyncRequiresUserActionAndCreatesWeightCheckin();

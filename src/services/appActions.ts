@@ -773,11 +773,11 @@ async function applyFoodFollowUpAnswer(
   userMessage: ChatMessage,
 ) {
   const state = getState();
-  const active = state.activeFoodAnalysis;
-  if (!active?.needsFollowUp) {
+  const pendingAnalyses = pendingFoodFollowUps(state);
+  if (!pendingAnalyses.length) {
     return false;
   }
-  if (!api || !active.sourceImageUri || !active.sourceFilename || !active.sourceMimeType) {
+  if (!api) {
     const nextState = getState();
     setState({
       ...nextState,
@@ -793,6 +793,7 @@ async function applyFoodFollowUpAnswer(
     return true;
   }
   const thinkingState = getState();
+  const plural = pendingAnalyses.length > 1;
   setState({
     ...thinkingState,
     chatMessages: appendMissingMessages(thinkingState.chatMessages, [
@@ -800,7 +801,9 @@ async function applyFoodFollowUpAnswer(
     {
       id: `food-follow-up-thinking-${Date.now()}`,
       role: 'assistant',
-      text: '收到，我会结合原图和你的补充重新分析这张食物卡片。',
+      text: plural
+        ? `收到，我会把这条回复拆给 ${pendingAnalyses.length} 张待补充的食物卡片，分别结合原图重新分析。`
+        : '收到，我会结合原图和你的补充重新分析这张食物卡片。',
     },
     ]),
   });
@@ -808,55 +811,88 @@ async function applyFoodFollowUpAnswer(
     title: 'Food photo',
     kind: 'food',
   });
-  const combinedNote = [
-    active.sourceUserNote ? `Original user note: ${active.sourceUserNote}` : null,
-    active.followUpQuestion ? `Assistant follow-up question: ${active.followUpQuestion}` : null,
-    `User follow-up answer: ${answer.trim()}`,
-    'Re-analyze the original image using the follow-up answer. Return updated food details and nutrition ranges in Chinese.',
-  ].filter(Boolean).join('\n');
-  const response = await api.food.analyzePhoto({
-    threadId: backendThreadId,
-    imageUri: active.sourceImageUri,
-    filename: active.sourceFilename,
-    mimeType: active.sourceMimeType,
-    userNote: combinedNote,
-  });
-  const mapped = toFoodAnalysis(response, {
-    imageUri: active.sourceImageUri,
-    filename: active.sourceFilename,
-    mimeType: active.sourceMimeType,
-    userNote: combinedNote,
-  });
-  const nextAnalysis: FoodAnalysis = {
-    ...mapped,
-    id: active.id,
-    status: mapped.status === 'confirmed' ? 'confirmed' : 'edited',
-  };
-  const nextState = getState();
-  const assistantMessages: ChatMessage[] = [
-    {
-      id: `food-follow-up-done-${Date.now()}`,
+  const updatedAnalyses: FoodAnalysis[] = [];
+  const assistantMessages: ChatMessage[] = [];
+  for (const active of pendingAnalyses) {
+    if (!active.sourceImageUri || !active.sourceFilename || !active.sourceMimeType) {
+      assistantMessages.push({
+        id: `food-follow-up-missing-image-${active.id}-${Date.now()}`,
+        role: 'assistant',
+        text: `${active.title} 收到了补充信息，但当前卡片没有保留原图，不能重新让 AI 计算。请重新发送图片，或点“编辑内容”手动修正。`,
+      });
+      continue;
+    }
+    const combinedNote = [
+      plural ? `This follow-up answer may contain details for multiple food cards. Extract only the details relevant to this card: ${active.title}.` : null,
+      active.sourceUserNote ? `Original user note for this card: ${active.sourceUserNote}` : null,
+      active.followUpQuestion ? `Assistant follow-up question for this card: ${active.followUpQuestion}` : null,
+      `User follow-up answer containing all corrections: ${answer.trim()}`,
+      'Re-analyze the original image using only the relevant follow-up details for this card. Return updated food details and nutrition ranges in Chinese.',
+    ].filter(Boolean).join('\n');
+    const response = await api.food.analyzePhoto({
+      threadId: backendThreadId,
+      imageUri: active.sourceImageUri,
+      filename: active.sourceFilename,
+      mimeType: active.sourceMimeType,
+      userNote: combinedNote,
+    });
+    const mapped = toFoodAnalysis(response, {
+      imageUri: active.sourceImageUri,
+      filename: active.sourceFilename,
+      mimeType: active.sourceMimeType,
+      userNote: combinedNote,
+    });
+    const nextAnalysis: FoodAnalysis = {
+      ...mapped,
+      id: active.id,
+      status: mapped.status === 'confirmed' ? 'confirmed' : 'edited',
+    };
+    updatedAnalyses.push(nextAnalysis);
+    assistantMessages.push({
+      id: `food-follow-up-done-${active.id}-${Date.now()}`,
       role: 'assistant',
       text: `${nextAnalysis.title} 已根据你的补充重新分析。请检查新的食物卡片，确认无误后写入 Records。`,
-    },
-  ];
-  if (nextAnalysis.needsFollowUp && nextAnalysis.followUpQuestion) {
-    assistantMessages.push({
-      id: `food-follow-up-again-${Date.now()}`,
-      role: 'assistant',
-      text: nextAnalysis.followUpQuestion,
     });
+    if (nextAnalysis.needsFollowUp && nextAnalysis.followUpQuestion) {
+      assistantMessages.push({
+        id: `food-follow-up-again-${active.id}-${Date.now()}`,
+        role: 'assistant',
+        text: nextAnalysis.followUpQuestion,
+      });
+    }
   }
+  const nextState = getState();
+  const nextActive = updatedAnalyses[updatedAnalyses.length - 1] ?? nextState.activeFoodAnalysis;
+  const nextRecords = updatedAnalyses.reduce(
+    (records, analysis) => upsertFoodRecord(records, analysis, analysis.status),
+    nextState.records,
+  );
+  const nextMessages = updatedAnalyses.reduce(
+    (messages, analysis) => updateFoodAnalysisInMessages(messages, analysis),
+    appendMissingMessages(nextState.chatMessages, [userMessage, ...assistantMessages]),
+  );
   setState({
     ...nextState,
-    activeFoodAnalysis: nextAnalysis,
-    records: upsertFoodRecord(nextState.records, nextAnalysis, nextAnalysis.status),
-    chatMessages: updateFoodAnalysisInMessages(
-      appendMissingMessages(nextState.chatMessages, [userMessage, ...assistantMessages]),
-      nextAnalysis,
-    ),
+    activeFoodAnalysis: nextActive,
+    records: nextRecords,
+    chatMessages: nextMessages,
   });
   return true;
+}
+
+function pendingFoodFollowUps(state: AppDataState) {
+  const analyses = [
+    ...state.chatMessages.map((message) => message.foodAnalysis).filter(Boolean),
+    state.activeFoodAnalysis,
+  ].filter(Boolean) as FoodAnalysis[];
+  const seen = new Set<string>();
+  return analyses.filter((analysis) => {
+    if (!analysis.needsFollowUp || seen.has(analysis.id)) {
+      return false;
+    }
+    seen.add(analysis.id);
+    return true;
+  });
 }
 
 function appendMissingMessages(

@@ -543,7 +543,9 @@ export const styles = StyleSheet.create({
   },
   detailInput: {
     minHeight: compactPhone ? 108 : 132,
+    maxHeight: compactPhone ? 204 : 224,
     paddingTop: 12,
+    lineHeight: compactPhone ? 18 : 20,
     textAlignVertical: 'top',
     color: colors.text,
   },
@@ -562,8 +564,13 @@ export const styles = StyleSheet.create({
   editorContent: {
     paddingHorizontal: narrowPhone ? 12 : 14,
     paddingTop: 14,
-    paddingBottom: compactPhone ? 18 : 24,
+    paddingBottom: compactPhone ? 132 : 148,
     gap: compactPhone ? 10 : 12,
+  },
+  editorFooterInline: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 6,
   },
   editorFooter: {
     flexDirection: 'row',

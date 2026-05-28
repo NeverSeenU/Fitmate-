@@ -223,6 +223,7 @@ export function Field({
         editable={Boolean(onChangeText)}
         keyboardType={keyboardType}
         placeholderTextColor="#777"
+        contextMenuHidden={false}
       />
     </View>
   );

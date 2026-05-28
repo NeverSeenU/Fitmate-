@@ -332,7 +332,9 @@ export function ChatScreen({
               placeholder="询问 FitMate"
               placeholderTextColor="#777"
               multiline
+              numberOfLines={10}
               scrollEnabled
+              contextMenuHidden={false}
               textAlignVertical="top"
             />
             <Pressable
@@ -579,7 +581,7 @@ function FoodEditorPage({
       <ScrollView contentContainerStyle={styles.editorContent} keyboardShouldPersistTaps="handled">
         <View style={styles.field}>
           <Text style={styles.label}>食物名称</Text>
-          <TextInput style={styles.input} value={form.title} onChangeText={(value) => update('title', value)} placeholder="例如：鸡胸饭、火锅、拿铁" placeholderTextColor="#777" />
+          <TextInput style={styles.input} value={form.title} onChangeText={(value) => update('title', value)} placeholder="例如：鸡胸饭、火锅、拿铁" placeholderTextColor="#777" contextMenuHidden={false} />
         </View>
         <View style={styles.formGrid}>
           <NumberField label="热量 kcal" value={form.caloriesKcal} onChangeText={(value) => update('caloriesKcal', value)} />
@@ -596,14 +598,17 @@ function FoodEditorPage({
             placeholder="写清楚吃了什么、份量、酱料、剩了多少，后面 AI 总结和记录页都会用到。"
             placeholderTextColor="#777"
             multiline
+            numberOfLines={10}
+            scrollEnabled
+            contextMenuHidden={false}
             autoFocus
           />
         </View>
+        <View style={styles.editorFooterInline}>
+          <Button label="取消" variant="secondary" onPress={onClose} disabled={busy} style={styles.actionButton} />
+          <Button label={busy ? '保存中...' : '保存编辑'} onPress={onSave} disabled={busy} style={styles.actionButton} />
+        </View>
       </ScrollView>
-      <View style={styles.editorFooter}>
-        <Button label="取消" variant="secondary" onPress={onClose} disabled={busy} style={styles.actionButton} />
-        <Button label={busy ? '保存中...' : '保存编辑'} onPress={onSave} disabled={busy} style={styles.actionButton} />
-      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -619,6 +624,7 @@ function NumberField({ label, value, onChangeText }: { label: string; value: str
         keyboardType="numeric"
         placeholder="0"
         placeholderTextColor="#777"
+        contextMenuHidden={false}
       />
     </View>
   );
@@ -647,6 +653,9 @@ function TextArea({
         placeholder={placeholder}
         placeholderTextColor="#777"
         multiline
+        numberOfLines={10}
+        scrollEnabled
+        contextMenuHidden={false}
         autoFocus={autoFocus}
       />
     </View>
