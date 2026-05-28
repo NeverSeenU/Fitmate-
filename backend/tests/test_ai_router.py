@@ -148,6 +148,21 @@ def test_xiaomi_string_items_and_boolean_are_normalized_for_food_analysis() -> N
     assert result["safety_flags"] == ["no_food_detected"]
 
 
+def test_food_confidence_percent_is_normalized_for_model_output() -> None:
+    xiaomi = FakeProvider(
+        "xiaomi",
+        "mimo-v2-omni",
+        [VALID_ANALYSIS | {"confidence": "80%"}],
+    )
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [])
+    router = FoodVisionRouter(primary_provider=xiaomi, fallback_provider=qwen)
+
+    result = router.analyze_food_photo(b"image")
+
+    assert result["confidence"] == 0.8
+    assert result["model_provider"] == "xiaomi"
+
+
 def test_xiaomi_invalid_json_retries_once_and_logs_error_then_success() -> None:
     xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [{"meal_name": "bad"}, VALID_ANALYSIS])
     qwen = FakeProvider("qwen", "qwen3-vl-plus", [VALID_ANALYSIS])
@@ -216,6 +231,16 @@ def test_food_vision_router_can_force_xiaomi_provider(monkeypatch) -> None:
 
     assert router.primary_provider.provider_name == "xiaomi"
     assert router.fallback_provider.provider_name == "xiaomi"
+    assert router.low_confidence_threshold == 0.0
+
+
+def test_food_vision_router_can_force_qwen_provider(monkeypatch) -> None:
+    monkeypatch.setenv("FOOD_VISION_PROVIDER", "qwen")
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "qwen-key")
+    router = FoodVisionRouter(model_call_repository=InMemoryModelCallRepository())
+
+    assert router.primary_provider.provider_name == "qwen"
+    assert router.fallback_provider.provider_name == "qwen"
     assert router.low_confidence_threshold == 0.0
 
 

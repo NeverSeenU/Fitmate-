@@ -46,11 +46,11 @@ export function FoodAnalysisCard({
     <View style={styles.card}>
       <View style={styles.rowBetween}>
         <View>
-          <Text style={styles.h2}>{analysis.title}</Text>
-          <Text style={styles.muted}>
+          <Text selectable style={styles.h2}>{analysis.title}</Text>
+          <Text selectable style={styles.muted}>
             置信度 {analysis.confidence.toFixed(2)} · {canManage ? '待你确认，确认后才写入记录' : foodAnalysisStatusCopy(analysis.status)}
           </Text>
-          {foodAnalysisMetadata(analysis) ? <Text style={styles.muted}>{foodAnalysisMetadata(analysis)}</Text> : null}
+          {foodAnalysisMetadata(analysis) ? <Text selectable style={styles.muted}>{foodAnalysisMetadata(analysis)}</Text> : null}
         </View>
         <Text style={styles.status}>{foodAnalysisStatusLabel(analysis.status)}</Text>
       </View>
@@ -59,7 +59,7 @@ export function FoodAnalysisCard({
         <Metric value={analysis.protein} label="蛋白" />
         <Metric value={analysis.carbs} label="碳水" />
       </View>
-      <Text style={styles.muted}>{analysis.advice}</Text>
+      <Text selectable style={styles.muted}>{analysis.advice}</Text>
       {canManage ? (
         <>
           <View style={styles.actionGrid}>
@@ -315,7 +315,7 @@ export function ChatBubble({
           ))}
         </View>
       ) : null}
-      {text ? <Text style={styles.body}>{text}</Text> : null}
+      {text ? <Text selectable style={styles.body}>{text}</Text> : null}
       {!user && fileInsight ? <FileInsightCard insight={fileInsight} onSync={() => onSyncFileInsight?.(id)} /> : null}
       {openImageUri ? (
         <Modal visible transparent animationType="fade" onRequestClose={() => setOpenImageUri(null)}>
@@ -335,9 +335,9 @@ function FileInsightCard({ insight, onSync }: { insight: FileInsight; onSync?: (
     <View style={styles.fileInsightCard}>
       <View style={styles.rowBetween}>
         <View style={styles.fileInsightTitleWrap}>
-          <Text style={styles.bodyStrong}>{documentTypeLabel(insight.documentType)}</Text>
-          <Text style={styles.muted}>{insight.filename}</Text>
-          {fileInsightMetadata(insight) ? <Text style={styles.muted}>{fileInsightMetadata(insight)}</Text> : null}
+          <Text selectable style={styles.bodyStrong}>{documentTypeLabel(insight.documentType)}</Text>
+          <Text selectable style={styles.muted}>{insight.filename}</Text>
+          {fileInsightMetadata(insight) ? <Text selectable style={styles.muted}>{fileInsightMetadata(insight)}</Text> : null}
         </View>
         <View style={styles.pill}>
           <Text style={styles.pillText}>{insight.documentType}</Text>
@@ -347,17 +347,17 @@ function FileInsightCard({ insight, onSync }: { insight: FileInsight; onSync?: (
         <View style={styles.fileInsightGrid}>
           {visibleInsights.map((item) => (
             <View key={`${item.label}-${item.value}`} style={styles.fileInsightMetric}>
-              <Text style={styles.metricValue}>{item.value}</Text>
-              <Text style={styles.metricLabel}>{insightLabel(item.label)}</Text>
-              {insightMetricMetadata(item) ? <Text style={styles.metricLabel}>{insightMetricMetadata(item)}</Text> : null}
-              {item.sourceText ? <Text style={styles.metricLabel} numberOfLines={2}>{item.sourceText}</Text> : null}
+              <Text selectable style={styles.metricValue}>{item.value}</Text>
+              <Text selectable style={styles.metricLabel}>{insightLabel(item.label)}</Text>
+              {insightMetricMetadata(item) ? <Text selectable style={styles.metricLabel}>{insightMetricMetadata(item)}</Text> : null}
+              {item.sourceText ? <Text selectable style={styles.metricLabel} numberOfLines={2}>{item.sourceText}</Text> : null}
             </View>
           ))}
         </View>
       ) : null}
-      {insight.recommendations[0] ? <Text style={styles.muted}>{insight.recommendations[0]}</Text> : null}
+      {insight.recommendations[0] ? <Text selectable style={styles.muted}>{insight.recommendations[0]}</Text> : null}
       {canSync ? <Button label={syncButtonLabel(insight.documentType)} onPress={onSync} /> : null}
-      {insight.syncStatus === 'synced' ? <Text style={styles.doneStatus}>已同步到档案和今日记录</Text> : null}
+      {insight.syncStatus === 'synced' ? <Text selectable style={styles.doneStatus}>已同步到档案和今日记录</Text> : null}
     </View>
   );
 }

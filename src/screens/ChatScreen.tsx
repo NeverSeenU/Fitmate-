@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Image, Keyboard, KeyboardAvoidingView, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { BottomTabs, Button, ChatBubble, ChatHeader, FoodAnalysisCard } from '../components/ui';
 import type { AppDataState, ChatMessage, FoodAnalysis } from '../domain/models';
-import { AttachmentPanel, ThreadDrawer } from '../overlays/ChatOverlays';
+import { AttachmentPanel, BottomPanel, ThreadDrawer } from '../overlays/ChatOverlays';
 import { promptsForState, type RecoveryPrompt } from '../product/recoveryPrompts';
 import type { createAppActions, FoodLogEditInput } from '../services/appActions';
 import { formatFileSize, pickFitMateFile, type PickedFile } from '../services/filePicker';
@@ -359,11 +359,51 @@ export function ChatScreen({
           close={() => setPanel(null)}
           takeFoodPhoto={() => void analyzePickedPhoto('camera')}
           chooseFoodPhoto={() => void analyzePickedPhoto('library')}
+          openPersona={() => setPanel('persona')}
           startFoodRecord={openManualFoodRecord}
           openFile={openFilePicker}
           createCheckin={openWeightPanel}
           sendWorkout={openWorkoutPanel}
         />
+      )}
+      {panel === 'persona' && (
+        <BottomPanel close={() => setPanel(null)} title="伙伴模式">
+          <View style={styles.panelGrid}>
+            <PersonaAction
+              label="FitMate 默认"
+              hint="诚实、稳、先帮你回到下一步"
+              active
+              onPress={() => {
+                setStatus('已使用 FitMate 默认陪伴人格');
+                setPanel(null);
+              }}
+            />
+            <PersonaAction
+              label="温柔陪伴"
+              hint="焦虑、断档、体重波动时更柔和"
+              onPress={() => {
+                setStatus('温柔陪伴会在下一阶段接入保存');
+                setPanel(null);
+              }}
+            />
+            <PersonaAction
+              label="直接教练"
+              hint="少安慰，多给明确动作"
+              onPress={() => {
+                setStatus('直接教练会在下一阶段接入保存');
+                setPanel(null);
+              }}
+            />
+            <PersonaAction
+              label="Mean Girl Coach"
+              hint="只吐槽借口，不攻击身体或自我价值"
+              onPress={() => {
+                setStatus('Mean Girl Coach 会作为可选人格接入，默认不会开启');
+                setPanel(null);
+              }}
+            />
+          </View>
+        </BottomPanel>
       )}
       {panel === 'threads' && (
         <ThreadDrawer
@@ -643,6 +683,25 @@ function UtilitySheet({
         {children}
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+function PersonaAction({
+  label,
+  hint,
+  active,
+  onPress,
+}: {
+  label: string;
+  hint: string;
+  active?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={[styles.panelAction, active && styles.threadRowActive]} onPress={onPress}>
+      <Text style={styles.bodyStrong}>{label}</Text>
+      <Text style={styles.muted}>{active ? `${hint} · 当前` : hint}</Text>
+    </Pressable>
   );
 }
 

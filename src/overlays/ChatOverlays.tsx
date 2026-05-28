@@ -7,6 +7,7 @@ export function AttachmentPanel({
   close,
   takeFoodPhoto,
   chooseFoodPhoto,
+  openPersona,
   startFoodRecord,
   openFile,
   createCheckin,
@@ -15,6 +16,7 @@ export function AttachmentPanel({
   close: () => void;
   takeFoodPhoto?: () => void;
   chooseFoodPhoto?: () => void;
+  openPersona?: () => void;
   startFoodRecord?: () => void;
   openFile?: () => void;
   createCheckin?: () => void;
@@ -29,6 +31,7 @@ export function AttachmentPanel({
         <PanelAction label="运动记录" hint="时长、强度、消耗" onPress={sendWorkout} />
         <PanelAction label="食物记录" hint="手动输入食物和份量" onPress={startFoodRecord} />
         <PanelAction label="体重打卡" hint="同步到记录页" onPress={createCheckin} />
+        <PanelAction label="伙伴模式" hint="切换 FitMate 的陪伴人格" onPress={openPersona} />
       </View>
     </BottomPanel>
   );

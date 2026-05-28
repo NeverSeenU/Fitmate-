@@ -67,9 +67,10 @@ def validate_food_analysis(raw: object) -> dict[str, Any]:
         if value[0] > value[1]:
             raise FoodVisionSchemaError(f"{field}_min_gt_max")
 
-    confidence = raw["confidence"]
-    if not isinstance(confidence, int | float) or confidence < 0 or confidence > 1:
+    confidence = _coerce_confidence(raw["confidence"])
+    if confidence is None:
         raise FoodVisionSchemaError("confidence_out_of_range")
+    raw["confidence"] = confidence
     if not isinstance(raw["meal_name"], str) or not raw["meal_name"].strip():
         raise FoodVisionSchemaError("meal_name_required")
     raw["detected_items"] = _coerce_string_list(raw["detected_items"])
@@ -102,6 +103,23 @@ def _coerce_numeric_range(value: object) -> object:
             parsed = float(numbers[0])
             return [parsed, parsed]
     return value
+
+
+def _coerce_confidence(value: object) -> float | None:
+    if isinstance(value, str):
+        stripped = value.strip().replace("%", "")
+        try:
+            value = float(stripped)
+        except ValueError:
+            return None
+    if not isinstance(value, int | float):
+        return None
+    parsed = float(value)
+    if 0 <= parsed <= 1:
+        return round(parsed, 2)
+    if 1 < parsed <= 100:
+        return round(parsed / 100, 2)
+    return None
 
 
 def _coerce_string_list(value: object) -> object:

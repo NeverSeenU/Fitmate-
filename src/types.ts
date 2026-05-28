@@ -27,4 +27,4 @@ export type Sheet =
   | 'appVersion'
   | null;
 
-export type ChatPanel = 'attach' | 'threads' | null;
+export type ChatPanel = 'attach' | 'threads' | 'persona' | null;
