@@ -182,6 +182,7 @@ class OpenAICompatibleVisionProvider:
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0.2,
+            "max_tokens": 1200,
         }
         response = self.transport.post_json(
             url=f"{self.base_url}/chat/completions",
@@ -215,6 +216,7 @@ class OpenAICompatibleVisionProvider:
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0.2,
+            "max_tokens": 2200,
         }
         response = self.transport.post_json(
             url=f"{self.base_url}/chat/completions",
@@ -236,6 +238,7 @@ class OpenAICompatibleVisionProvider:
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0.1,
+            "max_tokens": 900,
         }
         response = self.transport.post_json(
             url=f"{self.base_url}/chat/completions",
@@ -266,6 +269,7 @@ class OpenAICompatibleVisionProvider:
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0.1,
+            "max_tokens": 1200,
         }
         response = self.transport.post_json(
             url=f"{self.base_url}/chat/completions",
@@ -287,6 +291,7 @@ class OpenAICompatibleVisionProvider:
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0.1,
+            "max_tokens": 900,
         }
         response = self.transport.post_json(
             url=f"{self.base_url}/chat/completions",
@@ -311,6 +316,7 @@ class OpenAICompatibleVisionProvider:
             "model": self.model_name,
             "messages": messages,
             "temperature": 0.35,
+            "max_tokens": 700,
         }
         response = self.transport.post_json(
             url=f"{self.base_url}/chat/completions",

@@ -238,7 +238,12 @@ def test_multi_photo_endpoint_returns_structured_analyses_and_groups() -> None:
     ]
     assert body["food_analyses"][0]["source_photo_indexes"] == [0]
     assert body["food_analyses"][0]["source_images"][0]["filename"] == "burger.jpg"
+    assert body["food_analyses"][0]["request_latency_ms"] is not None
+    assert body["food_analyses"][0]["fallback_used"] is False
     assert body["food_analyses"][1]["source_images"][0]["filename"] == "salad.jpg"
+    assert body["performance"]["photo_count"] == 2
+    assert body["performance"]["analysis_count"] == 2
+    assert body["performance"]["request_latency_ms"] is not None
     assert usage_for_email(email).food_photo_count == 2
 
 

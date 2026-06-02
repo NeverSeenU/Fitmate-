@@ -11,7 +11,7 @@ export type RuntimeConfig = {
   useMockApi: boolean;
 };
 
-const DEFAULT_DEV_API_BASE_URL = 'http://192.168.1.71:8000';
+const DEFAULT_DEV_API_BASE_URL = 'http://192.168.1.18:8000';
 
 export const runtimeConfig: RuntimeConfig = createRuntimeConfig({
   EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,

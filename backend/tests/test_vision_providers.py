@@ -53,6 +53,7 @@ def test_xiaomi_provider_sends_openai_compatible_multimodal_request(monkeypatch)
     monkeypatch.setenv("XIAOMI_API_KEY", "xiaomi-key")
     monkeypatch.setenv("XIAOMI_BASE_URL", "https://mimo.example/v1")
     monkeypatch.setenv("XIAOMI_MODEL_NAME", "mimo-v2-omni-test")
+    monkeypatch.setenv("AI_PROVIDER_TIMEOUT_SECONDS", "9")
     transport = FakeTransport()
     provider = XiaomiVisionProvider(transport=transport)
 
@@ -64,6 +65,8 @@ def test_xiaomi_provider_sends_openai_compatible_multimodal_request(monkeypatch)
     assert request["headers"]["Authorization"] == "Bearer xiaomi-key"
     assert request["payload"]["model"] == "mimo-v2-omni-test"
     assert request["payload"]["response_format"] == {"type": "json_object"}
+    assert request["payload"]["max_tokens"] == 1200
+    assert request["timeout_seconds"] == 9
     assert request["payload"]["messages"][0]["role"] == "system"
     user_content = request["payload"]["messages"][1]["content"]
     assert user_content[0]["type"] == "text"
@@ -93,6 +96,7 @@ def test_xiaomi_provider_sends_multi_photo_structured_request(monkeypatch) -> No
     user_content = request["payload"]["messages"][1]["content"]
     assert result["groups"][0]["analysis_indexes"] == [0, 1]
     assert request["payload"]["model"] == "mimo-v2-omni-test"
+    assert request["payload"]["max_tokens"] == 2200
     assert user_content[0]["type"] == "text"
     assert "same meal?" in user_content[0]["text"]
     assert "food_analyses" in user_content[0]["text"]
@@ -116,6 +120,7 @@ def test_xiaomi_provider_sends_openai_compatible_file_extraction_request(monkeyp
     assert result["document_type"] == "body_report"
     assert request["url"] == "https://mimo.example/v1/chat/completions"
     assert request["payload"]["response_format"] == {"type": "json_object"}
+    assert request["payload"]["max_tokens"] == 1200
     assert request["payload"]["messages"][0]["role"] == "system"
     assert request["payload"]["messages"][1]["role"] == "user"
     assert "document_type, confidence, insights, recommendations" in request["payload"]["messages"][1]["content"]
@@ -138,6 +143,7 @@ def test_xiaomi_provider_sends_openai_compatible_text_food_request(monkeypatch) 
     assert result["meal_name"] == "bibimbap"
     assert request["url"] == "https://mimo.example/v1/chat/completions"
     assert request["payload"]["response_format"] == {"type": "json_object"}
+    assert request["payload"]["max_tokens"] == 900
     assert request["payload"]["messages"][0]["role"] == "system"
     assert "Food text:" in request["payload"]["messages"][1]["content"]
 
@@ -161,6 +167,7 @@ def test_xiaomi_provider_sends_openai_compatible_workout_analysis_request(monkey
     assert result["workout_type"] == "strength"
     assert request["url"] == "https://mimo.example/v1/chat/completions"
     assert request["payload"]["response_format"] == {"type": "json_object"}
+    assert request["payload"]["max_tokens"] == 900
     assert request["payload"]["messages"][0]["role"] == "system"
     assert "Workout note:" in request["payload"]["messages"][1]["content"]
 
@@ -180,6 +187,7 @@ def test_xiaomi_provider_sends_recovery_soul_chat_prompt(monkeypatch) -> None:
     request = transport.requests[0]
     assert result == "先稳住，这一餐不是整周失败。"
     assert request["url"] == "https://mimo.example/v1/chat/completions"
+    assert request["payload"]["max_tokens"] == 700
     assert "non-shaming fat-loss recovery companion" in request["payload"]["messages"][0]["content"]
     assert "Never recommend skipping meals" in request["payload"]["messages"][0]["content"]
     assert "Known structured context" in request["payload"]["messages"][-1]["content"]

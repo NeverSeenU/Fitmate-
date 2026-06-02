@@ -32,7 +32,7 @@ type AppActionsApi = {
     analyzePhoto(input: PhotoUploadInput): Promise<FoodPhotoAnalysisResponse>;
     analyzePhotos?(input: {
       threadId: string;
-      photos: Array<{ imageUri: string; filename: string; mimeType: string }>;
+      photos: Array<{ imageUri: string; filename: string; mimeType: string; uploadUri?: string; uploadFilename?: string; uploadMimeType?: string }>;
       userNote?: string | null;
     }): Promise<FoodPhotoBatchAnalysisResponse>;
     createLog(payload: Record<string, unknown>): Promise<unknown>;
@@ -833,11 +833,21 @@ async function applyFoodFollowUpAnswer(
       });
       continue;
     }
+    const relevantAnswer = relevantFollowUpAnswer(active, answer, plural);
+    if (!relevantAnswer) {
+      assistantMessages.push({
+        id: `food-follow-up-ambiguous-${active.id}-${Date.now()}`,
+        role: 'assistant',
+        text: `${active.title} 这张卡我还没法确定你刚才回答的是它。请补一句食物名或点开卡片手动编辑，我再帮你重算。`,
+      });
+      continue;
+    }
     const combinedNote = [
       plural ? `This follow-up answer may contain details for multiple food cards. Extract only the details relevant to this card: ${active.title}.` : null,
       active.sourceUserNote ? `Original user note for this card: ${active.sourceUserNote}` : null,
       active.followUpQuestion ? `Assistant follow-up question for this card: ${active.followUpQuestion}` : null,
-      `User follow-up answer containing all corrections: ${answer.trim()}`,
+      plural ? `Likely relevant user answer for this card: ${relevantAnswer}` : null,
+      `Full user follow-up answer for reference: ${answer.trim()}`,
       'Re-analyze the original image using only the relevant follow-up details for this card. Return updated food details and nutrition ranges in Chinese.',
     ].filter(Boolean).join('\n');
     const response = validSourceImages.length > 1 && api.food.analyzePhotos
@@ -922,6 +932,73 @@ function pendingFoodFollowUps(state: AppDataState) {
   });
 }
 
+function relevantFollowUpAnswer(analysis: FoodAnalysis, answer: string, plural: boolean) {
+  const cleaned = answer.trim();
+  if (!plural || !cleaned) {
+    return cleaned || null;
+  }
+  const segments = splitFollowUpAnswer(cleaned);
+  const keywords = foodAnalysisKeywords(analysis);
+  const scored = segments
+    .map((segment, index) => ({
+      segment,
+      index,
+      score: segmentRelevanceScore(segment, keywords),
+    }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+  if (!scored.length) {
+    return null;
+  }
+  const bestScore = scored[0].score;
+  return scored
+    .filter((item) => item.score >= Math.max(1, bestScore - 1))
+    .sort((a, b) => a.index - b.index)
+    .map((item) => item.segment)
+    .join('；');
+}
+
+function splitFollowUpAnswer(answer: string) {
+  return answer
+    .split(/[;；。.!！?\n]+/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
+function foodAnalysisKeywords(analysis: FoodAnalysis) {
+  const source = [
+    analysis.title,
+    analysis.groupMealName,
+    analysis.detail,
+    analysis.followUpQuestion,
+    ...(analysis.detectedItems ?? []),
+  ].filter(Boolean).join(' ');
+  const normalized = source.toLowerCase();
+  const words = new Set<string>();
+  const latinWords = normalized.match(/[a-z0-9]{3,}/g) ?? [];
+  latinWords.forEach((word) => words.add(word));
+  Array.from(normalized.matchAll(/[\u4e00-\u9fff]{2,}/g)).forEach((match) => {
+    const text = match[0];
+    words.add(text);
+    for (let size = 2; size <= Math.min(4, text.length); size += 1) {
+      for (let index = 0; index <= text.length - size; index += 1) {
+        words.add(text.slice(index, index + size));
+      }
+    }
+  });
+  return Array.from(words).filter((word) => word.length >= 2);
+}
+
+function segmentRelevanceScore(segment: string, keywords: string[]) {
+  const normalized = segment.toLowerCase();
+  return keywords.reduce((score, keyword) => {
+    if (!keyword || !normalized.includes(keyword)) {
+      return score;
+    }
+    return score + Math.min(4, keyword.length);
+  }, 0);
+}
+
 function appendMissingMessages(
   messages: ChatMessage[],
   candidates: ChatMessage[],
@@ -999,6 +1076,9 @@ async function analyzeFoodPhotoBatch(
       imageUri: photo.imageUri,
       filename: photo.filename,
       mimeType: photo.mimeType,
+      uploadUri: photo.uploadUri,
+      uploadFilename: photo.uploadFilename,
+      uploadMimeType: photo.uploadMimeType,
     })),
   });
   return response.food_analyses.map((analysis, index) => {
@@ -1522,6 +1602,8 @@ function toFoodAnalysis(response: FoodPhotoAnalysisResponse, source?: {
     fallbackSource: analysis.fallback_source ?? undefined,
     fallbackErrorCode: analysis.fallback_error_code ?? undefined,
     analysisSource: analysis.analysis_source ?? undefined,
+    providerLatencyMs: typeof analysis.provider_latency_ms === 'number' ? analysis.provider_latency_ms : undefined,
+    requestLatencyMs: typeof analysis.request_latency_ms === 'number' ? analysis.request_latency_ms : undefined,
     needsFollowUp: analysis.needs_follow_up,
     followUpQuestion,
     detectedItems,

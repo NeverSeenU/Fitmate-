@@ -19,4 +19,5 @@ class QwenVisionProvider(OpenAICompatibleVisionProvider):
             ),
             not_configured_error="qwen_provider_not_configured",
             transport=transport,
+            timeout_seconds=settings.ai_provider_timeout_seconds,
         )

@@ -5,6 +5,7 @@ from datetime import date, datetime, timezone
 from typing import Any
 import uuid
 import re
+import time
 
 from app.services.chat_service import StoredMessage, chat_service
 from app.services.subscription_service import subscription_service
@@ -104,6 +105,7 @@ class FoodService:
             content=image_bytes,
             content_type=image_content_type,
         )
+        started = time.perf_counter()
         try:
             analysis = vision_router.analyze_food_photo(
                 image_bytes=image_bytes,
@@ -167,7 +169,7 @@ class FoodService:
         self.usage_service.increment(user_id, "food_photo")
         return {
             "assistant_message": self.chat_service._message_response(assistant_message),
-            "food_analysis": self._analysis_response(analysis, food_log),
+            "food_analysis": self._analysis_response(analysis, food_log, request_latency_ms=self._latency_ms(started)),
         }
 
     def analyze_photos(
@@ -192,6 +194,7 @@ class FoodService:
             )
             for photo in photos
         ]
+        started = time.perf_counter()
         try:
             batch = vision_router.analyze_food_photos(
                 photos=photos,
@@ -276,7 +279,7 @@ class FoodService:
                     model_name=enriched_analysis.get("model_name"),
                 )
             )
-            food_analyses.append(self._analysis_response(enriched_analysis, food_log))
+            food_analyses.append(self._analysis_response(enriched_analysis, food_log, request_latency_ms=self._latency_ms(started)))
             assistant_messages.append(self.chat_service._message_response(assistant_message))
         for _ in photos:
             self.usage_service.increment(user_id, "food_photo")
@@ -285,6 +288,12 @@ class FoodService:
             "food_analyses": food_analyses,
             "assistant_messages": assistant_messages,
             "groups": groups,
+            "performance": {
+                **(batch.get("performance") or {}),
+                "request_latency_ms": self._latency_ms(started),
+                "photo_count": len(photos),
+                "analysis_count": len(food_analyses),
+            },
         }
 
     def list_logs(self, user_id: str, target_date: date | None = None) -> dict:
@@ -355,7 +364,7 @@ class FoodService:
                 deleted_count += 1
         return deleted_count
 
-    def _analysis_response(self, analysis: dict, food_log: StoredFoodLog | None) -> dict:
+    def _analysis_response(self, analysis: dict, food_log: StoredFoodLog | None, request_latency_ms: int | None = None) -> dict:
         return {
             "food_log_id": food_log.id if food_log else None,
             "meal_name": analysis["meal_name"],
@@ -371,9 +380,14 @@ class FoodService:
             "fat_loss_advice": analysis.get("fat_loss_advice"),
             "model_provider": analysis.get("model_provider"),
             "model_name": analysis.get("model_name"),
+            "provider_latency_ms": analysis.get("provider_latency_ms"),
+            "request_latency_ms": request_latency_ms,
             "source_group": analysis.get("source_group"),
             "source_photo_indexes": analysis.get("source_photo_indexes"),
             "source_images": analysis.get("source_images"),
+            "fallback_used": analysis.get("fallback_used", False),
+            "fallback_source": analysis.get("fallback_source"),
+            "analysis_source": analysis.get("analysis_source"),
         }
 
     def _log_response(self, log: StoredFoodLog) -> dict:
@@ -455,6 +469,9 @@ class FoodService:
                 "size_bytes": stored_images[index].size_bytes,
             })
         return source_images
+
+    def _latency_ms(self, started: float) -> int:
+        return max(0, int((time.perf_counter() - started) * 1000))
 
 
 food_service = FoodService()

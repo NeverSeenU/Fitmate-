@@ -40,6 +40,9 @@ export type PhotoUploadInput = {
   imageUri: string;
   filename: string;
   mimeType: string;
+  uploadUri?: string;
+  uploadFilename?: string;
+  uploadMimeType?: string;
   userNote?: string | null;
 };
 
@@ -49,6 +52,9 @@ export type PhotoBatchUploadInput = {
     imageUri: string;
     filename: string;
     mimeType: string;
+    uploadUri?: string;
+    uploadFilename?: string;
+    uploadMimeType?: string;
   }>;
   userNote?: string | null;
 };
@@ -100,6 +106,8 @@ export type FoodPhotoAnalysisResponse = {
     fat_loss_advice?: string;
     model_provider?: string;
     model_name?: string;
+    provider_latency_ms?: number | null;
+    request_latency_ms?: number | null;
     fallback_used?: boolean;
     fallback_source?: string | null;
     fallback_error_code?: string | null;
@@ -115,6 +123,16 @@ export type FoodPhotoBatchAnalysisResponse = {
   food_analyses: FoodPhotoAnalysisResponse['food_analysis'][];
   assistant_messages?: Array<{ id?: string; content_text?: string; message_type?: string; structured_json?: unknown }>;
   groups?: Array<{ group_id: string; analysis_indexes: number[]; source_photo_indexes?: number[]; meal_name: string }>;
+  performance?: {
+    provider?: string;
+    model_name?: string;
+    provider_latency_ms?: number;
+    request_latency_ms?: number;
+    photo_count?: number;
+    analysis_count?: number;
+    fallback_used?: boolean;
+    fallback_source?: string | null;
+  };
 };
 
 export type DiagnosticsSmokeResponse = {
@@ -421,9 +439,9 @@ class PhotoUploadBody {
       data.append('user_note', this.input.userNote);
     }
     data.append('image', {
-      uri: this.input.imageUri,
-      name: this.input.filename,
-      type: this.input.mimeType,
+      uri: this.input.uploadUri ?? this.input.imageUri,
+      name: this.input.uploadFilename ?? this.input.filename,
+      type: this.input.uploadMimeType ?? this.input.mimeType,
     } as unknown as Blob);
     return data;
   }
@@ -431,7 +449,8 @@ class PhotoUploadBody {
   toString() {
     const params = [
       `thread_id=${this.input.threadId}`,
-      `image=${this.input.filename}`,
+      `image=${this.input.uploadFilename ?? this.input.filename}`,
+      `type=${this.input.uploadMimeType ?? this.input.mimeType}`,
     ];
     if (this.input.userNote) {
       params.push(`user_note=${this.input.userNote}`);
@@ -455,9 +474,9 @@ class PhotoBatchUploadBody {
     }
     this.input.photos.forEach((photo) => {
       data.append('images', {
-        uri: photo.imageUri,
-        name: photo.filename,
-        type: photo.mimeType,
+        uri: photo.uploadUri ?? photo.imageUri,
+        name: photo.uploadFilename ?? photo.filename,
+        type: photo.uploadMimeType ?? photo.mimeType,
       } as unknown as Blob);
     });
     return data;
@@ -466,7 +485,8 @@ class PhotoBatchUploadBody {
   toString() {
     const params = [
       `thread_id=${this.input.threadId}`,
-      ...this.input.photos.map((photo) => `images=${photo.filename}`),
+      ...this.input.photos.map((photo) => `images=${photo.uploadFilename ?? photo.filename}`),
+      ...this.input.photos.map((photo) => `types=${photo.uploadMimeType ?? photo.mimeType}`),
     ];
     if (this.input.userNote) {
       params.push(`user_note=${this.input.userNote}`);

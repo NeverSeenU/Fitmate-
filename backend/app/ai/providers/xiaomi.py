@@ -16,4 +16,5 @@ class XiaomiVisionProvider(OpenAICompatibleVisionProvider):
             base_url=os.getenv("XIAOMI_BASE_URL", "https://api.xiaomimimo.com/v1"),
             not_configured_error="xiaomi_provider_not_configured",
             transport=transport,
+            timeout_seconds=settings.ai_provider_timeout_seconds,
         )

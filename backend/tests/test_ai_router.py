@@ -312,7 +312,25 @@ def test_food_vision_router_uses_batch_provider_for_multi_photo_grouping() -> No
     assert qwen.calls == 0
     assert [item["meal_name"] for item in result["food_analyses"]] == ["burger", "ramen"]
     assert result["food_analyses"][0]["model_provider"] == "xiaomi"
+    assert result["food_analyses"][0]["provider_latency_ms"] is not None
+    assert result["performance"]["provider"] == "xiaomi"
     assert result["groups"][1]["analysis_indexes"] == [1]
+
+
+def test_batch_timeout_does_not_fall_back_to_expensive_sequential_single_photo_path() -> None:
+    xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [RuntimeError("timeout")])
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [{"food_analyses": [{"meal_name": "bad"}]}])
+    router = FoodVisionRouter(primary_provider=xiaomi, fallback_provider=qwen)
+
+    with pytest.raises(FoodVisionUnavailableError) as exc:
+        router.analyze_food_photos([
+            {"image_bytes": b"image-one", "image_filename": "burger.jpg", "image_content_type": "image/jpeg"},
+            {"image_bytes": b"image-two", "image_filename": "ramen.jpg", "image_content_type": "image/jpeg"},
+        ])
+
+    assert exc.value.error_code == "provider_timeout"
+    assert xiaomi.calls == 1
+    assert qwen.calls == 1
 
 
 def test_file_insight_router_uses_ai_structured_output_and_logs_usage() -> None:

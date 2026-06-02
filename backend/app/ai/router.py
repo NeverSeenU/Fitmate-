@@ -124,8 +124,12 @@ class FoodVisionRouter:
         )
         if fallback_result is None:
             if primary_result is not None:
+                primary_result["fallback_used"] = False
+                primary_result["fallback_source"] = "low_confidence_primary"
                 return primary_result
             raise FoodVisionUnavailableError(self._most_actionable_error([primary_error, fallback_error]))
+        fallback_result["fallback_used"] = True
+        fallback_result["fallback_source"] = "low_confidence_primary" if primary_result is not None else primary_error
         return fallback_result
 
     def analyze_food_photos(
@@ -140,7 +144,15 @@ class FoodVisionRouter:
 
         fallback_result, fallback_error = self._try_batch_provider_once(self.fallback_provider, photos, user_note, user_id, purpose="fallback")
         if fallback_result is not None:
+            fallback_result["fallback_used"] = True
+            fallback_result["fallback_source"] = primary_error
+            for item in fallback_result["food_analyses"]:
+                item["fallback_used"] = True
+                item["fallback_source"] = primary_error
             return fallback_result
+
+        if not self._should_try_sequential_photo_fallback(primary_error, fallback_error):
+            raise FoodVisionUnavailableError(self._most_actionable_error([primary_error, fallback_error]))
 
         try:
             food_analyses = [
@@ -164,6 +176,10 @@ class FoodVisionRouter:
                 for index, item in enumerate(food_analyses)
             ],
         }
+
+    def _should_try_sequential_photo_fallback(self, primary_error: str | None, fallback_error: str | None) -> bool:
+        errors = {error for error in (primary_error, fallback_error) if error}
+        return bool(errors) and errors.issubset({"AttributeError"})
 
     def _try_provider_with_retry(
         self,
@@ -234,14 +250,18 @@ class FoodVisionRouter:
             )
             return None, error_code
 
+        latency_ms = self._latency_ms(started)
         result["model_provider"] = provider.provider_name
         result["model_name"] = provider.model_name
+        result["provider_latency_ms"] = latency_ms
+        result["fallback_used"] = purpose == "fallback"
+        result["analysis_source"] = "ai"
         self._record_model_call(
             provider=provider,
             user_id=user_id,
             purpose=purpose,
             status="success",
-            latency_ms=self._latency_ms(started),
+            latency_ms=latency_ms,
             estimated_cost_cents=self._estimated_cost_cents(provider.provider_name, purpose),
         )
         return result, None
@@ -294,15 +314,25 @@ class FoodVisionRouter:
             )
             return None, error_code
 
+        latency_ms = self._latency_ms(started)
         for item in result["food_analyses"]:
             item["model_provider"] = provider.provider_name
             item["model_name"] = provider.model_name
+            item["provider_latency_ms"] = latency_ms
+            item["fallback_used"] = purpose == "fallback"
+            item["analysis_source"] = "ai"
+        result["performance"] = {
+            "provider": provider.provider_name,
+            "model_name": provider.model_name,
+            "provider_latency_ms": latency_ms,
+            "fallback_used": purpose == "fallback",
+        }
         self._record_model_call(
             provider=provider,
             user_id=user_id,
             purpose=purpose,
             status="success",
-            latency_ms=self._latency_ms(started),
+            latency_ms=latency_ms,
             estimated_cost_cents=self._estimated_cost_cents(provider.provider_name, purpose),
         )
         return result, None

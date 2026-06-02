@@ -123,6 +123,9 @@ export function ChatScreen({
             imageUri: photo.imageUri,
             filename: photo.filename,
             mimeType: photo.mimeType,
+            uploadUri: photo.uploadUri,
+            uploadFilename: photo.uploadFilename,
+            uploadMimeType: photo.uploadMimeType,
             userNote: text,
           })));
         setFoodEditorOpen(false);

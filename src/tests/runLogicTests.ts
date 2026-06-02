@@ -378,6 +378,9 @@ async function testApiClientMultipartPhotoUpload() {
     imageUri: 'file:///food.jpg',
     filename: 'food.jpg',
     mimeType: 'image/jpeg',
+    uploadUri: 'file:///food-optimized.jpg',
+    uploadFilename: 'food-optimized.jpg',
+    uploadMimeType: 'image/jpeg',
     userNote: 'dinner',
   });
 
@@ -387,7 +390,7 @@ async function testApiClientMultipartPhotoUpload() {
   assert(requests[0].init.headers.Authorization === 'Bearer photo-token', 'photo upload must attach bearer token');
   assert(!('Content-Type' in requests[0].init.headers), 'multipart requests must not force JSON content type');
   assert(String(requests[0].init.body).includes('thread_id=thread-1'), 'photo upload body must include thread id');
-  assert(String(requests[0].init.body).includes('food.jpg'), 'photo upload body must include image file metadata');
+  assert(String(requests[0].init.body).includes('food-optimized.jpg'), 'photo upload body must prefer optimized image file metadata when available');
   assert(String(requests[0].init.body).includes('user_note=dinner'), 'photo upload body must include the user question as image context');
 }
 
@@ -413,17 +416,17 @@ async function testMockFallbackServicesStayAvailable() {
 
 async function testRuntimeConfigUsesBackendWhenApiBaseUrlIsProvided() {
   const config = createRuntimeConfig({
-    EXPO_PUBLIC_API_BASE_URL: 'http://192.168.1.71:8000',
+    EXPO_PUBLIC_API_BASE_URL: 'http://192.168.1.18:8000',
   });
 
-  assert(config.apiBaseUrl === 'http://192.168.1.71:8000', 'runtime config must preserve Expo LAN backend URL');
+  assert(config.apiBaseUrl === 'http://192.168.1.18:8000', 'runtime config must preserve Expo LAN backend URL');
   assert(!config.useMockApi, 'runtime config must use backend when a real API base URL is provided');
 }
 
 async function testRuntimeConfigDefaultsToBackendForExpoGoDevelopment() {
   const config = createRuntimeConfig(undefined);
 
-  assert(config.apiBaseUrl === 'http://192.168.1.71:8000', 'Expo Go development must default to the LAN backend URL');
+  assert(config.apiBaseUrl === 'http://192.168.1.18:8000', 'Expo Go development must default to the LAN backend URL');
   assert(!config.useMockApi, 'Expo Go development must not silently fall back to local preview mode');
 }
 
@@ -1427,6 +1430,7 @@ async function testFoodFollowUpAnswerCanUpdateMultiplePendingCards() {
     ],
   };
   const calls: string[] = [];
+  const notes: Record<string, string> = {};
   const actions = createAppActions({
     api: {
       chat: {
@@ -1441,6 +1445,7 @@ async function testFoodFollowUpAnswerCanUpdateMultiplePendingCards() {
       food: {
         async analyzePhoto(input: PhotoUploadInput) {
           calls.push(`${input.filename}:${input.userNote?.includes('牛肉饼270g')}:${input.userNote?.includes('三文鱼是刺身')}`);
+          notes[input.filename] = input.userNote ?? '';
           const isBurger = input.filename === 'burger.jpg';
           return {
             food_analysis: {
@@ -1486,11 +1491,96 @@ async function testFoodFollowUpAnswerCanUpdateMultiplePendingCards() {
   assert(calls.length === 2, 'one combined follow-up answer must reanalyze every pending card');
   assert(calls.some((call) => call.startsWith('burger.jpg:true:true')), 'burger reanalysis must receive the full combined answer');
   assert(calls.some((call) => call.startsWith('ramen.jpg:true:true')), 'ramen reanalysis must receive the full combined answer');
+  assert(relevantAnswerLine(notes['burger.jpg']).includes('牛肉饼270g'), 'burger reanalysis must highlight only the burger-relevant answer slice');
+  assert(!relevantAnswerLine(notes['burger.jpg']).includes('三文鱼是刺身'), 'burger relevant answer slice must not include ramen details');
+  assert(relevantAnswerLine(notes['ramen.jpg']).includes('三文鱼是刺身'), 'ramen reanalysis must highlight only the ramen-relevant answer slice');
+  assert(!relevantAnswerLine(notes['ramen.jpg']).includes('牛肉饼270g'), 'ramen relevant answer slice must not include burger details');
   const updatedCards = state.chatMessages.filter((message) => message.foodAnalysis);
   assert(updatedCards.some((message) => message.foodAnalysis?.id === 'burger-card' && message.foodAnalysis.title.includes('已补充') && !message.foodAnalysis.needsFollowUp), 'burger card must be updated in place');
   assert(updatedCards.some((message) => message.foodAnalysis?.id === 'ramen-card' && message.foodAnalysis.title.includes('已补充') && !message.foodAnalysis.needsFollowUp), 'ramen card must be updated in place');
   assert(state.records.some((record) => record.id === 'burger-card'), 'burger draft record must be updated');
   assert(state.records.some((record) => record.id === 'ramen-card'), 'ramen draft record must be updated');
+}
+
+async function testAmbiguousMultiCardFollowUpDoesNotReanalyzeEveryCard() {
+  const base: FoodAnalysis = {
+    id: 'burger-card',
+    title: '牛肉汉堡',
+    status: 'analysis_only',
+    confidence: 0.7,
+    needsFollowUp: true,
+    followUpQuestion: '汉堡是单人份吗？',
+    calories: '680-820',
+    protein: '48-58g',
+    carbs: '35-48g',
+    fat: '25-35g',
+    detail: 'burger',
+    advice: '需要补充份量后再确认。',
+    sourceImageUri: 'file:///burger.jpg',
+    sourceFilename: 'burger.jpg',
+    sourceMimeType: 'image/jpeg',
+  };
+  const ramen: FoodAnalysis = {
+    ...base,
+    id: 'ramen-card',
+    title: '三文鱼拉面',
+    followUpQuestion: '拉面有没有额外加油？',
+    sourceImageUri: 'file:///ramen.jpg',
+    sourceFilename: 'ramen.jpg',
+    detail: 'ramen',
+  };
+  let state: AppDataState = {
+    ...initialAppState,
+    activeFoodAnalysis: ramen,
+    records: [],
+    chatMessages: [
+      { id: 'food-card-burger', role: 'assistant', text: '', foodAnalysis: base },
+      { id: 'food-card-ramen', role: 'assistant', text: '', foodAnalysis: ramen },
+    ],
+  };
+  const calls: string[] = [];
+  const actions = createAppActions({
+    api: {
+      chat: {
+        async createThread() {
+          return { id: '11111111-1111-4111-8111-111111111111', title: 'FitMate chat', kind: 'general' };
+        },
+        async sendTextMessage() {
+          calls.push('sendText');
+          return {};
+        },
+      },
+      food: {
+        async analyzePhoto() {
+          calls.push('analyzePhoto');
+          return {} as never;
+        },
+        async createLog() { return {}; },
+        async confirmLog() { return {}; },
+        async patchLog() { return {}; },
+        async discardLog() { return {}; },
+        async deleteLog() { return {}; },
+      },
+      profile: { async patchProfile() { return {}; } },
+      records: { async createCheckin() { return {}; }, async patchCheckin() { return {}; }, async deleteCheckin() { return {}; } },
+      workouts: { async analyze() { return {}; }, async createLog() { return {}; }, async confirmLog() { return {}; }, async patchLog() { return {}; } },
+      files: { async upload() { return {} as never; } },
+      subscription: { async restore() { return { entitlements: initialAppState.entitlements }; } },
+      privacy: { async deletePhotos() { return {}; }, async deleteAccount() { return {}; } },
+    },
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  await actions.sendText('food-today', '是的');
+
+  assert(!calls.includes('sendText'), 'ambiguous multi-card follow-up should still stay in food follow-up flow');
+  assert(!calls.includes('analyzePhoto'), 'ambiguous multi-card answer must not reanalyze every card blindly');
+  assert(state.chatMessages.some((message) => message.text.includes('还没法确定')), 'ambiguous answer should ask the user to identify the card');
+  assert(state.chatMessages.some((message) => message.foodAnalysis?.id === 'burger-card' && message.foodAnalysis.needsFollowUp), 'burger card should remain pending after ambiguous answer');
+  assert(state.chatMessages.some((message) => message.foodAnalysis?.id === 'ramen-card' && message.foodAnalysis.needsFollowUp), 'ramen card should remain pending after ambiguous answer');
 }
 
 async function testPhotoUploadShowsUserBubbleEvenWhenAnalysisFails() {
@@ -2101,6 +2191,12 @@ function testNextMealPromptUsesDashboardAndFoodContext() {
   assert(tomorrowPrompt.includes('明天'), 'next-meal prompt should shift toward tomorrow meal planning when today is nearly full');
 }
 
+function relevantAnswerLine(note: string | undefined) {
+  return (note ?? '')
+    .split('\n')
+    .find((line) => line.startsWith('Likely relevant user answer for this card:')) ?? '';
+}
+
 async function run() {
   runEnergyTargetTests();
   await testSubscriptionEntitlements();
@@ -2131,6 +2227,7 @@ async function run() {
   await testFoodFollowUpAnswerUpdatesExistingCard();
   await testFoodFollowUpAnswerUsesGroupedSourceImagesForReanalysis();
   await testFoodFollowUpAnswerCanUpdateMultiplePendingCards();
+  await testAmbiguousMultiCardFollowUpDoesNotReanalyzeEveryCard();
   await testPhotoUploadShowsUserBubbleEvenWhenAnalysisFails();
   await testBackendFileUploadCreatesStructuredInsightMessage();
   await testFileInsightSyncRequiresUserActionAndCreatesWeightCheckin();

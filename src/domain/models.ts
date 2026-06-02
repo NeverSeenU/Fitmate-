@@ -111,6 +111,8 @@ export type FoodAnalysis = {
   fallbackSource?: string;
   fallbackErrorCode?: string;
   analysisSource?: string;
+  providerLatencyMs?: number;
+  requestLatencyMs?: number;
   needsFollowUp?: boolean;
   followUpQuestion?: string;
   detectedItems?: string[];
