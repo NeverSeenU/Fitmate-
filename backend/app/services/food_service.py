@@ -229,9 +229,18 @@ class FoodService:
 
         food_analyses = []
         assistant_messages = []
+        groups = batch.get("groups") or self._analysis_groups(batch["food_analyses"])
         for analysis_index, analysis in enumerate(batch["food_analyses"]):
-            group = self._group_for_analysis(batch.get("groups", []), analysis_index)
-            image_index = group["analysis_indexes"][0] if group and group["analysis_indexes"] else min(analysis_index, len(stored_images) - 1)
+            group = self._group_for_analysis(groups, analysis_index)
+            source_photo_indexes = self._source_photo_indexes(group, analysis_index, len(stored_images))
+            source_images = self._source_images(stored_images, photos, source_photo_indexes)
+            image_index = source_photo_indexes[0] if source_photo_indexes else min(analysis_index, len(stored_images) - 1)
+            enriched_analysis = {
+                **analysis,
+                "source_group": group,
+                "source_photo_indexes": source_photo_indexes,
+                "source_images": source_images,
+            }
             food_log = None
             if should_auto_record:
                 food_log = self.store.create(
@@ -240,17 +249,17 @@ class FoodService:
                         user_id=user_id,
                         source_message_id=image_message.id,
                         image_object_key=stored_images[image_index].object_key if stored_images else None,
-                        meal_name=analysis["meal_name"],
-                        calories_range_kcal=analysis["calories_range_kcal"],
-                        protein_g_range=analysis["protein_g_range"],
-                        carbs_g_range=analysis["carbs_g_range"],
-                        fat_g_range=analysis["fat_g_range"],
-                        confidence=float(analysis["confidence"]),
+                        meal_name=enriched_analysis["meal_name"],
+                        calories_range_kcal=enriched_analysis["calories_range_kcal"],
+                        protein_g_range=enriched_analysis["protein_g_range"],
+                        carbs_g_range=enriched_analysis["carbs_g_range"],
+                        fat_g_range=enriched_analysis["fat_g_range"],
+                        confidence=float(enriched_analysis["confidence"]),
                         status="pending",
-                        needs_follow_up=bool(analysis["needs_follow_up"]),
-                        follow_up_question=analysis["follow_up_question"],
-                        model_provider=analysis.get("model_provider"),
-                        model_name=analysis.get("model_name"),
+                        needs_follow_up=bool(enriched_analysis["needs_follow_up"]),
+                        follow_up_question=enriched_analysis["follow_up_question"],
+                        model_provider=enriched_analysis.get("model_provider"),
+                        model_name=enriched_analysis.get("model_name"),
                     )
                 )
 
@@ -261,13 +270,13 @@ class FoodService:
                     user_id=user_id,
                     role="assistant",
                     message_type="food_analysis",
-                    content_text=analysis["supportive_reply"],
-                    structured_json={"food_analysis": analysis, "group": group},
-                    model_provider=analysis.get("model_provider"),
-                    model_name=analysis.get("model_name"),
+                    content_text=enriched_analysis["supportive_reply"],
+                    structured_json={"food_analysis": enriched_analysis, "group": group},
+                    model_provider=enriched_analysis.get("model_provider"),
+                    model_name=enriched_analysis.get("model_name"),
                 )
             )
-            food_analyses.append(self._analysis_response(analysis, food_log))
+            food_analyses.append(self._analysis_response(enriched_analysis, food_log))
             assistant_messages.append(self.chat_service._message_response(assistant_message))
         for _ in photos:
             self.usage_service.increment(user_id, "food_photo")
@@ -275,7 +284,7 @@ class FoodService:
         return {
             "food_analyses": food_analyses,
             "assistant_messages": assistant_messages,
-            "groups": batch.get("groups") or self._analysis_groups(food_analyses),
+            "groups": groups,
         }
 
     def list_logs(self, user_id: str, target_date: date | None = None) -> dict:
@@ -362,6 +371,9 @@ class FoodService:
             "fat_loss_advice": analysis.get("fat_loss_advice"),
             "model_provider": analysis.get("model_provider"),
             "model_name": analysis.get("model_name"),
+            "source_group": analysis.get("source_group"),
+            "source_photo_indexes": analysis.get("source_photo_indexes"),
+            "source_images": analysis.get("source_images"),
         }
 
     def _log_response(self, log: StoredFoodLog) -> dict:
@@ -394,10 +406,12 @@ class FoodService:
                 groups.append({
                     "group_id": key or f"group-{index + 1}",
                     "analysis_indexes": [index],
+                    "source_photo_indexes": [index],
                     "meal_name": analysis.get("meal_name") or "餐食",
                 })
             else:
                 groups[group_index]["analysis_indexes"].append(index)
+                groups[group_index]["source_photo_indexes"].append(index)
         return groups
 
     def _analysis_group_key(self, analysis: dict) -> str:
@@ -412,6 +426,35 @@ class FoodService:
             if analysis_index in group.get("analysis_indexes", []):
                 return group
         return None
+
+    def _source_photo_indexes(self, group: dict | None, analysis_index: int, photo_count: int) -> list[int]:
+        if photo_count <= 0:
+            return []
+        raw_indexes = group.get("source_photo_indexes") if group else None
+        if not isinstance(raw_indexes, list):
+            raw_indexes = group.get("analysis_indexes") if group else None
+        indexes = [
+            int(item)
+            for item in (raw_indexes if isinstance(raw_indexes, list) else [analysis_index])
+            if isinstance(item, int) and not isinstance(item, bool) and 0 <= item < photo_count
+        ]
+        if not indexes:
+            indexes = [min(analysis_index, photo_count - 1)]
+        return sorted(set(indexes))
+
+    def _source_images(self, stored_images: list[Any], photos: list[dict[str, Any]], indexes: list[int]) -> list[dict[str, Any]]:
+        source_images = []
+        for index in indexes:
+            if index >= len(stored_images) or index >= len(photos):
+                continue
+            source_images.append({
+                "index": index,
+                "image_object_key": stored_images[index].object_key,
+                "filename": photos[index].get("image_filename"),
+                "content_type": stored_images[index].content_type,
+                "size_bytes": stored_images[index].size_bytes,
+            })
+        return source_images
 
 
 food_service = FoodService()

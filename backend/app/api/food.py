@@ -119,11 +119,12 @@ async def analyze_chat_photo(
             vision_router=vision_router,
         )
     except FoodVisionUnavailableError as exc:
+        code = vision_unavailable_code(exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
-                "code": "vision_unavailable",
-                "message": "Food photo analysis is not available yet. Configure Xiaomi/Qwen provider keys or try again later.",
+                "code": code,
+                "message": vision_unavailable_message(code),
             },
         ) from exc
     except UsageLimitExceededError as exc:
@@ -171,11 +172,12 @@ async def analyze_chat_photos(
             vision_router=vision_router,
         )
     except FoodVisionUnavailableError as exc:
+        code = vision_unavailable_code(exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
-                "code": "vision_unavailable",
-                "message": "Food photo analysis is not available yet. Configure Xiaomi/Qwen provider keys or try again later.",
+                "code": code,
+                "message": vision_unavailable_message(code),
             },
         ) from exc
     except UsageLimitExceededError as exc:
@@ -241,6 +243,35 @@ async def _read_normalized_photo_upload(image: UploadFile) -> dict:
         "image_filename": image_filename,
         "image_content_type": image_content_type,
     }
+
+
+def vision_unavailable_code(exc: FoodVisionUnavailableError) -> str:
+    if exc.error_code == "provider_not_configured":
+        return "vision_provider_not_configured"
+    if exc.error_code == "provider_auth_failed":
+        return "vision_provider_auth_failed"
+    if exc.error_code == "provider_rate_limited":
+        return "vision_provider_rate_limited"
+    if exc.error_code == "provider_timeout":
+        return "vision_provider_timeout"
+    if exc.error_code == "provider_network_error":
+        return "vision_provider_network_error"
+    if exc.error_code in {"schema_error", "provider_invalid_response"}:
+        return "vision_provider_invalid_response"
+    return "vision_unavailable"
+
+
+def vision_unavailable_message(code: str) -> str:
+    messages = {
+        "vision_provider_not_configured": "Food photo AI is not configured on this backend.",
+        "vision_provider_auth_failed": "Food photo AI credentials were rejected by the provider.",
+        "vision_provider_rate_limited": "Food photo AI provider rate limit was reached. Please try again later.",
+        "vision_provider_timeout": "Food photo AI provider timed out. Please try again.",
+        "vision_provider_network_error": "Food photo AI provider could not be reached from the backend.",
+        "vision_provider_invalid_response": "Food photo AI returned an invalid response. Please try again.",
+        "vision_unavailable": "Food photo analysis is temporarily unavailable. Please try again.",
+    }
+    return messages.get(code, messages["vision_unavailable"])
 
 
 @router.get("/food/logs")

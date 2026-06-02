@@ -171,14 +171,20 @@ def test_xiaomi_provider_sends_recovery_soul_chat_prompt(monkeypatch) -> None:
     transport = FakeTransport(response_payload=chat_response("先稳住，这一餐不是整周失败。"))
     provider = XiaomiVisionProvider(transport=transport)
 
-    result = provider.generate_chat_reply("我吃多了，很慌", conversation_context=[{"role": "user", "content": "昨天断档了"}])
+    result = provider.generate_chat_reply(
+        "我吃多了，很慌",
+        conversation_context=[{"role": "user", "content": "昨天断档了"}],
+        structured_context={"records": {"food": [{"title": "三文鱼茶泡饭", "caloriesKcal": 525}]}},
+    )
 
     request = transport.requests[0]
     assert result == "先稳住，这一餐不是整周失败。"
     assert request["url"] == "https://mimo.example/v1/chat/completions"
     assert "non-shaming fat-loss recovery companion" in request["payload"]["messages"][0]["content"]
     assert "Never recommend skipping meals" in request["payload"]["messages"][0]["content"]
-    assert request["payload"]["messages"][-1]["content"] == "我吃多了，很慌"
+    assert "Known structured context" in request["payload"]["messages"][-1]["content"]
+    assert "三文鱼茶泡饭" in request["payload"]["messages"][-1]["content"]
+    assert "User message:\n我吃多了，很慌" in request["payload"]["messages"][-1]["content"]
     assert "response_format" not in request["payload"]
 
 

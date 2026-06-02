@@ -38,9 +38,10 @@ MULTI_PHOTO_USER_PROMPT = (
     "food_analyses must be a list of food analysis objects. Each food analysis object must include: "
     "meal_name, detected_items, calories_range_kcal, protein_g_range, carbs_g_range, fat_g_range, "
     "confidence, needs_follow_up, follow_up_question, fat_loss_advice, supportive_reply, safety_flags. "
-    "groups must be a list of objects with group_id, analysis_indexes, meal_name. "
-    "Use zero-based analysis_indexes. If two photos are the same dish, return one analysis and one group "
-    "whose analysis_indexes points to that analysis; explain visible portion clues in detected_items. "
+    "groups must be a list of objects with group_id, analysis_indexes, source_photo_indexes, meal_name. "
+    "Use zero-based analysis_indexes for food_analyses and zero-based source_photo_indexes for the uploaded photos. "
+    "If two photos are the same dish, return one analysis and one group whose analysis_indexes points to that analysis "
+    "and whose source_photo_indexes contains both photo indexes; explain visible portion clues in detected_items. "
     "If photos show different dishes, return one analysis per dish. Do not merge different foods into one card. "
     "Ask concise follow-up questions only when portion, oil, sauce, shared serving, or leftovers are unclear."
 )
@@ -86,6 +87,7 @@ CHAT_RECOVERY_SOUL_PROMPT = (
     "You are FitMate AI, a non-shaming fat-loss recovery companion. "
     "Reply in Simplified Chinese by default. Sound like a calm, perceptive human companion, not a generic wellness article or checklist bot. "
     "Use warm, plain speech with a little personality, but do not overuse emojis, headings, bold markdown, blue diamonds, or green checkmark lists. "
+    "Do not use asterisks, markdown headings, or checklist formatting in user-facing replies. "
     "Your job is not to shame, punish, or optimize the user into extremes. "
     "Context honesty is mandatory: only cite known facts from the provided conversation or structured context. "
     "Do not infer or invent missing context. If there is no workout record, do not say the user trained today or burned a lot. "
@@ -128,8 +130,7 @@ class UrllibJsonTransport:
             with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")[:500]
-            raise RuntimeError(f"provider_http_{exc.code}:{detail}") from exc
+            raise RuntimeError(f"provider_http_{exc.code}") from exc
         except urllib.error.URLError as exc:
             raise RuntimeError("provider_network_error") from exc
         except TimeoutError as exc:
@@ -295,7 +296,7 @@ class OpenAICompatibleVisionProvider:
         )
         return self._extract_json_content(response)
 
-    def generate_chat_reply(self, text: str, conversation_context: list[dict] | None = None) -> str:
+    def generate_chat_reply(self, text: str, conversation_context: list[dict] | None = None, structured_context: dict | None = None) -> str:
         if not self.api_key:
             raise RuntimeError(self.not_configured_error)
 
@@ -305,7 +306,7 @@ class OpenAICompatibleVisionProvider:
             content = message.get("content")
             if role in {"user", "assistant"} and isinstance(content, str) and content.strip():
                 messages.append({"role": role, "content": content[:2000]})
-        messages.append({"role": "user", "content": text[:4000]})
+        messages.append({"role": "user", "content": self._chat_user_content(text, structured_context)})
         payload = {
             "model": self.model_name,
             "messages": messages,
@@ -318,6 +319,17 @@ class OpenAICompatibleVisionProvider:
             timeout_seconds=self.timeout_seconds,
         )
         return self._extract_text_content(response)
+
+    def _chat_user_content(self, text: str, structured_context: dict | None) -> str:
+        if not structured_context:
+            return text[:4000]
+        context_json = json.dumps(structured_context, ensure_ascii=False)[:3000]
+        return (
+            f"Known structured context:\n{context_json}\n\n"
+            "Important context rules: records.food are confirmed eaten records. "
+            "records.pendingFood and activeFoodAnalysis are pending estimates and must not be treated as already eaten unless the user says they ate them.\n\n"
+            f"User message:\n{text[:3000]}"
+        )
 
     def _user_text(self, user_note: str | None) -> str:
         if not user_note:

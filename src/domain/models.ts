@@ -76,6 +76,7 @@ export type ChatMessageImage = {
   uri: string;
   filename?: string;
   mimeType?: string;
+  index?: number;
 };
 
 export type FileInsight = {
@@ -84,6 +85,10 @@ export type FileInsight = {
   confidence?: number;
   modelProvider?: string;
   modelName?: string;
+  fallbackUsed?: boolean;
+  fallbackSource?: string;
+  fallbackErrorCode?: string;
+  analysisSource?: string;
   syncStatus?: 'available' | 'synced' | 'unavailable';
   insights: Array<{
     label: string;
@@ -102,12 +107,20 @@ export type FoodAnalysis = {
   confidence: number;
   modelProvider?: string;
   modelName?: string;
+  fallbackUsed?: boolean;
+  fallbackSource?: string;
+  fallbackErrorCode?: string;
+  analysisSource?: string;
   needsFollowUp?: boolean;
   followUpQuestion?: string;
   detectedItems?: string[];
   sourceImageUri?: string;
   sourceFilename?: string;
   sourceMimeType?: string;
+  sourceImages?: ChatMessageImage[];
+  sourcePhotoIndexes?: number[];
+  groupId?: string;
+  groupMealName?: string;
   sourceUserNote?: string;
   calories: string;
   protein: string;
@@ -141,6 +154,10 @@ export type DailyRecord = {
   carbsG?: number;
   fatG?: number;
   detail?: string;
+  fallbackUsed?: boolean;
+  fallbackSource?: string;
+  fallbackErrorCode?: string;
+  analysisSource?: string;
   weightKg?: number;
   bodyFatPercent?: number;
   moodLevel?: number;

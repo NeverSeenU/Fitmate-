@@ -145,8 +145,16 @@ class WorkoutService:
         if self.workout_analysis_router is not None:
             ai_analysis = self.workout_analysis_router.analyze_workout_text(text=text, user_id=user_id)
             if ai_analysis is not None:
+                ai_analysis.setdefault("fallback_used", False)
+                ai_analysis.setdefault("analysis_source", "ai")
                 return ai_analysis
-        return self._analyze(text)
+        analysis = self._analyze(text)
+        analysis["fallback_used"] = self.workout_analysis_router is not None
+        analysis["fallback_source"] = "local_heuristic"
+        analysis["analysis_source"] = "heuristic"
+        if self.workout_analysis_router is not None:
+            analysis["fallback_error_code"] = getattr(self.workout_analysis_router, "last_error_code", None) or "provider_unavailable"
+        return analysis
 
     def _workout_type(self, text: str) -> str:
         if "椭圆" in text and "腿" in text:
@@ -189,6 +197,10 @@ class WorkoutService:
             "model_name": analysis.get("model_name"),
             "confidence": analysis.get("confidence"),
             "summary": analysis.get("summary"),
+            "fallback_used": analysis.get("fallback_used", False),
+            "fallback_source": analysis.get("fallback_source"),
+            "fallback_error_code": analysis.get("fallback_error_code"),
+            "analysis_source": analysis.get("analysis_source"),
             "status": workout_log.status if workout_log else "analysis_only",
         }
 

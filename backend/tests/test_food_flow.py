@@ -75,20 +75,50 @@ class GroupingVisionRouter:
         return {
             "food_analyses": [first, second],
             "groups": [
-                {"group_id": "牛肉汉堡", "analysis_indexes": [0], "meal_name": "牛肉汉堡"},
-                {"group_id": "水果沙拉", "analysis_indexes": [1], "meal_name": "水果沙拉"},
+                {"group_id": "牛肉汉堡", "analysis_indexes": [0], "source_photo_indexes": [0], "meal_name": "牛肉汉堡"},
+                {"group_id": "水果沙拉", "analysis_indexes": [1], "source_photo_indexes": [1], "meal_name": "水果沙拉"},
             ],
         }
 
 
-class UnavailableVisionRouter:
+class SameDishBatchVisionRouter:
     def analyze_food_photo(
         self,
         image_bytes: bytes,
         user_note: str | None = None,
         user_id: str | None = None,
     ) -> dict:
-        raise FoodVisionUnavailableError("all_vision_providers_failed")
+        return dict(VISION_ANALYSIS)
+
+    def analyze_food_photos(
+        self,
+        photos: list[dict],
+        user_note: str | None = None,
+        user_id: str | None = None,
+    ) -> dict:
+        assert len(photos) == 2
+        analysis = dict(VISION_ANALYSIS)
+        analysis["meal_name"] = "牛肉汉堡"
+        analysis["detected_items"] = ["burger", "bun", "cheese"]
+        return {
+            "food_analyses": [analysis],
+            "groups": [
+                {"group_id": "burger-angle-set", "analysis_indexes": [0], "source_photo_indexes": [0, 1], "meal_name": "牛肉汉堡"},
+            ],
+        }
+
+
+class UnavailableVisionRouter:
+    def __init__(self, error_code: str = "all_vision_providers_failed") -> None:
+        self.error_code = error_code
+
+    def analyze_food_photo(
+        self,
+        image_bytes: bytes,
+        user_note: str | None = None,
+        user_id: str | None = None,
+    ) -> dict:
+        raise FoodVisionUnavailableError(self.error_code)
 
 
 def auth_headers(email: str) -> dict[str, str]:
@@ -203,10 +233,43 @@ def test_multi_photo_endpoint_returns_structured_analyses_and_groups() -> None:
     assert [item["meal_name"] for item in body["food_analyses"]] == ["牛肉汉堡", "水果沙拉"]
     assert len(body["assistant_messages"]) == 2
     assert body["groups"] == [
-        {"group_id": "牛肉汉堡", "analysis_indexes": [0], "meal_name": "牛肉汉堡"},
-        {"group_id": "水果沙拉", "analysis_indexes": [1], "meal_name": "水果沙拉"},
+        {"group_id": "牛肉汉堡", "analysis_indexes": [0], "source_photo_indexes": [0], "meal_name": "牛肉汉堡"},
+        {"group_id": "水果沙拉", "analysis_indexes": [1], "source_photo_indexes": [1], "meal_name": "水果沙拉"},
     ]
+    assert body["food_analyses"][0]["source_photo_indexes"] == [0]
+    assert body["food_analyses"][0]["source_images"][0]["filename"] == "burger.jpg"
+    assert body["food_analyses"][1]["source_images"][0]["filename"] == "salad.jpg"
     assert usage_for_email(email).food_photo_count == 2
+
+
+def test_multi_photo_same_dish_returns_one_analysis_with_all_source_images() -> None:
+    email = "multi-photo-same-dish@example.com"
+    headers = auth_headers(email)
+    thread_id = create_thread(headers)
+    app.dependency_overrides[food_api.get_food_vision_router] = lambda: SameDishBatchVisionRouter()
+
+    try:
+        response = client.post(
+            "/v1/chat/photos",
+            headers=headers,
+            data={"thread_id": thread_id, "user_note": "同一个汉堡两个角度"},
+            files=[
+                ("images", ("burger-front.jpg", b"fake-image", "image/jpeg")),
+                ("images", ("burger-side.jpg", b"fake-image", "image/jpeg")),
+            ],
+        )
+    finally:
+        app.dependency_overrides[food_api.get_food_vision_router] = lambda: FakeVisionRouter()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["food_analyses"]) == 1
+    analysis = body["food_analyses"][0]
+    assert analysis["source_group"]["group_id"] == "burger-angle-set"
+    assert analysis["source_photo_indexes"] == [0, 1]
+    assert [item["filename"] for item in analysis["source_images"]] == ["burger-front.jpg", "burger-side.jpg"]
+    structured = body["assistant_messages"][0]["structured_json"]["food_analysis"]
+    assert structured["source_photo_indexes"] == [0, 1]
 
 
 def test_photo_rejects_unsupported_upload_type() -> None:
@@ -352,6 +415,30 @@ def test_photo_analysis_returns_stable_unavailable_error_when_providers_are_miss
     assert response.status_code == 503
     assert response.json()["detail"]["code"] == "vision_unavailable"
     assert usage_for_email("vision-unavailable@example.com").food_photo_count == 0
+
+    app.dependency_overrides[get_food_vision_router] = lambda: FakeVisionRouter()
+
+
+def test_photo_analysis_returns_specific_safe_provider_error_code() -> None:
+    from app.api.food import get_food_vision_router
+
+    app.dependency_overrides[get_food_vision_router] = lambda: UnavailableVisionRouter("provider_auth_failed")
+    headers = auth_headers("vision-auth-failed@example.com")
+    thread_id = create_thread(headers)
+
+    response = client.post(
+        "/v1/chat/photo",
+        headers=headers,
+        data={"thread_id": thread_id, "user_note": "晚餐"},
+        files={"image": ("food.jpg", b"fake-image", "image/jpeg")},
+    )
+
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert detail["code"] == "vision_provider_auth_failed"
+    assert "credentials" in detail["message"]
+    assert "secret" not in str(detail).lower()
+    assert usage_for_email("vision-auth-failed@example.com").food_photo_count == 0
 
     app.dependency_overrides[get_food_vision_router] = lambda: FakeVisionRouter()
 

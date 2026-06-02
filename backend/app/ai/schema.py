@@ -94,7 +94,7 @@ def validate_food_analysis(raw: object) -> dict[str, Any]:
     return dict(raw)
 
 
-def validate_food_batch_analysis(raw: object) -> dict[str, Any]:
+def validate_food_batch_analysis(raw: object, photo_count: int | None = None) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise FoodVisionSchemaError("batch_analysis_must_be_object")
     analyses = raw.get("food_analyses")
@@ -102,12 +102,13 @@ def validate_food_batch_analysis(raw: object) -> dict[str, Any]:
         raise FoodVisionSchemaError("food_analyses_required")
     normalized_analyses = [validate_food_analysis(item) for item in analyses[:5]]
     groups = raw.get("groups")
-    normalized_groups = _coerce_food_groups(groups, len(normalized_analyses))
+    normalized_groups = _coerce_food_groups(groups, len(normalized_analyses), photo_count)
     if not normalized_groups:
         normalized_groups = [
             {
                 "group_id": str(item.get("meal_name") or f"meal-{index + 1}"),
                 "analysis_indexes": [index],
+                "source_photo_indexes": [index],
                 "meal_name": str(item.get("meal_name") or "餐食"),
             }
             for index, item in enumerate(normalized_analyses)
@@ -118,7 +119,7 @@ def validate_food_batch_analysis(raw: object) -> dict[str, Any]:
     }
 
 
-def _coerce_food_groups(value: object, analysis_count: int) -> list[dict[str, Any]]:
+def _coerce_food_groups(value: object, analysis_count: int, photo_count: int | None = None) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
     groups: list[dict[str, Any]] = []
@@ -133,6 +134,17 @@ def _coerce_food_groups(value: object, analysis_count: int) -> list[dict[str, An
             for item in raw_indexes
             if isinstance(item, int) and not isinstance(item, bool) and 0 <= item < analysis_count
         ]
+        raw_photo_indexes = group.get("source_photo_indexes")
+        if not isinstance(raw_photo_indexes, list):
+            raw_photo_indexes = group.get("photo_indexes")
+        photo_limit = photo_count if isinstance(photo_count, int) and photo_count > 0 else analysis_count
+        source_photo_indexes = [
+            int(item)
+            for item in (raw_photo_indexes if isinstance(raw_photo_indexes, list) else raw_indexes)
+            if isinstance(item, int) and not isinstance(item, bool) and 0 <= item < photo_limit
+        ]
+        if not indexes and source_photo_indexes:
+            indexes = [min(index, analysis_count - 1)]
         if not indexes:
             continue
         meal_name = group.get("meal_name")
@@ -140,6 +152,7 @@ def _coerce_food_groups(value: object, analysis_count: int) -> list[dict[str, An
         groups.append({
             "group_id": str(group_id),
             "analysis_indexes": sorted(set(indexes)),
+            "source_photo_indexes": sorted(set(source_photo_indexes or indexes)),
             "meal_name": str(meal_name or group_id),
         })
     return groups

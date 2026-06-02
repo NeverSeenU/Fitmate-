@@ -30,14 +30,33 @@ class FakeTextFoodRouter:
         }
 
 
-class FakeChatReplyRouter:
-    def __init__(self) -> None:
-        self.calls: list[dict] = []
+class FailingTextFoodRouter:
+    last_error_code = "provider_timeout"
 
-    def generate_reply(self, text: str, user_id: str | None = None, conversation_context: list[dict] | None = None) -> dict:
-        self.calls.append({"text": text, "user_id": user_id, "conversation_context": conversation_context or []})
+    def analyze_food_text(self, text: str, user_id: str | None = None) -> None:
+        return None
+
+
+class FakeChatReplyRouter:
+    def __init__(self, content_text: str = "先稳住，这一餐不是整周失败。下一餐正常吃。") -> None:
+        self.calls: list[dict] = []
+        self.content_text = content_text
+
+    def generate_reply(
+        self,
+        text: str,
+        user_id: str | None = None,
+        conversation_context: list[dict] | None = None,
+        structured_context: dict | None = None,
+    ) -> dict:
+        self.calls.append({
+            "text": text,
+            "user_id": user_id,
+            "conversation_context": conversation_context or [],
+            "structured_context": structured_context or {},
+        })
         return {
-            "content_text": "先稳住，这一餐不是整周失败。下一餐正常吃。",
+            "content_text": self.content_text,
             "model_provider": "xiaomi",
             "model_name": "mimo-v2-omni",
         }
@@ -266,6 +285,109 @@ def test_chat_reply_router_can_generate_recovery_soul_bubble() -> None:
     assert chat_reply_router.calls[0]["text"] == "我刚刚吃多了，有点慌。"
 
 
+def test_recovery_prompt_with_food_context_does_not_create_text_food_card() -> None:
+    chat_reply_router = FakeChatReplyRouter()
+    service = ChatService(
+        store=InMemoryChatStore(),
+        chat_reply_router=chat_reply_router,
+        text_food_analysis_router=FakeTextFoodRouter(),
+    )
+    thread = service.create_thread(user_id="user-1", title="Recovery", kind="general")
+
+    response = service.send_text_message(
+        user_id="user-1",
+        thread_id=thread["id"],
+        text=(
+            "我刚刚觉得自己吃多了，有点慌。请不要羞辱我。\n"
+            "今日食物记录：1. 三文鱼茶泡饭：525 kcal，蛋白 35g。\n"
+            "请判断我是不是明显吃多了，并给下一步。"
+        ),
+        context={"records": {"food": [{"title": "三文鱼茶泡饭", "caloriesKcal": 525}]}},
+    )
+
+    assert response is not None
+    assert response["message"]["message_type"] == "text"
+    assert "food_analysis" not in response
+    assert chat_reply_router.calls[0]["structured_context"]["records"]["food"][0]["title"] == "三文鱼茶泡饭"
+    assert response["message"]["structured_json"]["chat_reply"]["source"] == "ai"
+    assert response["message"]["structured_json"]["chat_reply"]["food_context_count"] == 1
+
+
+def test_recovery_fallback_uses_food_context_when_chat_provider_is_unavailable() -> None:
+    service = ChatService(
+        store=InMemoryChatStore(),
+        allow_contract_mocks=False,
+        text_food_analysis_router=FakeTextFoodRouter(),
+    )
+    thread = service.create_thread(user_id="user-1", title="Recovery", kind="general")
+
+    response = service.send_text_message(
+        user_id="user-1",
+        thread_id=thread["id"],
+        text="我刚刚吃多了，有点慌。请判断我是不是明显吃多了。",
+        context={
+            "dailySummary": {"dailyTargetCalories": 1800},
+            "records": {
+                "food": [
+                    {"title": "三文鱼茶泡饭", "caloriesKcal": 525, "proteinG": 35},
+                    {"title": "牛肉汉堡", "caloriesKcal": 760, "proteinG": 45},
+                ],
+                "pendingFood": [{"title": "待确认薯条", "caloriesKcal": 300}],
+            },
+        },
+    )
+
+    assert response is not None
+    assert response["message"]["message_type"] == "text"
+    assert response["message"]["model_provider"] == "fitmate"
+    assert "三文鱼茶泡饭" in response["message"]["content_text"]
+    assert "1285 kcal" in response["message"]["content_text"]
+    assert "待确认薯条" not in response["message"]["content_text"]
+    metadata = response["message"]["structured_json"]["chat_reply"]
+    assert metadata["source"] == "fallback"
+    assert metadata["food_context_count"] == 2
+    assert metadata["pending_food_context_count"] == 1
+
+
+def test_chat_reply_sanitizes_markdown_stars_from_provider_text() -> None:
+    chat_reply_router = FakeChatReplyRouter("**先稳住**\n- **下一餐**正常吃。")
+    service = ChatService(store=InMemoryChatStore(), chat_reply_router=chat_reply_router)
+    thread = service.create_thread(user_id="user-1", title="Recovery", kind="general")
+
+    response = service.send_text_message(
+        user_id="user-1",
+        thread_id=thread["id"],
+        text="我吃多了很慌。",
+        context={"records": {"food": [{"title": "三文鱼茶泡饭", "caloriesKcal": 525}]}},
+    )
+
+    assert response is not None
+    assert "*" not in response["message"]["content_text"]
+    assert "- " not in response["message"]["content_text"]
+
+
+def test_negated_safety_terms_do_not_hijack_recovery_prompt() -> None:
+    chat_reply_router = FakeChatReplyRouter()
+    service = ChatService(
+        store=InMemoryChatStore(),
+        chat_reply_router=chat_reply_router,
+        safety_service_dependency=SafetyService(store=InMemorySafetyEventStore()),
+    )
+    thread = service.create_thread(user_id="user-1", title="Recovery", kind="general")
+
+    response = service.send_text_message(
+        user_id="user-1",
+        thread_id=thread["id"],
+        text="我吃多了很慌。请给安全下一步，但不要建议催吐、泻药、断食或补偿性运动。",
+        context=None,
+    )
+
+    assert response is not None
+    assert response["message"]["message_type"] == "text"
+    assert response.get("safety") is None
+    assert chat_reply_router.calls[0]["text"].startswith("我吃多了")
+
+
 def test_food_text_message_returns_editable_food_analysis_card() -> None:
     headers = auth_headers("chat-food-card@example.com")
     thread = client.post(
@@ -292,6 +414,25 @@ def test_food_text_message_returns_editable_food_analysis_card() -> None:
     assert body["food_analysis"]["meal_name"] == "半碗米饭和鸡胸肉"
     assert body["food_analysis"]["calories_range_kcal"][1] > 0
     assert body["food_analysis"]["protein_g_range"][1] > 0
+
+
+def test_food_text_ai_failure_returns_heuristic_card_with_safe_fallback_metadata() -> None:
+    service = ChatService(
+        store=InMemoryChatStore(),
+        text_food_analysis_router=FailingTextFoodRouter(),
+    )
+    thread = service.create_thread("user-1", "Fallback", "food")
+
+    response = service.send_text_message("user-1", thread["id"], "吃了半碗米饭和鸡胸肉", None)
+
+    assert response is not None
+    assert response["message"]["message_type"] == "food_analysis"
+    assert response["food_analysis"]["meal_name"] == "半碗米饭和鸡胸肉"
+    assert response["food_analysis"]["fallback_used"] is True
+    assert response["food_analysis"]["fallback_source"] == "local_heuristic"
+    assert response["food_analysis"]["fallback_error_code"] == "provider_timeout"
+    assert response["food_analysis"]["analysis_source"] == "heuristic"
+    assert response["food_analysis"]["model_provider"] == "fitmate"
 
 
 def test_user_cannot_read_another_users_thread_messages() -> None:

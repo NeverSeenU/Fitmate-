@@ -42,6 +42,13 @@ Mobile workflow smoke with structured logs:
 npm.cmd run smoke:mobile
 ```
 
+Pre-device backend gate for Expo Go AI/photo testing:
+
+```powershell
+$env:EXPO_PUBLIC_API_BASE_URL="http://192.168.1.71:8000"
+npm.cmd run smoke:pre-device
+```
+
 Expo dev server:
 
 ```powershell

@@ -1,4 +1,5 @@
 import type { AppDataState } from '../domain/models';
+import { calculateEnergyTarget, summarizeFoodIntake } from '../services/energyTargets';
 
 export type RecoveryPromptId =
   | 'cold_intro'
@@ -117,6 +118,9 @@ export function recoveryPromptText(id: RecoveryPromptId, state?: AppDataState) {
   if (id === 'overeaten' && state) {
     return overeatenPromptText(state);
   }
+  if ((id === 'next_meal' || id === 'steady_next_meal') && state) {
+    return nextMealPromptText(state);
+  }
   return baseRecoveryPromptText(id);
 }
 
@@ -146,6 +150,42 @@ function overeatenPromptText(state: AppDataState) {
     '我刚刚觉得自己吃多了，有点慌。请不要羞辱我。',
     '请基于下面的今日食物记录判断我是不是明显吃多了，还是只是短期焦虑/水分/盐分/碳水带来的感觉。',
     foodSummary,
-    '先直接回答：今天是否需要担心。然后给一个稳定情绪的解释和一个安全下一步。不要建议惩罚性断食、催吐、泻药或补偿性过度运动。',
+    '先直接回答：今天是否需要担心。然后给一个稳定情绪的解释和一个安全下一步。请保持温柔、具体、像真人说话，不要写星号或 markdown 标题。',
+  ].join('\n');
+}
+
+function nextMealPromptText(state: AppDataState) {
+  const foodRecords = state.records.filter((record) => record.kind === 'food' && record.status !== '已丢弃' && record.done !== false);
+  const intake = summarizeFoodIntake(state.records);
+  const energy = calculateEnergyTarget({ profile: state.profile, foodCaloriesKcal: intake.caloriesKcal });
+  if (!foodRecords.length) {
+    return [
+      '今天还没有食物记录。请不要假装知道我今天吃过什么。',
+      '如果这是今天第一顿，请给我一个适合减脂但不痛苦的第一顿食谱：蛋白质、主食、蔬菜和酱料怎么搭配都说清楚。',
+      '如果你还需要信息，只问一个小问题。回复要像真人教练，不要写星号或 markdown 标题。',
+    ].join('\n');
+  }
+  const foodSummary = foodRecords.map((record, index) => {
+    const macros = [
+      record.caloriesKcal === undefined ? null : `${record.caloriesKcal} kcal`,
+      record.proteinG === undefined ? null : `蛋白 ${record.proteinG}g`,
+      record.carbsG === undefined ? null : `碳水 ${record.carbsG}g`,
+      record.fatG === undefined ? null : `脂肪 ${record.fatG}g`,
+    ].filter(Boolean).join(' · ');
+    return `${index + 1}. ${record.title}${macros ? `：${macros}` : ''}${record.detail ? `；${record.detail}` : record.text ? `；${record.text}` : ''}`;
+  }).join('\n');
+  if (energy.progress >= 0.8) {
+    return [
+      `我的今日摄入已经接近或超过目标的 80%。今日已记录：`,
+      foodSummary,
+      `当前大概已吃 ${intake.caloriesKcal} kcal，目标约 ${energy.dailyTargetCalories} kcal。`,
+      '请不要再安排很大的一餐。帮我判断今天如果还饿怎么收尾，并顺手给一个明天的轻盈高蛋白食谱。回复要短、有人味，不要写星号或 markdown 标题。',
+    ].join('\n');
+  }
+  return [
+    '请根据我今天已经记录的食物，推荐下一餐怎么吃，重点是搭配上一餐来补足蛋白、控制油和主食，不要泛泛科普。',
+    foodSummary,
+    `当前大概已吃 ${intake.caloriesKcal} kcal，今日目标约 ${energy.dailyTargetCalories} kcal，还可吃约 ${Math.max(0, energy.caloriesLeft)} kcal。`,
+    '请给一个具体食谱：蛋白质、主食、蔬菜、酱料和份量怎么搭。回复要像真人，不要写星号或 markdown 标题。',
   ].join('\n');
 }

@@ -171,6 +171,10 @@ class FileService:
             data["insight_schema_version"] = file_insights["schema_version"]
             data["model_provider"] = file_insights.get("model_provider")
             data["model_name"] = file_insights.get("model_name")
+            data["fallback_used"] = file_insights.get("fallback_used", False)
+            data["fallback_source"] = file_insights.get("fallback_source")
+            data["fallback_error_code"] = file_insights.get("fallback_error_code")
+            data["analysis_source"] = file_insights.get("analysis_source")
         return data
 
     def _file_insights(self, user_id: str, filename: str, content: bytes, content_type: str, user_prompt: str | None = None) -> dict:
@@ -184,8 +188,16 @@ class FileService:
                 user_id=user_id,
             )
             if ai_insights is not None:
+                ai_insights.setdefault("fallback_used", False)
+                ai_insights.setdefault("analysis_source", "ai")
                 return ai_insights
-        return build_file_insights(filename=filename, content=content, content_type=content_type)
+        insights = build_file_insights(filename=filename, content=content, content_type=content_type)
+        insights["fallback_used"] = bool(self.file_insight_router is not None and text)
+        insights["fallback_source"] = "local_heuristic"
+        insights["analysis_source"] = "heuristic"
+        if insights["fallback_used"]:
+            insights["fallback_error_code"] = getattr(self.file_insight_router, "last_error_code", None) or "provider_unavailable"
+        return insights
 
     def _object_key(self, user_id: str, filename: str) -> str:
         safe_filename = filename or "fitmate-file"

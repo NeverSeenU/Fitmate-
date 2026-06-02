@@ -4,9 +4,17 @@ from app.db.session import SessionLocal
 from app.main import app
 from app.repositories.sqlalchemy.auth import SqlAlchemyAuthRepository
 from app.repositories.sqlalchemy.usage import SqlAlchemyUsageCounterRepository
+from app.services.workout_service import WorkoutService
 
 
 client = TestClient(app)
+
+
+class FailingWorkoutAnalysisRouter:
+    last_error_code = "provider_timeout"
+
+    def analyze_workout_text(self, text: str, user_id: str | None = None) -> None:
+        return None
 
 
 def auth_headers(email: str) -> dict[str, str]:
@@ -242,6 +250,19 @@ def test_free_workout_analysis_does_not_auto_create_log() -> None:
     assert body["workout_analysis"]["status"] == "analysis_only"
     assert usage_for_email(email).workout_analysis_count == 1
     assert client.get("/v1/records/today", headers=headers).json()["workout_logs"] == []
+
+
+def test_workout_ai_failure_returns_heuristic_analysis_with_safe_fallback_metadata() -> None:
+    service = WorkoutService(workout_analysis_router=FailingWorkoutAnalysisRouter())
+
+    analysis = service._analysis("user-1", "跑步 30 分钟，轻松强度")
+    response = service._analysis_response(analysis, None)
+
+    assert response["duration_minutes"] > 0
+    assert response["fallback_used"] is True
+    assert response["fallback_source"] == "local_heuristic"
+    assert response["fallback_error_code"] == "provider_timeout"
+    assert response["analysis_source"] == "heuristic"
 
 
 def test_workout_fair_use_limit_returns_429() -> None:

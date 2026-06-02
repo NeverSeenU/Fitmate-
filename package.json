@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsc -p tsconfig.test.json && node .test-build/tests/runLogicTests.js",
     "smoke:mobile": "tsc -p tsconfig.test.json && node .test-build/tests/runMobileSmoke.js",
+    "smoke:pre-device": "tsc -p tsconfig.test.json && node .test-build/tests/runPreDeviceSmokeGate.js",
     "smoke:file-insight-live": "tsc -p tsconfig.test.json && node .test-build/tests/runLiveFileInsightSmoke.js",
     "smoke:file-insight-ai": "tsc -p tsconfig.test.json && node .test-build/tests/runLiveFileInsightSmoke.js --require-ai-metadata"
   },

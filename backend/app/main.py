@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from app.api.admin import router as admin_router
 from app.api.auth import router as auth_router
 from app.api.chat import router as chat_router
+from app.api.diagnostics import router as diagnostics_router
 from app.api.food import router as food_router
 from app.api.files import router as files_router
 from app.api.me import router as me_router
@@ -24,6 +25,7 @@ app = FastAPI(
 app.include_router(auth_router, prefix="/v1")
 app.include_router(admin_router, prefix="/v1")
 app.include_router(chat_router, prefix="/v1")
+app.include_router(diagnostics_router, prefix="/v1")
 app.include_router(files_router, prefix="/v1")
 app.include_router(food_router, prefix="/v1")
 app.include_router(me_router, prefix="/v1")

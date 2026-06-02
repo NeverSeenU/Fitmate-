@@ -9,6 +9,7 @@ Run this checklist in Expo Go after meaningful mobile or backend changes.
 - Expo: `exp://192.168.1.71:8081`
 - For physical phones, start the backend with `python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000` from `backend/`, then verify `http://192.168.1.71:8000/v1/healthz` works.
 - Start Expo with cache clear when UI looks stale: `npx.cmd expo start --lan --port 8081 --clear`
+- Before opening Expo Go for AI/chat/photo testing, run `npm.cmd run smoke:pre-device` against the same backend URL. It verifies backend reachability, Chat AI readiness, food vision readiness, and structured-context support without exposing provider keys.
 - Before opening Expo Go, run `npm.cmd run smoke:file-insight-live` with the backend running to verify body-report, menu, and workout-plan uploads, file insight extraction, explicit sync actions, profile persistence, food-log persistence, workout-log persistence, and Records persistence.
 - Manual file fixtures live in `docs/engineering/smoke-fixtures/`. Copy `body-report-smoke.txt`, `menu-smoke.txt`, and `workout-plan-smoke.txt` to a phone-accessible Files/iCloud/Drive location before the Expo Go pass.
 

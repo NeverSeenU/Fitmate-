@@ -76,6 +76,10 @@ export type FileUploadResponse = {
     insight_schema_version?: number;
     model_provider?: string;
     model_name?: string;
+    fallback_used?: boolean;
+    fallback_source?: string | null;
+    fallback_error_code?: string | null;
+    analysis_source?: string | null;
   };
   assistant_message?: { id?: string; content_text?: string; message_type?: string; structured_json?: unknown };
 };
@@ -96,6 +100,13 @@ export type FoodPhotoAnalysisResponse = {
     fat_loss_advice?: string;
     model_provider?: string;
     model_name?: string;
+    fallback_used?: boolean;
+    fallback_source?: string | null;
+    fallback_error_code?: string | null;
+    analysis_source?: string | null;
+    source_group?: { group_id?: string; analysis_indexes?: number[]; source_photo_indexes?: number[]; meal_name?: string } | null;
+    source_photo_indexes?: number[] | null;
+    source_images?: Array<{ index?: number; filename?: string | null; content_type?: string | null; image_object_key?: string; size_bytes?: number }> | null;
   };
   assistant_message?: { id?: string; content_text?: string; message_type?: string; structured_json?: unknown };
 };
@@ -103,7 +114,37 @@ export type FoodPhotoAnalysisResponse = {
 export type FoodPhotoBatchAnalysisResponse = {
   food_analyses: FoodPhotoAnalysisResponse['food_analysis'][];
   assistant_messages?: Array<{ id?: string; content_text?: string; message_type?: string; structured_json?: unknown }>;
-  groups?: Array<{ group_id: string; analysis_indexes: number[]; meal_name: string }>;
+  groups?: Array<{ group_id: string; analysis_indexes: number[]; source_photo_indexes?: number[]; meal_name: string }>;
+};
+
+export type DiagnosticsSmokeResponse = {
+  status: string;
+  service: string;
+  environment: string;
+  local_runtime: boolean;
+  features: {
+    chat_ai_reply_enabled: boolean;
+    text_food_ai_analysis_enabled: boolean;
+    file_ai_extraction_enabled: boolean;
+    workout_ai_analysis_enabled: boolean;
+    food_vision_provider: string;
+  };
+  providers: {
+    xiaomi: { configured: boolean; model: string };
+    qwen: { configured: boolean; model: string };
+  };
+  readiness: {
+    backend_reachable: boolean;
+    chat_ai_ready: boolean;
+    food_vision_ready: boolean;
+    file_ai_ready: boolean;
+    workout_ai_ready: boolean;
+    text_food_ai_ready: boolean;
+  };
+  routing: {
+    food_vision_provider_order: string[];
+    chat_reply_provider_order: string[];
+  };
 };
 
 export class ApiError extends Error {
@@ -159,6 +200,9 @@ export function createBackendApi(options: ApiClientOptions = {}) {
           receipt: payload.receipt,
         }).then(toSubscriptionStatus)
       ),
+    },
+    diagnostics: {
+      smoke: () => client.get('/diagnostics/smoke', { authenticated: false }) as Promise<DiagnosticsSmokeResponse>,
     },
     chat: {
       listThreads: () => client.get('/chat/threads') as ReturnType<BackendApiForAppData['chat']['listThreads']>,
@@ -495,17 +539,17 @@ function apiErrorMessage(status: number, detail: unknown) {
   }
   const body = detail as { detail?: unknown; message?: unknown };
   const nested = body?.detail as { code?: unknown; message?: unknown } | string | undefined;
-  if (typeof nested === 'object' && nested?.code === 'vision_unavailable') {
-    return 'Image recognition is temporarily unavailable. FitMate could not process this photo right now; please try again.';
+  if (typeof nested === 'object' && isVisionProviderErrorCode(nested.code)) {
+    return visionProviderErrorMessage(String(nested.code));
   }
   if (typeof nested === 'object' && nested?.code === 'image_conversion_unavailable') {
-    return 'Photo conversion is temporarily unavailable. Please try again later.';
+    return '照片转换暂时不可用，请稍后再试。';
   }
   if (typeof nested === 'object' && nested?.code === 'image_conversion_failed') {
-    return 'This photo could not be decoded. Please upload the original photo again.';
+    return '这张照片暂时无法解析，请重新选择原图再试。';
   }
   if (typeof nested === 'object' && nested?.code === 'unsupported_image_type') {
-    return 'This photo format is not supported yet. Please upload the original system camera or photo library image.';
+    return '这个照片格式暂时不支持，请从系统相册重新选择原图。';
   }
   if (typeof nested === 'object' && nested?.code === 'fair_use_limit_reached') {
     return '今天的使用次数已达到当前订阅的公平使用上限。你可以明天再试，或升级订阅后继续使用。';
@@ -520,6 +564,34 @@ function apiErrorMessage(status: number, detail: unknown) {
     return nested;
   }
   return `FitMate API request failed with status ${status}`;
+}
+
+function isVisionProviderErrorCode(code: unknown) {
+  return typeof code === 'string' && (
+    code === 'vision_unavailable'
+    || code === 'vision_provider_not_configured'
+    || code === 'vision_provider_auth_failed'
+    || code === 'vision_provider_rate_limited'
+    || code === 'vision_provider_timeout'
+    || code === 'vision_provider_network_error'
+    || code === 'vision_provider_invalid_response'
+  );
+}
+
+function visionProviderErrorMessage(code: string) {
+  if (code === 'vision_provider_timeout' || code === 'vision_provider_network_error') {
+    return 'AI 响应有点慢或网络不稳定。请稍后重试，刚才的内容不会丢。';
+  }
+  if (code === 'vision_provider_rate_limited') {
+    return 'AI 服务现在有点拥挤，请过一会儿再试。';
+  }
+  if (code === 'vision_provider_auth_failed' || code === 'vision_provider_not_configured') {
+    return '当前环境的图片 AI 服务还没准备好。请稍后再试，或先用文字描述这餐。';
+  }
+  if (code === 'vision_provider_invalid_response') {
+    return 'AI 返回的识别结果格式不稳定，这次没有自动写入记录。请重试或用文字补充。';
+  }
+  return '图片识别暂时不可用。你可以稍后再试，或先用文字描述这餐，我会先帮你估算。';
 }
 
 function isAuthInvalidDetail(detail: unknown) {

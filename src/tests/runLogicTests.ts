@@ -5,6 +5,7 @@ import { loadAppDataFromBackend } from '../services/appBackend';
 import { createRuntimeConfig } from '../config/env';
 import { createAiVisionService, type FoodVisionInput, type VisionProvider } from '../services/aiVision';
 import { normalizeFileMimeType, normalizeImageMimeType } from '../services/mimeTypes';
+import { runPreDeviceSmokeGate } from '../services/smokeGate';
 import { evaluateEntitlement, entitlementsForTier } from '../services/subscription';
 import { initialAppState } from '../state/appState';
 import type { AppDataState, FoodAnalysis } from '../domain/models';
@@ -150,6 +151,95 @@ async function testApiClientDoesNotMaskErrorDetailsWithAlreadyRead() {
   assert(message === 'thread_not_found', 'API errors must preserve backend text instead of masking with Already read');
 }
 
+async function testDiagnosticsSmokeClientAndPreDeviceGate() {
+  const requests: ApiRequestRecord[] = [];
+  const api = createBackendApi({
+    baseUrl: 'https://api.example.test',
+    getAccessToken: () => 'token-123',
+    fetchImpl: async (url, init) => {
+      requests.push({ url, init });
+      return jsonResponse({
+        status: 'ok',
+        service: 'fitmate-backend',
+        environment: 'local',
+        local_runtime: true,
+        features: {
+          chat_ai_reply_enabled: true,
+          text_food_ai_analysis_enabled: true,
+          file_ai_extraction_enabled: true,
+          workout_ai_analysis_enabled: true,
+          food_vision_provider: 'auto',
+        },
+        providers: {
+          xiaomi: { configured: true, model: 'mimo-v2-omni' },
+          qwen: { configured: true, model: 'qwen3-vl-plus' },
+        },
+        readiness: {
+          backend_reachable: true,
+          chat_ai_ready: true,
+          food_vision_ready: true,
+          file_ai_ready: true,
+          workout_ai_ready: true,
+          text_food_ai_ready: true,
+        },
+        routing: {
+          food_vision_provider_order: ['xiaomi', 'qwen'],
+          chat_reply_provider_order: ['xiaomi', 'qwen'],
+        },
+      });
+    },
+  });
+
+  const result = await runPreDeviceSmokeGate(api);
+
+  assert(requests[0].url === 'https://api.example.test/v1/diagnostics/smoke', 'smoke gate must call diagnostics endpoint');
+  assert(!requests[0].init.headers.Authorization, 'diagnostics smoke must not require user bearer auth');
+  assert(result.status === 'passed', 'pre-device smoke gate should pass when diagnostics are ready');
+  assert(result.checks.some((check) => check.name === 'chat_ai_ready' && check.passed), 'smoke gate must check chat AI readiness');
+  assert(result.checks.some((check) => check.name === 'food_vision_ready' && check.passed), 'smoke gate must check food vision readiness');
+}
+
+async function testPreDeviceSmokeGateFailsWhenChatAiIsDisabled() {
+  const result = await runPreDeviceSmokeGate({
+    diagnostics: {
+      async smoke() {
+        return {
+          status: 'ok',
+          service: 'fitmate-backend',
+          environment: 'local',
+          local_runtime: true,
+          features: {
+            chat_ai_reply_enabled: false,
+            text_food_ai_analysis_enabled: true,
+            file_ai_extraction_enabled: true,
+            workout_ai_analysis_enabled: true,
+            food_vision_provider: 'auto',
+          },
+          providers: {
+            xiaomi: { configured: true, model: 'mimo-v2-omni' },
+            qwen: { configured: true, model: 'qwen3-vl-plus' },
+          },
+          readiness: {
+            backend_reachable: true,
+            chat_ai_ready: false,
+            food_vision_ready: true,
+            file_ai_ready: true,
+            workout_ai_ready: true,
+            text_food_ai_ready: true,
+          },
+          routing: {
+            food_vision_provider_order: ['xiaomi', 'qwen'],
+            chat_reply_provider_order: ['xiaomi', 'qwen'],
+          },
+        };
+      },
+    },
+  });
+
+  assert(result.status === 'failed', 'pre-device smoke gate should fail when chat AI is disabled');
+  assert(result.checks.some((check) => check.name === 'chat_ai_ready' && !check.passed && check.detail.includes('CHAT_AI_REPLY_ENABLED=false')), 'failed gate should explain disabled chat AI');
+}
+
 async function testBackendServiceClearsInvalidToken() {
   const requests: ApiRequestRecord[] = [];
   let invalidated = 0;
@@ -216,6 +306,42 @@ async function testApiClientMapsUnsupportedHeicPhotoErrors() {
   }
 
   assert(message.includes('HEIC/HEIF'), 'HEIC upload errors must show a readable format message');
+}
+
+async function testApiClientMapsVisionProviderErrorsToChineseCopy() {
+  const cases = [
+    { code: 'vision_provider_timeout', expected: '网络不稳定' },
+    { code: 'vision_provider_rate_limited', expected: '有点拥挤' },
+    { code: 'vision_provider_auth_failed', expected: '还没准备好' },
+    { code: 'vision_provider_invalid_response', expected: '格式不稳定' },
+    { code: 'vision_unavailable', expected: '图片识别暂时不可用' },
+  ];
+
+  for (const item of cases) {
+    const api = createBackendApi({
+      baseUrl: 'https://api.example.test',
+      fetchImpl: async () => jsonResponse({
+        detail: {
+          code: item.code,
+          message: 'raw backend message should not be user copy',
+        },
+      }, 503),
+    });
+
+    let message = '';
+    try {
+      await api.food.analyzePhoto({
+        threadId: 'thread-1',
+        imageUri: 'file:///photo.jpg',
+        filename: 'photo.jpg',
+        mimeType: 'image/jpeg',
+      });
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    assert(message.includes(item.expected), `${item.code} must map to Chinese user-friendly copy`);
+    assert(!message.includes('raw backend'), `${item.code} must not expose backend diagnostic text`);
+  }
 }
 
 async function testApiClientMultipartPhotoUpload() {
@@ -535,6 +661,10 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
               confidence: 0.78,
               model_provider: 'xiaomi',
               model_name: 'mimo-v2-omni',
+              fallback_used: true,
+              fallback_source: 'local_heuristic',
+              fallback_error_code: 'provider_timeout',
+              analysis_source: 'heuristic',
               summary: 'Strength training session.',
               status: 'pending',
             },
@@ -576,6 +706,10 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
               follow_up_question: null,
               model_provider: 'xiaomi',
               model_name: 'mimo-v2-omni',
+              fallback_used: true,
+              fallback_source: 'local_heuristic',
+              fallback_error_code: 'provider_timeout',
+              analysis_source: 'heuristic',
             },
             assistant_message: { id: 'assistant-photo' },
           };
@@ -617,6 +751,10 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
               insights: [{ label: 'weight_kg', value: '70 kg', source: 'file_text' }],
               recommendations: ['Sync the weight value to the profile or check-in record before comparing trends.'],
               insight_schema_version: 1,
+              fallback_used: true,
+              fallback_source: 'local_heuristic',
+              fallback_error_code: 'provider_timeout',
+              analysis_source: 'heuristic',
             },
           };
         },
@@ -659,17 +797,24 @@ async function testAppActionsCallBackendMutationsAndUpdateState() {
     userNote: 'lunch',
   });
   assert(snapshots.some((snapshot) => snapshot.activeFoodAnalysis?.modelProvider === 'xiaomi' && snapshot.activeFoodAnalysis.modelName === 'mimo-v2-omni'), 'food card must preserve AI provider metadata');
+  assert(snapshots.some((snapshot) =>
+    (snapshot.activeFoodAnalysis?.fallbackUsed === true && snapshot.activeFoodAnalysis.fallbackErrorCode === 'provider_timeout')
+    || snapshot.chatMessages.some((message) => message.foodAnalysis?.fallbackUsed === true && message.foodAnalysis.fallbackErrorCode === 'provider_timeout'),
+  ), 'food card must preserve AI fallback metadata');
   await actions.confirmFoodLog('food-live');
   await actions.editFoodLogPortion('food-live', '米饭吃了一半');
   await actions.discardFoodLog('food-live');
   await actions.createCheckin({ weightKg: 71.2, moodLevel: 6 });
+  const snapshotsBeforeWorkout = snapshots.length;
   await actions.createWorkoutLog('力量训练 45 分钟');
+  assert(snapshots.slice(snapshotsBeforeWorkout).some((snapshot) => snapshot.records.some((record) => record.kind === 'workout' && record.fallbackUsed === true && record.analysisSource === 'heuristic')), 'workout record must preserve fallback metadata');
   await actions.attachFile({
     uri: 'file:///report.txt',
     name: 'report.txt',
     mimeType: 'text/plain',
     sizeBytes: 128,
   }, 'Summarize this report');
+  assert(snapshots.some((snapshot) => snapshot.chatMessages.some((message) => message.fileInsight?.fallbackUsed === true && message.fileInsight.fallbackErrorCode === 'provider_timeout')), 'file insight card must preserve fallback metadata');
   await actions.restoreSubscription('fitmate.pro.monthly', 'receipt');
   await actions.updateProfile({ weightKg: 70.8, goalLabel: 'Lean wedding cut' });
   await actions.deletePhotos();
@@ -942,6 +1087,32 @@ async function testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse() {
         },
       },
       food: {
+        async analyzePhotos(input: { photos: Array<{ imageUri: string; filename: string; mimeType: string }> }) {
+          return {
+            food_analyses: [{
+              food_log_id: null,
+              meal_name: '三文鱼茶泡饭',
+              detected_items: ['salmon', 'rice', 'tea broth'],
+              calories_range_kcal: [450, 620],
+              protein_g_range: [25, 38],
+              carbs_g_range: [48, 65],
+              fat_g_range: [12, 22],
+              confidence: 0.78,
+              status: 'analysis_only',
+              needs_follow_up: false,
+              follow_up_question: null,
+              model_provider: 'xiaomi',
+              model_name: 'mimo-v2-omni',
+            }],
+            assistant_messages: [{ id: 'assistant-same-group', content_text: '同一道食物角度图。' }],
+            groups: [{
+              group_id: 'salmon-angle-set',
+              analysis_indexes: [0],
+              source_photo_indexes: input.photos.map((_, index) => index),
+              meal_name: '三文鱼茶泡饭',
+            }],
+          };
+        },
         async analyzePhoto() {
           photoCalls += 1;
           const title = photoCalls === 1 ? 'Pasta plate' : 'Second meal';
@@ -961,6 +1132,10 @@ async function testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse() {
               fat_loss_advice: 'AI bubble reply: this looks like a moderate carb meal, keep the next meal protein-first.',
               model_provider: 'xiaomi',
               model_name: 'mimo-v2-omni',
+              fallback_used: true,
+              fallback_source: 'local_heuristic',
+              fallback_error_code: 'provider_timeout',
+              analysis_source: 'heuristic',
             },
             assistant_message: { id: 'assistant-photo', content_text: 'AI bubble reply: this looks like a moderate carb meal, keep the next meal protein-first.' },
           };
@@ -1060,6 +1235,7 @@ async function testFoodFollowUpAnswerUpdatesExistingCard() {
         },
       },
       food: {
+        analyzePhotos: undefined,
         async analyzePhoto(input: PhotoUploadInput) {
           calls.push(`analyzePhoto:${input.filename}:${input.userNote?.includes('酱料吃完了') ? 'has-answer' : 'missing-answer'}`);
           return {
@@ -1113,6 +1289,100 @@ async function testFoodFollowUpAnswerUpdatesExistingCard() {
   assert(state.activeFoodAnalysis?.detail === 'one serving pasta, tomato sauce', 'follow-up answer must use AI-generated details instead of copying the raw user answer');
   assert(state.records.some((record) => record.id === 'analysis-needs-context'), 'follow-up answer must create a confirmable record draft');
   assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('重新分析')), 'follow-up answer must give visible feedback');
+}
+
+async function testFoodFollowUpAnswerUsesGroupedSourceImagesForReanalysis() {
+  let state: AppDataState = {
+    ...initialAppState,
+    activeFoodAnalysis: {
+      id: 'grouped-burger-card',
+      title: '牛肉汉堡',
+      status: 'analysis_only',
+      confidence: 0.62,
+      needsFollowUp: true,
+      followUpQuestion: '这个汉堡是单人份吗？',
+      calories: '650-850',
+      protein: '30-45g',
+      carbs: '45-60g',
+      fat: '20-35g',
+      detail: 'burger, bun, cheese',
+      advice: '需要补充份量后再确认。',
+      sourceImageUri: 'file:///burger-front.jpg',
+      sourceFilename: 'burger-front.jpg',
+      sourceMimeType: 'image/jpeg',
+      sourceImages: [
+        { uri: 'file:///burger-front.jpg', filename: 'burger-front.jpg', mimeType: 'image/jpeg', index: 0 },
+        { uri: 'file:///burger-side.jpg', filename: 'burger-side.jpg', mimeType: 'image/jpeg', index: 1 },
+      ],
+      sourcePhotoIndexes: [0, 1],
+      groupId: 'burger-angle-set',
+      groupMealName: '牛肉汉堡',
+    },
+    records: [],
+    chatMessages: [],
+  };
+  const calls: string[] = [];
+  const actions = createAppActions({
+    api: {
+      chat: {
+        async createThread() {
+          return { id: '11111111-1111-4111-8111-111111111111', title: 'FitMate chat', kind: 'general' };
+        },
+        async sendTextMessage() {
+          calls.push('sendText');
+          return {};
+        },
+      },
+      food: {
+        async analyzePhotos(input: { photos: Array<{ imageUri: string; filename: string; mimeType: string }>; userNote?: string | null }) {
+          calls.push(`analyzePhotos:${input.photos.map((photo) => photo.filename).join('|')}`);
+          return {
+            food_analyses: [{
+              food_log_id: null,
+              meal_name: 'AI corrected burger',
+              detected_items: ['single burger', 'cheese'],
+              calories_range_kcal: [700, 820],
+              protein_g_range: [35, 45],
+              carbs_g_range: [45, 58],
+              fat_g_range: [28, 38],
+              confidence: 0.8,
+              status: 'analysis_only',
+              needs_follow_up: false,
+              follow_up_question: null,
+              model_provider: 'xiaomi',
+              model_name: 'mimo-v2-omni',
+            }],
+          };
+        },
+        async analyzePhoto() {
+          calls.push('analyzePhoto');
+          return {} as never;
+        },
+        async createLog() { return {}; },
+        async confirmLog() { return {}; },
+        async patchLog() { return {}; },
+        async discardLog() { return {}; },
+        async deleteLog() { return {}; },
+      },
+      profile: { async patchProfile() { return {}; } },
+      records: { async createCheckin() { return {}; }, async patchCheckin() { return {}; }, async deleteCheckin() { return {}; } },
+      workouts: { async analyze() { return {}; }, async createLog() { return {}; }, async confirmLog() { return {}; }, async patchLog() { return {}; } },
+      files: { async upload() { return {} as never; } },
+      subscription: { async restore() { return { entitlements: initialAppState.entitlements }; } },
+      privacy: { async deletePhotos() { return {}; }, async deleteAccount() { return {}; } },
+    },
+    getState: () => state,
+    setState: (next: AppDataState) => {
+      state = next;
+    },
+  });
+
+  await actions.sendText('food-today', '单人份，酱料全吃了');
+
+  assert(calls.includes('analyzePhotos:burger-front.jpg|burger-side.jpg'), 'grouped card follow-up must reanalyze all source images together');
+  assert(!calls.includes('analyzePhoto'), 'grouped card should not collapse back to one source image');
+  assert(state.activeFoodAnalysis?.id === 'grouped-burger-card', 'grouped follow-up must keep the same card id');
+  assert(state.activeFoodAnalysis?.sourceImages?.length === 2, 'grouped follow-up must keep all source images after reanalysis');
 }
 
 async function testFoodFollowUpAnswerCanUpdateMultiplePendingCards() {
@@ -1317,6 +1587,10 @@ async function testBackendFileUploadCreatesStructuredInsightMessage() {
               ],
               recommendations: ['Sync the weight value to the profile or check-in record before comparing trends.'],
               insight_schema_version: 1,
+              fallback_used: true,
+              fallback_source: 'local_heuristic',
+              fallback_error_code: 'provider_timeout',
+              analysis_source: 'heuristic',
             },
           };
         },
@@ -1517,10 +1791,15 @@ async function testSendTextPreservesUserBubbleDuringBackendThreadMigration() {
     activeThreadId: 'food-today',
     threads: [{ id: 'food-today', title: '新对话', subtitle: 'general', messages: [] }],
     chatMessages: [],
+    records: [
+      { id: 'food-confirmed', kind: 'food', title: '三文鱼茶泡饭', status: '已确认写入', text: '525 kcal', done: true, caloriesKcal: 525 },
+      { id: 'food-pending', kind: 'food', title: '待确认汉堡', status: '待确认', text: '760 kcal', done: false, caloriesKcal: 760 },
+    ],
   };
   let state = staleState;
   let returnStaleState = false;
   const calls: string[] = [];
+  const payloads: Array<{ threadId: string; text: string; context?: any }> = [];
   const actions = createAppActions({
     api: {
       chat: {
@@ -1528,8 +1807,9 @@ async function testSendTextPreservesUserBubbleDuringBackendThreadMigration() {
           returnStaleState = true;
           return { id: '11111111-1111-4111-8111-111111111111', title: 'FitMate chat', kind: 'general' };
         },
-        async sendTextMessage(payload: { threadId: string; text: string }) {
+        async sendTextMessage(payload: { threadId: string; text: string; context?: any }) {
           calls.push(payload.text);
+          payloads.push(payload);
           return {
             assistant_message: { id: 'assistant-migrated', content_text: 'backend reply' },
           };
@@ -1546,6 +1826,10 @@ async function testSendTextPreservesUserBubbleDuringBackendThreadMigration() {
   await actions.sendText('food-today', 'hidden full prompt', '下一餐');
 
   assert(calls.includes('hidden full prompt'), 'quick prompt must send the full hidden prompt to the backend');
+  assert(payloads[0]?.context?.records, 'quick prompt must send structured context to the backend');
+  assert(payloads[0]?.context?.records?.food?.[0]?.title === '三文鱼茶泡饭', 'confirmed food should be sent as known eaten context');
+  assert(payloads[0]?.context?.records?.pendingFood?.[0]?.title === '待确认汉堡', 'pending food should be separated from known eaten context');
+  assert(payloads[0]?.context?.dailySummary?.dailyTargetCalories > 0, 'quick prompt context should include calculated energy target');
   assert(state.chatMessages.some((message) => message.role === 'user' && message.text === '下一餐'), 'quick prompt must show a user-facing label bubble');
   assert(!state.chatMessages.some((message) => message.role === 'user' && message.text === 'hidden full prompt'), 'quick prompt bubble must not expose the hidden backend prompt');
   assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text === 'backend reply'), 'backend reply must still append after thread migration');
@@ -1590,6 +1874,10 @@ async function testAnalyzeFoodPhotosCreatesOneMultiImageUserBubble() {
               follow_up_question: null,
               model_provider: 'xiaomi',
               model_name: 'mimo-v2-omni',
+              fallback_used: true,
+              fallback_source: 'local_heuristic',
+              fallback_error_code: 'provider_timeout',
+              analysis_source: 'heuristic',
             },
             assistant_message: {
               id: `assistant-${input.filename}`,
@@ -1664,6 +1952,10 @@ async function testAnalyzeFoodPhotosGroupsMatchingFoodCards() {
               follow_up_question: null,
               model_provider: 'xiaomi',
               model_name: 'mimo-v2-omni',
+              fallback_used: true,
+              fallback_source: 'local_heuristic',
+              fallback_error_code: 'provider_timeout',
+              analysis_source: 'heuristic',
             },
             assistant_message: { id: `assistant-same-${Date.now()}`, content_text: '同一道食物角度图。' },
           };
@@ -1689,6 +1981,9 @@ async function testAnalyzeFoodPhotosGroupsMatchingFoodCards() {
   assert(state.chatMessages.filter((message) => message.role === 'user').length === 1, 'same-food multi-photo upload must still keep one user bubble');
   const foodCards = state.chatMessages.filter((message) => message.foodAnalysis);
   assert(foodCards.length === 1, 'same-food photo analyses should be grouped into one food card when AI returns the same meal title');
+  assert(foodCards[0]?.foodAnalysis?.groupId === 'salmon-angle-set', 'batch group id must be preserved on the food card');
+  assert(foodCards[0]?.foodAnalysis?.sourceImages?.length === 2, 'grouped batch card must keep all source images');
+  assert(foodCards[0]?.foodAnalysis?.sourcePhotoIndexes?.join(',') === '0,1', 'grouped batch card must preserve source photo indexes');
   assert(state.chatMessages.some((message) => message.role === 'assistant' && message.text.includes('合并成一张')), 'same-food grouping should be visible to the user');
 }
 
@@ -1779,6 +2074,33 @@ function testOvereatenPromptUsesFoodContextWhenAvailable() {
   assert(loggedPrompt.includes('判断我是不是明显吃多了'), 'overeaten prompt should ask for an evidence-based overeating judgment');
 }
 
+function testNextMealPromptUsesDashboardAndFoodContext() {
+  const emptyState: AppDataState = { ...initialAppState, records: [], chatMessages: [], activeFoodAnalysis: null };
+  const firstMealPrompt = recoveryPromptText('next_meal', emptyState);
+  assert(firstMealPrompt.includes('今天还没有食物记录'), 'next-meal prompt should be honest when today has no food card');
+  assert(firstMealPrompt.includes('第一顿'), 'next-meal prompt should recommend a first-meal recipe when no food exists');
+
+  const loggedState: AppDataState = {
+    ...initialAppState,
+    records: [
+      { id: 'food-1', kind: 'food', title: '三文鱼茶泡饭', status: '已记录', text: '525 kcal', done: true, caloriesKcal: 525, proteinG: 35, carbsG: 48, fatG: 20 },
+    ],
+  };
+  const nextMealPrompt = recoveryPromptText('next_meal', loggedState);
+  assert(nextMealPrompt.includes('三文鱼茶泡饭'), 'next-meal prompt should include the previous food card');
+  assert(nextMealPrompt.includes('搭配上一餐'), 'next-meal prompt should ask for a recipe matched to the previous meal');
+
+  const almostFullState: AppDataState = {
+    ...initialAppState,
+    records: [
+      { id: 'food-1', kind: 'food', title: '大份汉堡', status: '已记录', text: '1900 kcal', done: true, caloriesKcal: 1900, proteinG: 65, carbsG: 180, fatG: 75 },
+    ],
+  };
+  const tomorrowPrompt = recoveryPromptText('next_meal', almostFullState);
+  assert(tomorrowPrompt.includes('80%'), 'next-meal prompt should detect when dashboard is mostly full');
+  assert(tomorrowPrompt.includes('明天'), 'next-meal prompt should shift toward tomorrow meal planning when today is nearly full');
+}
+
 async function run() {
   runEnergyTargetTests();
   await testSubscriptionEntitlements();
@@ -1788,8 +2110,11 @@ async function run() {
   await testApiClientAuthHeadersAndJsonBody();
   await testApiClientHandlesEmptyDeleteResponses();
   await testApiClientDoesNotMaskErrorDetailsWithAlreadyRead();
+  await testDiagnosticsSmokeClientAndPreDeviceGate();
+  await testPreDeviceSmokeGateFailsWhenChatAiIsDisabled();
   await testBackendServiceClearsInvalidToken();
   await testApiClientMapsUnsupportedHeicPhotoErrors();
+  await testApiClientMapsVisionProviderErrorsToChineseCopy();
   await testApiClientMultipartPhotoUpload();
   await testMockFallbackServicesStayAvailable();
   await testRuntimeConfigUsesBackendWhenApiBaseUrlIsProvided();
@@ -1804,6 +2129,7 @@ async function run() {
   await testFoodAnalysisUsesDetectedItemsForDetailAndFollowUpForAdvice();
   await testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse();
   await testFoodFollowUpAnswerUpdatesExistingCard();
+  await testFoodFollowUpAnswerUsesGroupedSourceImagesForReanalysis();
   await testFoodFollowUpAnswerCanUpdateMultiplePendingCards();
   await testPhotoUploadShowsUserBubbleEvenWhenAnalysisFails();
   await testBackendFileUploadCreatesStructuredInsightMessage();
@@ -1817,6 +2143,7 @@ async function run() {
   testRecoveryPromptsTargetRealFatLossPain();
   testQuickPromptsAreContextAwareAndHonest();
   testOvereatenPromptUsesFoodContextWhenAvailable();
+  testNextMealPromptUsesDashboardAndFoodContext();
 }
 
 void run();

@@ -1,4 +1,6 @@
-from app.ai.router import ChatReplyRouter, FileInsightRouter, FoodVisionRouter, TextFoodAnalysisRouter, WorkoutAnalysisRouter
+import pytest
+
+from app.ai.router import ChatReplyRouter, FileInsightRouter, FoodVisionRouter, FoodVisionUnavailableError, TextFoodAnalysisRouter, WorkoutAnalysisRouter, provider_error_code
 from app.repositories.sqlalchemy.model_calls import StoredAiModelCall
 
 
@@ -24,6 +26,7 @@ class FakeProvider:
         self.model_name = model_name
         self.responses = responses
         self.calls = 0
+        self.last_structured_context = None
 
     def analyze_food_photo(self, image_bytes: bytes, user_note: str | None = None) -> object:
         self.calls += 1
@@ -60,8 +63,14 @@ class FakeProvider:
             raise response
         return response
 
-    def generate_chat_reply(self, text: str, conversation_context: list[dict] | None = None) -> str:
+    def generate_chat_reply(
+        self,
+        text: str,
+        conversation_context: list[dict] | None = None,
+        structured_context: dict | None = None,
+    ) -> str:
         self.calls += 1
+        self.last_structured_context = structured_context
         response = self.responses.pop(0)
         if isinstance(response, Exception):
             raise response
@@ -208,7 +217,36 @@ def test_qwen_fallback_when_xiaomi_fails_twice_logs_fallback_usage() -> None:
     assert result["model_name"] == "qwen3-vl-plus"
     assert [call.provider for call in model_calls.calls] == ["xiaomi", "xiaomi", "qwen"]
     assert [call.status for call in model_calls.calls] == ["error", "error", "success"]
+    assert [call.error_code for call in model_calls.calls[:2]] == ["provider_timeout", "provider_timeout"]
     assert model_calls.calls[-1].purpose == "fallback"
+
+
+def test_food_vision_unavailable_uses_safe_error_code_without_raw_body() -> None:
+    xiaomi = FakeProvider("xiaomi", "mimo-v2-omni", [RuntimeError("provider_http_401:{secret body}"), RuntimeError("provider_http_401:{secret body}")])
+    qwen = FakeProvider("qwen", "qwen3-vl-plus", [RuntimeError("provider_http_401:{secret body}")])
+    model_calls = InMemoryModelCallRepository()
+    router = FoodVisionRouter(
+        primary_provider=xiaomi,
+        fallback_provider=qwen,
+        model_call_repository=model_calls,
+    )
+
+    with pytest.raises(FoodVisionUnavailableError) as exc:
+        router.analyze_food_photo(b"image")
+
+    assert exc.value.error_code == "provider_auth_failed"
+    assert [call.error_code for call in model_calls.calls] == ["provider_auth_failed", "provider_auth_failed", "provider_auth_failed"]
+    assert "secret body" not in str(exc.value)
+    assert all("secret body" not in str(call.error_code) for call in model_calls.calls)
+
+
+def test_provider_error_code_normalizes_common_provider_failures() -> None:
+    assert provider_error_code(RuntimeError("xiaomi_provider_not_configured")) == "provider_not_configured"
+    assert provider_error_code(RuntimeError("provider_http_403")) == "provider_auth_failed"
+    assert provider_error_code(RuntimeError("provider_http_429")) == "provider_rate_limited"
+    assert provider_error_code(TimeoutError("provider_timeout")) == "provider_timeout"
+    assert provider_error_code(RuntimeError("provider_network_error")) == "provider_network_error"
+    assert provider_error_code(ValueError("provider_returned_invalid_json")) == "provider_invalid_response"
 
 
 def test_low_confidence_xiaomi_result_uses_qwen_fallback_and_logs_both() -> None:
@@ -355,6 +393,32 @@ def test_file_insight_router_rejects_invalid_confidence() -> None:
     assert result is None
     assert [call.status for call in model_calls.calls] == ["error", "error"]
     assert model_calls.calls[0].error_code == "schema_error"
+    assert router.last_error_code == "provider_not_configured"
+
+
+def test_structured_text_routers_keep_safe_last_error_code_after_all_providers_fail() -> None:
+    raw_error = RuntimeError("provider_http_500 {secret body}")
+
+    file_router = FileInsightRouter(
+        primary_provider=FakeProvider("xiaomi", "mimo-v2-omni", [raw_error]),
+        fallback_provider=FakeProvider("qwen", "qwen3-vl-plus", [TimeoutError("timed out")]),
+    )
+    workout_router = WorkoutAnalysisRouter(
+        primary_provider=FakeProvider("xiaomi", "mimo-v2-omni", [RuntimeError("invalid_token")]),
+        fallback_provider=FakeProvider("qwen", "qwen3-vl-plus", [RuntimeError("provider_http_429")]),
+    )
+    text_food_router = TextFoodAnalysisRouter(
+        primary_provider=FakeProvider("xiaomi", "mimo-v2-omni", [{"meal_name": "bad"}]),
+        fallback_provider=FakeProvider("qwen", "qwen3-vl-plus", [RuntimeError("provider_network_error")]),
+    )
+
+    assert file_router.analyze_file_text("menu.txt", "protein 35g", "text/plain") is None
+    assert workout_router.analyze_workout_text("running 30 min") is None
+    assert text_food_router.analyze_food_text("ate chicken rice") is None
+    assert file_router.last_error_code == "provider_timeout"
+    assert workout_router.last_error_code == "provider_rate_limited"
+    assert text_food_router.last_error_code == "provider_network_error"
+    assert "secret" not in file_router.last_error_code
 
 
 def test_workout_analysis_router_uses_ai_structured_output_and_logs_usage() -> None:
@@ -462,12 +526,18 @@ def test_chat_reply_router_uses_primary_provider_and_logs_usage() -> None:
         model_call_repository=model_calls,
     )
 
-    result = router.generate_reply("我吃多了，很慌", user_id="user-1", conversation_context=[])
+    result = router.generate_reply(
+        "我吃多了，很慌",
+        user_id="user-1",
+        conversation_context=[],
+        structured_context={"records": {"food": [{"title": "三文鱼茶泡饭"}]}},
+    )
 
     assert result is not None
     assert result["content_text"].startswith("先稳住")
     assert result["model_provider"] == "xiaomi"
     assert result["model_name"] == "mimo-v2-omni"
     assert qwen.calls == 0
+    assert xiaomi.last_structured_context["records"]["food"][0]["title"] == "三文鱼茶泡饭"
     assert model_calls.calls[0].purpose == "chat_reply"
     assert model_calls.calls[0].status == "success"

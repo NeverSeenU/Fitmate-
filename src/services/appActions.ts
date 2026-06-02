@@ -1,5 +1,6 @@
 import type { AppDataState, ChatMessage, ConversationThread, Entitlements, FileInsight, FoodAnalysis, SubscriptionTier, UserProfile } from '../domain/models';
 import type { FileUploadResponse, FoodPhotoBatchAnalysisResponse, FoodPhotoAnalysisResponse, PhotoUploadInput } from './apiClient';
+import { calculateEnergyTarget, summarizeFoodIntake } from './energyTargets';
 import type { PickedFile } from './filePicker';
 
 type AppActionsOptions = {
@@ -14,7 +15,7 @@ type AppActionsApi = {
   };
   chat: {
     createThread(payload: { title: string; kind?: string }): Promise<unknown>;
-    sendTextMessage(payload: { threadId: string; text: string }): Promise<unknown>;
+    sendTextMessage(payload: { threadId: string; text: string; context?: Record<string, unknown> }): Promise<unknown>;
   };
   records: {
     createCheckin(payload: Record<string, unknown>): Promise<unknown>;
@@ -130,7 +131,7 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         title: 'FitMate chat',
         kind: 'general',
       }, [userMessage]);
-      const response = await api.chat.sendTextMessage({ threadId: backendThreadId, text }) as {
+      const response = await api.chat.sendTextMessage({ threadId: backendThreadId, text, context: buildChatContext(getState()) }) as {
         message?: { id?: string; content_text?: string };
         user_message?: { id?: string; content_text?: string };
         assistant_message?: { id?: string; content_text?: string };
@@ -367,6 +368,10 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           confidence?: number | null;
           model_provider?: string | null;
           model_name?: string | null;
+          fallback_used?: boolean;
+          fallback_source?: string | null;
+          fallback_error_code?: string | null;
+          analysis_source?: string | null;
           summary?: string | null;
           status?: string;
         };
@@ -814,7 +819,13 @@ async function applyFoodFollowUpAnswer(
   const updatedAnalyses: FoodAnalysis[] = [];
   const assistantMessages: ChatMessage[] = [];
   for (const active of pendingAnalyses) {
-    if (!active.sourceImageUri || !active.sourceFilename || !active.sourceMimeType) {
+    const activeSourceImages = active.sourceImages?.length
+      ? active.sourceImages
+      : active.sourceImageUri
+        ? [{ uri: active.sourceImageUri, filename: active.sourceFilename, mimeType: active.sourceMimeType }]
+        : [];
+    const validSourceImages = activeSourceImages.filter((image) => image.uri && image.filename && image.mimeType);
+    if (!validSourceImages.length) {
       assistantMessages.push({
         id: `food-follow-up-missing-image-${active.id}-${Date.now()}`,
         role: 'assistant',
@@ -829,17 +840,33 @@ async function applyFoodFollowUpAnswer(
       `User follow-up answer containing all corrections: ${answer.trim()}`,
       'Re-analyze the original image using only the relevant follow-up details for this card. Return updated food details and nutrition ranges in Chinese.',
     ].filter(Boolean).join('\n');
-    const response = await api.food.analyzePhoto({
-      threadId: backendThreadId,
-      imageUri: active.sourceImageUri,
-      filename: active.sourceFilename,
-      mimeType: active.sourceMimeType,
-      userNote: combinedNote,
-    });
+    const response = validSourceImages.length > 1 && api.food.analyzePhotos
+      ? {
+        food_analysis: (await api.food.analyzePhotos({
+          threadId: backendThreadId,
+          userNote: combinedNote,
+          photos: validSourceImages.map((image) => ({
+            imageUri: image.uri,
+            filename: image.filename ?? 'food-photo.jpg',
+            mimeType: image.mimeType ?? 'image/jpeg',
+          })),
+        })).food_analyses[0],
+      }
+      : await api.food.analyzePhoto({
+        threadId: backendThreadId,
+        imageUri: validSourceImages[0].uri,
+        filename: validSourceImages[0].filename ?? 'food-photo.jpg',
+        mimeType: validSourceImages[0].mimeType ?? 'image/jpeg',
+        userNote: combinedNote,
+      });
     const mapped = toFoodAnalysis(response, {
-      imageUri: active.sourceImageUri,
-      filename: active.sourceFilename,
-      mimeType: active.sourceMimeType,
+      imageUri: validSourceImages[0].uri,
+      filename: validSourceImages[0].filename,
+      mimeType: validSourceImages[0].mimeType,
+      images: validSourceImages,
+      sourcePhotoIndexes: active.sourcePhotoIndexes,
+      groupId: active.groupId,
+      groupMealName: active.groupMealName,
       userNote: combinedNote,
     });
     const nextAnalysis: FoodAnalysis = {
@@ -918,6 +945,10 @@ function appendFoodPhotoAnalysis(
     imageUri?: string;
     filename?: string;
     mimeType?: string;
+    images?: Array<{ uri: string; filename?: string; mimeType?: string; index?: number }>;
+    sourcePhotoIndexes?: number[];
+    groupId?: string;
+    groupMealName?: string;
     userNote?: string;
   },
   optimisticMessage?: ChatMessage,
@@ -971,7 +1002,10 @@ async function analyzeFoodPhotoBatch(
     })),
   });
   return response.food_analyses.map((analysis, index) => {
-    const photo = photos[index] ?? photos[0];
+    const group = groupForAnalysis(response.groups, index);
+    const sourcePhotoIndexes = sourcePhotoIndexesForGroup(group, index, photos.length);
+    const sourcePhotos = sourcePhotoIndexes.map((photoIndex) => photos[photoIndex]).filter(Boolean);
+    const photo = sourcePhotos[0] ?? photos[index] ?? photos[0];
     return {
       response: {
         food_analysis: analysis,
@@ -981,6 +1015,15 @@ async function analyzeFoodPhotoBatch(
         imageUri: photo.imageUri,
         filename: photo.filename,
         mimeType: photo.mimeType,
+        images: sourcePhotos.map((sourcePhoto, photoIndex) => ({
+          uri: sourcePhoto.imageUri,
+          filename: sourcePhoto.filename,
+          mimeType: sourcePhoto.mimeType,
+          index: sourcePhotoIndexes[photoIndex],
+        })),
+        sourcePhotoIndexes,
+        groupId: group?.group_id,
+        groupMealName: group?.meal_name,
         userNote: buildMultiPhotoUserNote(firstNote, index, photos.length),
       },
     };
@@ -1096,6 +1139,9 @@ function appendGroupedFoodPhotoAnalyses(
 }
 
 function normalizedFoodGroupKey(analysis: FoodAnalysis) {
+  if (analysis.groupId) {
+    return `group:${analysis.groupId}`;
+  }
   const title = analysis.title
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, '');
@@ -1107,14 +1153,58 @@ function normalizedFoodGroupKey(analysis: FoodAnalysis) {
 
 function mergeSameFoodAnalysis(base: FoodAnalysis, next: FoodAnalysis): FoodAnalysis {
   const detectedItems = Array.from(new Set([...(base.detectedItems ?? []), ...(next.detectedItems ?? [])]));
+  const sourceImages = mergeSourceImages(base.sourceImages, next.sourceImages);
+  const sourcePhotoIndexes = Array.from(new Set([...(base.sourcePhotoIndexes ?? []), ...(next.sourcePhotoIndexes ?? [])])).sort((a, b) => a - b);
   return {
     ...base,
     confidence: Math.max(base.confidence, next.confidence),
     needsFollowUp: Boolean(base.needsFollowUp || next.needsFollowUp),
     followUpQuestion: base.followUpQuestion ?? next.followUpQuestion,
     detectedItems,
+    sourceImages: sourceImages.length ? sourceImages : base.sourceImages,
+    sourcePhotoIndexes: sourcePhotoIndexes.length ? sourcePhotoIndexes : base.sourcePhotoIndexes,
+    sourceImageUri: sourceImages[0]?.uri ?? base.sourceImageUri,
+    sourceFilename: sourceImages[0]?.filename ?? base.sourceFilename,
+    sourceMimeType: sourceImages[0]?.mimeType ?? base.sourceMimeType,
     detail: detectedItems.length ? detectedItems.join(', ') : base.detail,
   };
+}
+
+function groupForAnalysis(
+  groups: FoodPhotoBatchAnalysisResponse['groups'] | undefined,
+  analysisIndex: number,
+) {
+  return groups?.find((group) => Array.isArray(group.analysis_indexes) && group.analysis_indexes.includes(analysisIndex));
+}
+
+function sourcePhotoIndexesForGroup(
+  group: NonNullable<FoodPhotoBatchAnalysisResponse['groups']>[number] | undefined,
+  analysisIndex: number,
+  photoCount: number,
+) {
+  const rawIndexes = Array.isArray(group?.source_photo_indexes)
+    ? group?.source_photo_indexes
+    : Array.isArray(group?.analysis_indexes)
+      ? group?.analysis_indexes
+      : [analysisIndex];
+  const indexes = (rawIndexes ?? [])
+    .filter((item): item is number => Number.isInteger(item) && item >= 0 && item < photoCount);
+  return Array.from(new Set(indexes.length ? indexes : [Math.min(analysisIndex, Math.max(photoCount - 1, 0))])).sort((a, b) => a - b);
+}
+
+function mergeSourceImages(
+  base: FoodAnalysis['sourceImages'],
+  next: FoodAnalysis['sourceImages'],
+) {
+  const seen = new Set<string>();
+  return [...(base ?? []), ...(next ?? [])].filter((image) => {
+    const key = `${image.uri}|${image.filename ?? ''}|${image.index ?? ''}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 function buildMultiPhotoUserNote(userNote: string, index: number, total: number) {
@@ -1124,6 +1214,79 @@ function buildMultiPhotoUserNote(userNote: string, index: number, total: number)
     userNote ? `用户补充：${userNote}` : null,
   ].filter(Boolean);
   return context.join('\n');
+}
+
+function buildChatContext(state: AppDataState) {
+  const intake = summarizeFoodIntake(state.records);
+  const energy = calculateEnergyTarget({ profile: state.profile, foodCaloriesKcal: intake.caloriesKcal });
+  return {
+    profile: {
+      goalLabel: state.profile.goalLabel,
+      trainingFrequency: state.profile.trainingFrequency,
+      dietPreference: state.profile.dietPreference,
+    },
+    dailySummary: {
+      ...state.dailySummary,
+      foodCaloriesKcal: intake.caloriesKcal,
+      foodProteinG: intake.proteinG,
+      foodCarbsG: intake.carbsG,
+      foodFatG: intake.fatG,
+      dailyTargetCalories: energy.dailyTargetCalories,
+      caloriesLeft: energy.caloriesLeft,
+      calorieProgress: energy.progress,
+    },
+    records: {
+      food: state.records
+        .filter((record) => record.kind === 'food' && record.status !== '已丢弃' && record.done)
+        .slice(0, 6)
+        .map((record) => ({
+          id: record.id,
+          title: record.title,
+          status: record.status,
+          done: Boolean(record.done),
+          caloriesKcal: record.caloriesKcal,
+          proteinG: record.proteinG,
+          carbsG: record.carbsG,
+          fatG: record.fatG,
+          detail: record.detail ?? record.text,
+        })),
+      pendingFood: state.records
+        .filter((record) => record.kind === 'food' && record.status !== '已丢弃' && !record.done)
+        .slice(0, 4)
+        .map((record) => ({
+          id: record.id,
+          title: record.title,
+          status: record.status,
+          done: Boolean(record.done),
+          caloriesKcal: record.caloriesKcal,
+          proteinG: record.proteinG,
+          carbsG: record.carbsG,
+          fatG: record.fatG,
+          detail: record.detail ?? record.text,
+        })),
+      workout: state.records
+        .filter((record) => record.kind === 'workout')
+        .slice(0, 4)
+        .map((record) => ({
+          id: record.id,
+          title: record.title,
+          status: record.status,
+          detail: record.detail ?? record.text,
+        })),
+    },
+    activeFoodAnalysis: state.activeFoodAnalysis
+      ? {
+        id: state.activeFoodAnalysis.id,
+        title: state.activeFoodAnalysis.title,
+        status: state.activeFoodAnalysis.status,
+        caloriesKcal: state.activeFoodAnalysis.caloriesKcal,
+        proteinG: state.activeFoodAnalysis.proteinG,
+        carbsG: state.activeFoodAnalysis.carbsG,
+        fatG: state.activeFoodAnalysis.fatG,
+        needsFollowUp: state.activeFoodAnalysis.needsFollowUp,
+      }
+      : null,
+  };
 }
 
 function toFoodAnalysisMessage(analysis: FoodAnalysis): ChatMessage {
@@ -1251,6 +1414,10 @@ function toWorkoutRecord(
     confidence?: number | null;
     model_provider?: string | null;
     model_name?: string | null;
+    fallback_used?: boolean;
+    fallback_source?: string | null;
+    fallback_error_code?: string | null;
+    analysis_source?: string | null;
     summary?: string | null;
     status?: string;
   } | undefined,
@@ -1285,6 +1452,10 @@ function toWorkoutRecord(
       fallbackText,
     ].filter(Boolean).join(' · '),
     done: analysis?.status !== 'pending',
+    fallbackUsed: analysis?.fallback_used,
+    fallbackSource: analysis?.fallback_source ?? undefined,
+    fallbackErrorCode: analysis?.fallback_error_code ?? undefined,
+    analysisSource: analysis?.analysis_source ?? undefined,
     detail: metadata ? `${metadata} · ${fallbackText}` : fallbackText,
   };
 }
@@ -1327,6 +1498,10 @@ function toFoodAnalysis(response: FoodPhotoAnalysisResponse, source?: {
   imageUri?: string;
   filename?: string;
   mimeType?: string;
+  images?: Array<{ uri: string; filename?: string; mimeType?: string; index?: number }>;
+  sourcePhotoIndexes?: number[];
+  groupId?: string;
+  groupMealName?: string;
   userNote?: string;
 }): FoodAnalysis {
   const analysis = response.food_analysis;
@@ -1343,12 +1518,24 @@ function toFoodAnalysis(response: FoodPhotoAnalysisResponse, source?: {
     confidence: analysis.confidence,
     modelProvider: analysis.model_provider,
     modelName: analysis.model_name,
+    fallbackUsed: analysis.fallback_used,
+    fallbackSource: analysis.fallback_source ?? undefined,
+    fallbackErrorCode: analysis.fallback_error_code ?? undefined,
+    analysisSource: analysis.analysis_source ?? undefined,
     needsFollowUp: analysis.needs_follow_up,
     followUpQuestion,
     detectedItems,
     sourceImageUri: source?.imageUri,
     sourceFilename: source?.filename,
     sourceMimeType: source?.mimeType,
+    sourceImages: source?.images?.length
+      ? source.images
+      : source?.imageUri
+        ? [{ uri: source.imageUri, filename: source.filename, mimeType: source.mimeType }]
+        : undefined,
+    sourcePhotoIndexes: source?.sourcePhotoIndexes ?? analysis.source_photo_indexes ?? analysis.source_group?.source_photo_indexes ?? undefined,
+    groupId: source?.groupId ?? analysis.source_group?.group_id,
+    groupMealName: source?.groupMealName ?? analysis.source_group?.meal_name,
     sourceUserNote: source?.userNote,
     calories: rangeLabel(analysis.calories_range_kcal),
     protein: `${rangeLabel(analysis.protein_g_range)}g`,
@@ -1381,6 +1568,10 @@ function toFileInsight(response: FileUploadResponse): FileInsight | undefined {
     confidence: upload.confidence,
     modelProvider: upload.model_provider,
     modelName: upload.model_name,
+    fallbackUsed: upload.fallback_used,
+    fallbackSource: upload.fallback_source ?? undefined,
+    fallbackErrorCode: upload.fallback_error_code ?? undefined,
+    analysisSource: upload.analysis_source ?? undefined,
     syncStatus: hasSyncableFileInsight(upload.document_type, upload.insights)
       ? 'available'
       : 'unavailable',

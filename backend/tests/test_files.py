@@ -3,9 +3,26 @@ import io
 import zipfile
 
 from app.main import app
+from app.services.chat_service import ChatService, InMemoryChatStore
+from app.services.file_service import FileService, InMemoryFileUploadStore
+from app.storage.local import LocalObjectStorage
 
 
 client = TestClient(app)
+
+
+class FailingFileInsightRouter:
+    last_error_code = "provider_timeout"
+
+    def analyze_file_text(
+        self,
+        filename: str,
+        content_text: str,
+        content_type: str,
+        user_prompt: str | None = None,
+        user_id: str | None = None,
+    ) -> None:
+        return None
 
 
 def auth_headers(email: str) -> dict[str, str]:
@@ -126,6 +143,34 @@ def test_file_upload_returns_structured_insights_for_menu_and_workout_plan() -> 
     assert workout_upload["document_type"] == "workout_plan"
     assert any(item["label"] == "training_frequency" and item["value"] == "4 days/week" for item in workout_upload["insights"])
     assert workout_upload["recommendations"]
+
+
+def test_file_ai_failure_returns_heuristic_insights_with_safe_fallback_metadata() -> None:
+    chat = ChatService(store=InMemoryChatStore())
+    thread = chat.create_thread("user-1", "Files", "files")
+    service = FileService(
+        store=InMemoryFileUploadStore(),
+        chat_service_dependency=chat,
+        storage=LocalObjectStorage(),
+        file_insight_router=FailingFileInsightRouter(),
+    )
+
+    body = service.upload_file(
+        user_id="user-1",
+        thread_id=thread["id"],
+        content=b"body report weight 70kg protein 120g",
+        filename="report.txt",
+        content_type="text/plain",
+    )
+
+    assert body is not None
+    upload = body["file_upload"]
+    assert upload["document_type"] == "body_report"
+    assert upload["fallback_used"] is True
+    assert upload["fallback_source"] == "local_heuristic"
+    assert upload["fallback_error_code"] == "provider_timeout"
+    assert upload["analysis_source"] == "heuristic"
+    assert body["assistant_message"]["structured_json"]["file_upload"]["fallback_used"] is True
 
 
 def test_file_upload_rejects_unsupported_type_and_large_file() -> None:

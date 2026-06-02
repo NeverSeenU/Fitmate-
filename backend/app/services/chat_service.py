@@ -118,12 +118,13 @@ class ChatService:
         if thread is None:
             return None
         safety_candidate = self._safety_candidate(text)
+        recovery_candidate = self._recovery_candidate(text)
         if not safety_candidate and not self.allow_contract_mocks and self.text_food_analysis_router is None:
             raise TextChatUnavailableError("text_chat_provider_not_configured")
         self.usage_service.ensure_allowed(user_id, "chat")
-        ai_reply = None if safety_candidate else self._ai_chat_reply(user_id=user_id, thread_id=thread_id, text=text)
-        soul_reply = None if safety_candidate or ai_reply else self._recovery_soul_response(text)
-        food_analysis = None if safety_candidate else self._text_food_analysis(user_id, text)
+        ai_reply = None if safety_candidate else self._ai_chat_reply(user_id=user_id, thread_id=thread_id, text=text, context=context)
+        soul_reply = None if safety_candidate or ai_reply else self._recovery_soul_response(text, context)
+        food_analysis = None if safety_candidate or recovery_candidate else self._text_food_analysis(user_id, text)
         if not self.allow_contract_mocks and food_analysis is None and soul_reply is None and not safety_candidate:
             raise TextChatUnavailableError("text_chat_provider_not_configured")
         user_message = self.store.add_message(
@@ -142,6 +143,15 @@ class ChatService:
             if safety_candidate
             else None
         )
+        chat_reply_source = "ai" if ai_reply else "fallback" if soul_reply else "mock"
+        assistant_text = (
+            self._safety_redirect_response(safety_result)
+            if safety_result
+            else
+            "我先把这顿生成一张可编辑食物卡片。你确认热量和份量后，再写入今日记录。"
+            if food_analysis
+            else self._clean_chat_reply_text((ai_reply or {}).get("content_text") or soul_reply or self._mock_ai_response(text))
+        )
         assistant_message = self.store.add_message(
             StoredMessage(
                 id=str(uuid.uuid4()),
@@ -149,20 +159,15 @@ class ChatService:
                 user_id=user_id,
                 role="assistant",
                 message_type="safety" if safety_result else "food_analysis" if food_analysis else "text",
-                content_text=(
-                    self._safety_redirect_response(safety_result)
-                    if safety_result
-                    else
-                    "我先把这顿生成一张可编辑食物卡片。你确认热量和份量后，再写入今日记录。"
-                    if food_analysis
-                    else (ai_reply or {}).get("content_text") or soul_reply or self._mock_ai_response(text)
-                ),
+                content_text=assistant_text,
                 structured_json=(
                     {"safety": safety_result}
                     if safety_result
-                    else {"food_analysis": food_analysis} if food_analysis else None
+                    else {"food_analysis": food_analysis}
+                    if food_analysis
+                    else {"chat_reply": self._chat_reply_metadata(context, chat_reply_source, ai_reply)}
                 ),
-                model_provider=(ai_reply or {}).get("model_provider") or "mock",
+                model_provider=(ai_reply or {}).get("model_provider") or ("fitmate" if soul_reply else "mock"),
                 model_name=(
                     "fitmate-safety-soul"
                     if safety_result
@@ -180,13 +185,14 @@ class ChatService:
         self.usage_service.increment(user_id, "chat")
         return response
 
-    def _ai_chat_reply(self, user_id: str, thread_id: str, text: str) -> dict | None:
+    def _ai_chat_reply(self, user_id: str, thread_id: str, text: str, context: dict | None = None) -> dict | None:
         if self.chat_reply_router is None:
             return None
         return self.chat_reply_router.generate_reply(
             text=text,
             user_id=user_id,
             conversation_context=self._conversation_context(thread_id),
+            structured_context=context,
         )
 
     def _conversation_context(self, thread_id: str) -> list[dict]:
@@ -197,9 +203,72 @@ class ChatService:
         ]
 
     def _safety_candidate(self, text: str) -> bool:
+        if self._contains_negated_safety_terms(text):
+            return False
         if self.safety_service is not None:
             return self.safety_service._risk(text)["risk_type"] != "none"
         return any(term in text for term in ["不吃饭", "不吃", "只喝水", "断食", "催吐", "泻药", "吐掉"])
+
+    def _contains_negated_safety_terms(self, text: str) -> bool:
+        negations = ["不要建议", "不要推荐", "不要让我", "不能建议", "别建议", "不建议"]
+        safety_terms = ["催吐", "泻药", "断食", "吐掉", "不吃饭", "补偿性"]
+        return any(negation in text for negation in negations) and any(term in text for term in safety_terms)
+
+    def _recovery_candidate(self, text: str) -> bool:
+        markers = [
+            "吃多了",
+            "吃爆",
+            "不要羞辱",
+            "今日食物记录",
+            "判断我是不是明显吃多了",
+            "推荐下一餐",
+            "安排下一餐",
+            "下一餐怎么",
+        ]
+        return any(marker in text for marker in markers)
+
+    def _chat_reply_metadata(self, context: dict | None, source: str, ai_reply: dict | None) -> dict[str, Any]:
+        food_records = self._context_food_records(context)
+        workout_records = self._context_workout_records(context)
+        return {
+            "source": source,
+            "used_structured_context": bool(context),
+            "food_context_count": len(food_records),
+            "workout_context_count": len(workout_records),
+            "pending_food_context_count": len(self._context_pending_food_records(context)),
+            "has_active_food_analysis": bool((context or {}).get("activeFoodAnalysis")),
+            "model_provider": (ai_reply or {}).get("model_provider"),
+            "model_name": (ai_reply or {}).get("model_name"),
+        }
+
+    def _context_food_records(self, context: dict | None) -> list[dict]:
+        records = ((context or {}).get("records") or {}).get("food") or []
+        return [record for record in records if isinstance(record, dict) and record.get("done", True) is not False]
+
+    def _context_pending_food_records(self, context: dict | None) -> list[dict]:
+        records = ((context or {}).get("records") or {}).get("pendingFood") or []
+        return [record for record in records if isinstance(record, dict)]
+
+    def _context_workout_records(self, context: dict | None) -> list[dict]:
+        records = ((context or {}).get("records") or {}).get("workout") or []
+        return [record for record in records if isinstance(record, dict)]
+
+    def _context_food_totals(self, food_records: list[dict]) -> dict[str, int]:
+        def value(record: dict, key: str) -> int:
+            raw = record.get(key)
+            return int(raw) if isinstance(raw, (int, float)) else 0
+
+        return {
+            "calories": sum(value(record, "caloriesKcal") for record in food_records),
+            "protein": sum(value(record, "proteinG") for record in food_records),
+            "carbs": sum(value(record, "carbsG") for record in food_records),
+            "fat": sum(value(record, "fatG") for record in food_records),
+        }
+
+    def _daily_target_from_context(self, context: dict | None) -> int | None:
+        summary = (context or {}).get("dailySummary") or {}
+        value = summary.get("dailyTargetCalories") or summary.get("targetCalories") or summary.get("calorieTarget")
+        return int(value) if isinstance(value, (int, float)) else None
 
     def _safety_result(self, user_id: str, text: str, source_message_id: str | None = None) -> dict | None:
         if self.safety_service is not None:
@@ -236,8 +305,27 @@ class ChatService:
             "明天正常吃，蛋白质够，少油少糖，多走路，别玩极端操作。"
         )
 
-    def _recovery_soul_response(self, text: str) -> str | None:
+    def _recovery_soul_response(self, text: str, context: dict | None = None) -> str | None:
         if any(term in text for term in ["吃多了", "吃爆", "补救", "不要羞辱"]):
+            food_records = self._context_food_records(context)
+            if food_records:
+                totals = self._context_food_totals(food_records)
+                titles = "、".join(str(record.get("title") or "这餐") for record in food_records[:3])
+                target = self._daily_target_from_context(context)
+                if target and totals["calories"] >= int(target * 0.8):
+                    return (
+                        f"我看到了今天已经记了{titles}，大概 {totals['calories']} kcal。今天确实接近目标了，但这不是需要惩罚自己的信号，只是提醒我们把收尾做轻一点。"
+                        "接下来别补偿，别把节奏打乱。如果还饿，选一份清淡蛋白加蔬菜；如果不饿，就喝水、休息，明天第一餐用高蛋白、少油、正常主食把状态接回来。"
+                    )
+                return (
+                    f"我看到了今天已经记了{titles}，大概 {totals['calories']} kcal。先别急着把它定义成吃崩了，单看这一组记录，更像是需要把下一餐安排稳，而不是补救。"
+                    "下一步很简单：水喝够，别追加零食追情绪；下一餐放一掌心蛋白质，主食半拳到一拳，油和酱料轻一点。你现在是身体撑，还是心里慌？"
+                )
+            if context:
+                return (
+                    "我现在还没有看到你的今日食物卡片，所以不能假装知道你今天到底吃了多少。先别急着给自己判刑，这种“我是不是吃多了”的感觉有时只是焦虑先到了。"
+                    "你只要回我一句：是吃了但还没上传，还是看到体重/份量后开始慌？我再按真实情况帮你判断下一步。"
+                )
             return (
                 "先别急着给自己判刑。这只是一餐，不是整周报废。现在最有用的不是补偿，而是把接下来的节奏稳住。"
                 "你先喝点水，今晚别用零食继续追着情绪跑；下一餐正常吃，蛋白质放前面，主食少一点但不要不吃。"
@@ -250,6 +338,25 @@ class ChatService:
                 "先把线接回来，比完美记录重要。"
             )
         if any(term in text for term in ["下一餐", "怎么吃", "饱腹"]):
+            food_records = self._context_food_records(context)
+            if food_records:
+                totals = self._context_food_totals(food_records)
+                titles = "、".join(str(record.get("title") or "这餐") for record in food_records[:3])
+                target = self._daily_target_from_context(context)
+                if target and totals["calories"] >= int(target * 0.8):
+                    return (
+                        f"今天已经有{titles}，大概 {totals['calories']} kcal，接近当天目标了。下一餐不需要再硬凑很完整的大餐，重点是轻、稳、别饿到报复性找零食。"
+                        "如果今晚还饿，就吃无糖酸奶或鸡蛋加一点蔬菜；如果已经不饿，今天到这里就很好。明天第一餐可以用鸡蛋/鱼/鸡胸加一拳主食和两拳蔬菜开局。"
+                    )
+                return (
+                    f"上一餐我看到了{titles}，大概 {totals['calories']} kcal。下一餐就把缺口补得稳一点：蛋白质放前面，主食别归零，油和酱料轻一点。"
+                    "你可以选鸡胸/鱼/鸡蛋豆腐，加半拳到一拳米饭或土豆，再配两拳蔬菜。这样不会像惩罚，也不容易晚上继续饿。"
+                )
+            if context:
+                return (
+                    "今天我还没看到食物卡片，所以不能说“根据今天记录”。如果这是第一餐，先吃一顿不痛苦的稳餐：一掌心蛋白质，一拳主食，两拳蔬菜，酱料少一点。"
+                    "你更想吃中餐、日料，还是简单便利店组合？"
+                )
             return (
                 "我现在还没有足够的今日记录，所以不能装作已经了解你今天吃了什么。先给你一个稳的框架：一掌心蛋白质，半拳到一拳主食，两拳蔬菜，酱料和油少一点。"
                 "这餐的目标不是越少越好，而是吃完 3-4 小时不崩、不乱找零食。"
@@ -262,6 +369,18 @@ class ChatService:
             )
         return None
 
+    def _clean_chat_reply_text(self, text: str) -> str:
+        cleaned = text.replace("**", "").replace("*", "")
+        cleaned_lines = []
+        for line in cleaned.splitlines():
+            stripped = line.strip()
+            while stripped.startswith("#"):
+                stripped = stripped[1:].strip()
+            if stripped.startswith(("- ", "• ")):
+                stripped = stripped[2:].strip()
+            cleaned_lines.append(stripped)
+        return "\n".join(cleaned_lines).strip()
+
     def _mock_ai_response(self, text: str) -> str:
         if "甜" in text or "饿" in text:
             return "先喝水，等 10 分钟；如果还饿，选高蛋白小份。你不是没自控力，是训练后身体需要恢复。"
@@ -273,6 +392,8 @@ class ChatService:
         if self.text_food_analysis_router is not None:
             ai_analysis = self.text_food_analysis_router.analyze_food_text(text=text, user_id=user_id)
             if ai_analysis is not None:
+                ai_analysis.setdefault("fallback_used", False)
+                ai_analysis.setdefault("analysis_source", "ai")
                 return self._food_analysis_response(ai_analysis)
         calories = self._estimate_calories(text)
         protein = self._estimate_protein(text)
@@ -287,8 +408,16 @@ class ChatService:
             "confidence": 0.55,
             "needs_follow_up": False,
             "follow_up_question": None,
-            "model_provider": "mock",
-            "model_name": "fitmate-text-food-card",
+            "model_provider": "fitmate",
+            "model_name": "fitmate-text-food-heuristic",
+            "fallback_used": self.text_food_analysis_router is not None,
+            "fallback_source": "local_heuristic",
+            "fallback_error_code": (
+                getattr(self.text_food_analysis_router, "last_error_code", None) or "provider_unavailable"
+                if self.text_food_analysis_router is not None
+                else None
+            ),
+            "analysis_source": "heuristic",
         })
 
     def _food_analysis_response(self, analysis: dict[str, Any]) -> dict[str, Any]:
@@ -305,6 +434,10 @@ class ChatService:
             "follow_up_question": analysis.get("follow_up_question"),
             "model_provider": analysis.get("model_provider"),
             "model_name": analysis.get("model_name"),
+            "fallback_used": analysis.get("fallback_used", False),
+            "fallback_source": analysis.get("fallback_source"),
+            "fallback_error_code": analysis.get("fallback_error_code"),
+            "analysis_source": analysis.get("analysis_source"),
         }
 
     def _looks_like_food_log(self, text: str) -> bool:
