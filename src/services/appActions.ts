@@ -165,20 +165,23 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
         text: input.userNote?.trim() || '',
         imageUri: input.imageUri,
       };
-      addMessages(getState, setState, [userPhotoMessage]);
+      const processingMessage = photoProcessingMessage(1);
+      addMessages(getState, setState, [userPhotoMessage, processingMessage]);
       await yieldToUi();
-      const backendInput = api
-        ? {
-          ...input,
-          threadId: await ensureBackendThread(api, getState, setState, input.threadId, {
-            title: 'Food photo',
-            kind: 'food',
-          }, [userPhotoMessage]),
-        }
-        : input;
-      const analysis = api
-        ? await api.food.analyzePhoto(backendInput)
-        : mockFoodPhotoResponse(backendInput.filename);
+      const analysis = await runWithPhotoProcessing(getState, setState, processingMessage.id, async () => {
+        const backendInput = api
+          ? {
+            ...input,
+            threadId: await ensureBackendThread(api, getState, setState, input.threadId, {
+              title: 'Food photo',
+              kind: 'food',
+            }, [userPhotoMessage, processingMessage]),
+          }
+          : input;
+        return api
+          ? api.food.analyzePhoto(backendInput)
+          : mockFoodPhotoResponse(backendInput.filename);
+      });
       const mapped = toFoodAnalysis(analysis, {
         imageUri: input.imageUri,
         filename: input.filename,
@@ -228,20 +231,23 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           text: photo.userNote?.trim() || '',
           imageUri: photo.imageUri,
         };
-        addMessages(getState, setState, [userPhotoMessage]);
+        const processingMessage = photoProcessingMessage(1);
+        addMessages(getState, setState, [userPhotoMessage, processingMessage]);
         await yieldToUi();
-        const backendInput = api
-          ? {
-            ...photo,
-            threadId: await ensureBackendThread(api, getState, setState, photo.threadId, {
-              title: 'Food photo',
-              kind: 'food',
-            }, [userPhotoMessage]),
-          }
-          : photo;
-        const analysis = api
-          ? await api.food.analyzePhoto(backendInput)
-          : mockFoodPhotoResponse(backendInput.filename);
+        const analysis = await runWithPhotoProcessing(getState, setState, processingMessage.id, async () => {
+          const backendInput = api
+            ? {
+              ...photo,
+              threadId: await ensureBackendThread(api, getState, setState, photo.threadId, {
+                title: 'Food photo',
+                kind: 'food',
+              }, [userPhotoMessage, processingMessage]),
+            }
+            : photo;
+          return api
+            ? api.food.analyzePhoto(backendInput)
+            : mockFoodPhotoResponse(backendInput.filename);
+        });
         appendFoodPhotoAnalysis(getState, setState, analysis, {
           imageUri: photo.imageUri,
           filename: photo.filename,
@@ -261,17 +267,20 @@ export function createAppActions({ api, getState, setState }: AppActionsOptions)
           mimeType: photo.mimeType,
         })),
       };
-      addMessages(getState, setState, [userPhotoMessage]);
+      const processingMessage = photoProcessingMessage(photos.length);
+      addMessages(getState, setState, [userPhotoMessage, processingMessage]);
       await yieldToUi();
-      const backendThreadId = api
-        ? await ensureBackendThread(api, getState, setState, photos[0].threadId, {
-          title: 'Food photo',
-          kind: 'food',
-        }, [userPhotoMessage])
-        : photos[0].threadId;
-      const results = api?.food.analyzePhotos
-        ? await analyzeFoodPhotoBatch(api, backendThreadId, photos, firstNote)
-        : await analyzeFoodPhotosIndividually(api, backendThreadId, photos, firstNote);
+      const results = await runWithPhotoProcessing(getState, setState, processingMessage.id, async () => {
+        const backendThreadId = api
+          ? await ensureBackendThread(api, getState, setState, photos[0].threadId, {
+            title: 'Food photo',
+            kind: 'food',
+          }, [userPhotoMessage, processingMessage])
+          : photos[0].threadId;
+        return api?.food.analyzePhotos
+          ? analyzeFoodPhotoBatch(api, backendThreadId, photos, firstNote)
+          : analyzeFoodPhotosIndividually(api, backendThreadId, photos, firstNote);
+      });
       appendGroupedFoodPhotoAnalyses(getState, setState, results.map((item, index) => {
         const mapped = toFoodAnalysis(item.response, item.source);
         return {
@@ -1012,6 +1021,71 @@ function appendMissingMessages(
     }
   });
   return next;
+}
+
+function removeMessagesById(
+  getState: () => AppDataState,
+  setState: (state: AppDataState) => void,
+  ids: string[],
+) {
+  replaceMessagesById(getState, setState, ids, []);
+}
+
+function replaceMessagesById(
+  getState: () => AppDataState,
+  setState: (state: AppDataState) => void,
+  ids: string[],
+  replacements: ChatMessage[],
+) {
+  const state = getState();
+  const removeIds = new Set(ids);
+  let inserted = false;
+  const chatMessages = state.chatMessages.flatMap((message) => {
+    if (!removeIds.has(message.id)) {
+      return [message];
+    }
+    if (inserted) {
+      return [];
+    }
+    inserted = true;
+    return replacements;
+  });
+  const nextMessages = inserted ? chatMessages : appendMissingMessages(chatMessages, replacements);
+  setState(syncCurrentThreadMessages({ ...state, chatMessages: nextMessages }, replacements));
+}
+
+async function runWithPhotoProcessing<T>(
+  getState: () => AppDataState,
+  setState: (state: AppDataState) => void,
+  processingMessageId: string,
+  task: () => Promise<T> | T,
+) {
+  try {
+    const result = await task();
+    removeMessagesById(getState, setState, [processingMessageId]);
+    return result;
+  } catch (error) {
+    replaceMessagesById(getState, setState, [processingMessageId], [photoAnalysisErrorMessage()]);
+    throw error;
+  }
+}
+
+function photoProcessingMessage(photoCount: number): ChatMessage {
+  return {
+    id: `assistant-photo-processing-${Date.now()}`,
+    role: 'assistant',
+    text: photoCount > 1
+      ? `我在看这 ${photoCount} 张照片，会先判断哪些是同一道食物，再生成卡片。`
+      : '我在看这张照片，先帮你估出一个可编辑的食物卡片。',
+  };
+}
+
+function photoAnalysisErrorMessage(): ChatMessage {
+  return {
+    id: `assistant-photo-error-${Date.now()}`,
+    role: 'assistant',
+    text: '这次图片分析没跑通。照片和你写的话还在上面，你可以重试，或者先用文字描述这餐。',
+  };
 }
 
 function appendFoodPhotoAnalysis(

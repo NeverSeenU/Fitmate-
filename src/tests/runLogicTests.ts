@@ -1171,7 +1171,9 @@ async function testPhotoAnalysisKeepsUserBubbleAfterSuccessfulCardResponse() {
   });
 
   assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///pasta.jpg' && message.text.includes('这是一人份')), 'photo analysis must immediately show the user image bubble before backend reply');
+  assert(state.chatMessages.some((message) => message.role === 'assistant' && message.id.startsWith('assistant-photo-processing-')), 'photo analysis must immediately show a temporary assistant processing bubble');
   await firstAnalysis;
+  assert(!state.chatMessages.some((message) => message.id.startsWith('assistant-photo-processing-')), 'successful photo analysis must remove the temporary processing bubble');
 
   assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///pasta.jpg' && message.text.includes('这是一人份')), 'successful photo analysis must keep the user image bubble');
   assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///pasta.jpg' && !message.text.includes('pasta.jpg') && message.imageFilename === undefined), 'user photo bubble must not expose internal image filenames');
@@ -1636,6 +1638,8 @@ async function testPhotoUploadShowsUserBubbleEvenWhenAnalysisFails() {
     failed = true;
   }
 
+  assert(!state.chatMessages.some((message) => message.id.startsWith('assistant-photo-processing-')), 'failed photo analysis must remove the temporary processing bubble');
+  assert(state.chatMessages.some((message) => message.role === 'assistant' && message.id.startsWith('assistant-photo-error-')), 'failed photo analysis must replace processing with a recoverable assistant error bubble');
   assert(failed, 'photo analysis failure must still surface to caller');
   assert(state.chatMessages.some((message) => message.role === 'user' && !message.text.includes('meal.jpg') && message.text.includes('意大利面')), 'failed photo uploads must still show the user photo bubble with typed context but no internal filename');
   assert(state.chatMessages.some((message) => message.role === 'user' && message.imageUri === 'file:///meal.jpg' && message.imageFilename === undefined), 'failed photo uploads must keep the image preview data on the user bubble without showing the filename');
@@ -1993,12 +1997,14 @@ async function testAnalyzeFoodPhotosCreatesOneMultiImageUserBubble() {
     { threadId: 'food-today', imageUri: 'file:///salad.jpg', filename: 'salad.jpg', mimeType: 'image/jpeg', userNote: '帮我分别估算' },
   ]);
 
-  assert(state.chatMessages.length === 1, 'multi-photo upload must immediately create one user bubble');
+  assert(state.chatMessages.length === 2, 'multi-photo upload must immediately create one user bubble and one processing bubble');
   assert(state.chatMessages[0].images?.length === 2, 'multi-photo user bubble must contain all selected images');
   assert(state.chatMessages[0].text === '帮我分别估算', 'multi-photo user bubble must preserve the typed user question once');
+  assert(state.chatMessages[1]?.role === 'assistant' && state.chatMessages[1]?.id.startsWith('assistant-photo-processing-'), 'multi-photo upload must show one temporary processing bubble');
   await pending;
 
   assert(analyzed.length === 2 && analyzed[1].endsWith('second'), 'multi-photo analysis must send each image to AI with its own position context');
+  assert(!state.chatMessages.some((message) => message.id.startsWith('assistant-photo-processing-')), 'multi-photo analysis must remove the temporary processing bubble after cards arrive');
   assert(state.chatMessages.filter((message) => message.role === 'user').length === 1, 'multi-photo analysis must not duplicate user bubbles');
   const foodCards = state.chatMessages.filter((message) => message.foodAnalysis);
   assert(foodCards.length === 2, 'different food photos must append separate food cards');
